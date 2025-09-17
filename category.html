@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Category</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div id="header-placeholder"></div>
+
+    <div class="left-section">
+      <button class="back-btn" aria-label="Back to categories">
+        <span class="back-icon">←</span>
+        <span class="back-text">Back</span>
+      </button>
+      <div class="section-header">
+        <div class="tabbar" role="tablist" aria-label="Category navigation">
+          <button class="tab active" role="tab" aria-selected="true" tabindex="0">
+            <span class="category-tab-label">Category</span>
+          </button>
+          <button class="tab" role="tab" aria-selected="false" tabindex="-1">
+            <span>Cabinet</span>
+          </button>
+        </div>
+        <div class="search-container">
+          <input type="text" class="search-input" placeholder="Search products...">
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div class="products-grid">
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+
+        <div class="product-card">
+          <div class="product-info">
+            <div class="product-image"></div>
+            <div class="product-name">Fish From Egypt</div>
+            <div class="product-price">$2.00</div>
+            <div class="product-status">Available</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-section">
+      <h2 class="total-header">Total</h2>
+      <div class="cart-items">
+        <div class="cart-item">
+          <div class="item-number">1</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$1.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">2</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$2.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">3</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$3.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">4</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$4.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">5</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$5.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">6</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$10.00</div>
+        </div>
+      </div>
+
+      <div class="subtotal">
+        <span class="subtotal-label">SubTotal:</span>
+        <span class="subtotal-amount">$25.00</span>
+      </div>
+
+      <button class="checkout-btn">Checkout</button>
+    </div>
+  </div>
+  <script src="include-header.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="site.js"></script>
+  <script src="vk-cabinet.js"></script>
+</body>
+</html>

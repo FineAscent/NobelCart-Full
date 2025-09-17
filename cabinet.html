@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cabinet</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="header-placeholder"></div>
+
+    <div class="left-section">
+     
+      <div class="section-header">
+        <div class="tabbar" role="tablist" aria-label="Cabinet navigation">
+          <button class="tab" role="tab" aria-selected="false" tabindex="-1">
+            <span>Category</span>
+          </button>
+          <button class="tab active" role="tab" aria-selected="true" tabindex="0">
+            <span>Cabinet</span>
+          </button>
+        </div>
+        <div class="search-container">
+          <input type="text" class="search-input" placeholder="Search products..." />
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+        </div>
+      </div>
+
+      <h1 class="section-title" style="font-size: 32px; margin-bottom: 18px; text-align: center;">Your Cabinet</h1>
+
+      <!-- Cabinet Sections A1..A10 -->
+      <div class="section-title" style="margin-bottom: 12px;">A1</div>
+      <div id="grid-A1" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A2</div>
+      <div id="grid-A2" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A3</div>
+      <div id="grid-A3" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A4</div>
+      <div id="grid-A4" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A5</div>
+      <div id="grid-A5" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A6</div>
+      <div id="grid-A6" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A7</div>
+      <div id="grid-A7" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A8</div>
+      <div id="grid-A8" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A9</div>
+      <div id="grid-A9" class="products-grid" style="margin-bottom: 28px;"></div>
+
+      <div class="section-title" style="margin-bottom: 12px;">A10</div>
+      <div id="grid-A10" class="products-grid" style="margin-bottom: 28px;"></div>
+    </div>
+
+    <div class="right-section">
+      <h2 class="total-header">Total</h2>
+      <div class="cart-items">
+        <div class="cart-item">
+          <div class="item-number">1</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$1.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">2</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$2.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">3</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$3.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">4</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$4.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">5</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$5.00</div>
+        </div>
+        <div class="cart-item">
+          <div class="item-number">6</div>
+          <div class="item-label">item</div>
+          <div class="item-price">$10.00</div>
+        </div>
+      </div>
+
+      <div class="subtotal">
+        <span class="subtotal-label">SubTotal:</span>
+        <span class="subtotal-amount">$25.00</span>
+      </div>
+
+      <button class="checkout-btn">Checkout</button>
+    </div>
+  </div>
+  <script src="include-header.js"></script>
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    // Route guard: require active session
+    (async () => {
+      try {
+        if (!window.sb) return (window.location.href = 'signin.html');
+        const { data, error } = await window.sb.auth.getSession();
+        const session = data && data.session;
+        if (error || !session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+          return (window.location.href = 'signin.html');
+        }
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        return (window.location.href = 'signin.html');
+      }
+    })();
+  </script>
+  <script src="site.js"></script>
+  <script src="vk-cabinet.js"></script>
+</body>
+</html>

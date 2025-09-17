@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Refunds</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="refunds-standalone">
+  <style>
+    /* Standalone Refunds view overrides: keep font from styles.css but own layout/colors */
+    body.refunds-standalone { background: #f7fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .rf-wrap { max-width: 980px; width: 100%; padding: 24px 16px; }
+    .rf-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; }
+    .rf-card { background:#ffffff; border:1px solid #e5e7eb; border-radius: 12px; padding:16px; }
+    .rf-card + .rf-card { margin-top: 14px; }
+    .rf-status { margin-top:8px; color:#6b7280; }
+    .rf-table { width: 100%; border-collapse: collapse; }
+    .rf-table th, .rf-table td { text-align:left; padding:8px 12px; border-bottom:1px solid #e5e7eb; }
+    .rf-actions .btn { background:#efefef; border:1px solid #e5e7eb; padding:6px 10px; border-radius: 8px; cursor:pointer; }
+    .rf-actions .btn:hover { background:#e9e9e9; }
+  </style>
+
+  <div class="rf-wrap">
+    <div class="rf-title">Refunds (Back Office)</div>
+
+    <form id="refund-search-form" class="rf-card">
+      <label for="refund-transcript" class="auth-label">Enter Receipt/Session ID</label>
+      <input id="refund-transcript" class="auth-input" placeholder="cs_test_..." />
+      <button type="submit" class="auth-button" style="max-width: 260px;">Search Receipt</button>
+      <div id="refund-status" class="rf-status"></div>
+    </form>
+
+    <div class="rf-card">
+      <div id="refund-summary" style="font-weight:700; margin-bottom:6px;">No transcript loaded</div>
+      <div id="refund-subsummary" style="color:#6b7280; margin-bottom:12px;"></div>
+      <table class="rf-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Amount</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="refund-items-body">
+          <tr><td colspan="4" style="padding:16px; color:#6b7280;">Search for a receipt to view items.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="site.js"></script>
+</body>
+</html>

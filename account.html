@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="header-placeholder"></div>
+
+    <div class="left-section">
+      <div class="section-header">
+        <div class="tabbar" role="tablist" aria-label="Account navigation">
+          <button class="tab" role="tab" aria-selected="false" tabindex="0" onclick="window.location.href='index.html'">
+            <span>Home</span>
+          </button>
+          <button class="tab active" role="tab" aria-selected="true" tabindex="-1">
+            <span>Account</span>
+          </button>
+        </div>
+        <div class="search-container" style="visibility:hidden;height:0"></div>
+      </div>
+
+      <h1 class="section-title" style="font-size: 28px; margin-bottom: 16px;">Your Account</h1>
+
+      <div class="account-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:520px">
+        <div style="margin-bottom:12px; color:#6b7280">Signed in as</div>
+        <div id="acct-email" style="font-size:18px;font-weight:600; color:#111827">—</div>
+        <div id="acct-id" style="font-size:12px;color:#6b7280; margin-top:6px; word-break:break-all">—</div>
+        <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+          <button id="signout-btn" class="auth-button" style="min-width:120px">Sign Out</button>
+          <div id="acct-error" class="auth-error" style="display:none;"></div>
+          <div id="acct-ok" style="display:none;color:#065f46;">Signed out.</div>
+        </div>
+      </div>
+
+      <h2 class="section-title" style="font-size: 22px; margin: 18px 0 10px;">Previous Purchases</h2>
+      <div id="purchases-status" style="color:#6b7280; margin-bottom:8px;">Loading...</div>
+      <div id="purchases-list" style="display:flex;flex-direction:column;gap:10px;width:100%;max-height:60vh;overflow-y:auto;padding-right:6px"></div>
+    </div>
+
+    
+  </div>
+
+  <script src="include-header.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    // Route guard and populate account info
+    (async () => {
+      try {
+        if (!window.sb) return (window.location.href = 'signin.html');
+        const { data, error } = await window.sb.auth.getSession();
+        if (error || !data?.session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+          return (window.location.href = 'signin.html');
+        }
+        const { data: u } = await window.sb.auth.getUser();
+        const email = u?.user?.email || '(unknown)';
+        const uid = u?.user?.id || '';
+        document.getElementById('acct-email').textContent = email;
+        document.getElementById('acct-id').textContent = uid;
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        return (window.location.href = 'signin.html');
+      }
+    })();
+
+    // Load previous purchases for the current user and render grouped by receipt (date/time)
+    async function loadPreviousPurchases() {
+      const status = document.getElementById('purchases-status');
+      const list = document.getElementById('purchases-list');
+      if (!status || !list) return;
+      status.textContent = 'Loading...';
+      list.innerHTML = '';
+      try {
+        if (!window.sb) throw new Error('Not signed in');
+        const { data: u } = await window.sb.auth.getUser();
+        const uid = u?.user?.id || null;
+        if (!uid) throw new Error('No user');
+        const { data: rows, error } = await window.sb
+          .from('receipts')
+          .select('session_id, created_at, items, currency, amount_total_cents')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (error) throw error;
+
+        // Collect product_ids across all receipts to resolve images in one fetch
+        const idSet = new Set();
+        for (const r of (rows || [])) {
+          const items = Array.isArray(r.items) ? r.items : [];
+          for (const it of items) {
+            const pid = it.product_id ?? null;
+            if (pid != null) idSet.add(String(pid));
+          }
+        }
+        const idList = Array.from(idSet);
+        const productMap = new Map();
+        try {
+          if (idList.length > 0) {
+            const products = await (window.fetchProductsByIds ? window.fetchProductsByIds(idList) : []);
+            for (const p of (products || [])) productMap.set(String(p.id), p);
+          }
+        } catch (_) {}
+
+        // Helpers
+        const fmtMoney = (cents, currency = 'USD') => {
+          const n = Number(cents || 0) / 100;
+          try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(n); } catch { return `$${n.toFixed(2)}`; }
+        };
+        const fmtDate = (iso) => {
+          try {
+            const d = new Date(iso);
+            return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+          } catch { return iso; }
+        };
+
+        // Render grouped by receipt
+        if (!rows || rows.length === 0) {
+          status.textContent = 'No purchases yet.';
+          return;
+        }
+        status.textContent = '';
+        for (const r of rows) {
+          const receiptBox = document.createElement('div');
+          receiptBox.className = 'purchase-receipt';
+          receiptBox.style.marginBottom = '12px';
+
+          // Header: date/time and total
+          const header = document.createElement('div');
+          header.className = 'purchase-header';
+          const when = document.createElement('div');
+          when.className = 'purchase-when';
+          when.textContent = fmtDate(r.created_at);
+          const total = document.createElement('div');
+          total.className = 'purchase-total';
+          total.textContent = fmtMoney(r.amount_total_cents, (r.currency || 'USD').toUpperCase());
+          header.appendChild(when);
+          header.appendChild(total);
+          receiptBox.appendChild(header);
+
+          const items = Array.isArray(r.items) ? r.items : [];
+          for (const it of items) {
+            const qty = Number(it.quantity ?? 1) || 1;
+            const unit = Number(it.amount_cents ?? 0) || 0;
+            const lineCents = unit * qty;
+
+            const row = document.createElement('div');
+            row.className = 'purchase-item';
+
+            const img = document.createElement('div');
+            img.className = 'purchase-img';
+            try {
+              const pid = it.product_id ?? null;
+              if (pid != null && productMap.has(String(pid))) {
+                const p = productMap.get(String(pid));
+                let url = null;
+                if (p.image_url) {
+                  if (/^https?:\/\//i.test(p.image_url)) url = p.image_url;
+                }
+                if (!url) {
+                  const key = Array.isArray(p.imageKeys) && p.imageKeys.length ? p.imageKeys[0] : (p.image_url || null);
+                  if (key && window.getImageUrlForKey) {
+                    try { url = await window.getImageUrlForKey(key); } catch {}
+                  }
+                }
+                if (url) {
+                  img.style.backgroundImage = `url('${url}')`;
+                }
+              }
+            } catch (_) {}
+
+            const name = document.createElement('div');
+            name.className = 'purchase-name';
+            name.textContent = (it.name || 'Item') + (qty > 1 ? ` x${qty}` : '');
+
+            const price = document.createElement('div');
+            price.className = 'purchase-price';
+            price.textContent = fmtMoney(lineCents, (r.currency || 'USD').toUpperCase());
+
+            row.appendChild(img);
+            row.appendChild(name);
+            row.appendChild(price);
+            receiptBox.appendChild(row);
+          }
+
+          list.appendChild(receiptBox);
+        }
+      } catch (e) {
+        const status = document.getElementById('purchases-status');
+        if (status) status.textContent = 'Failed to load purchases';
+        console.error('Failed to load purchases', e);
+      }
+    }
+
+    document.addEventListener('click', async (e) => {
+      if (e.target && e.target.id === 'signout-btn') {
+        e.preventDefault();
+        const err = document.getElementById('acct-error');
+        const ok = document.getElementById('acct-ok');
+        err.style.display = 'none';
+        ok.style.display = 'none';
+        try {
+          await window.sb.auth.signOut({ scope: 'local' });
+          ok.style.display = 'block';
+          setTimeout(() => { window.location.href = 'signin.html'; }, 300);
+        } catch (ex) {
+          err.textContent = ex?.message || 'Failed to sign out';
+          err.style.display = 'block';
+        }
+      }
+    });
+
+    // Kick off purchases load when page is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPreviousPurchases(); } catch (_) {}
+    });
+  </script>
+  <script src="site.js"></script>
+</body>
+</html>

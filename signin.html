@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="signin">
+  <div class="container">
+    <div id="header-placeholder"></div>
+
+    <!-- Fullscreen centered auth layout (no left/right sections) -->
+    <div class="auth-wrapper" role="main">
+      <div class="auth-card" aria-labelledby="signin-title">
+        <h1 id="signin-title" class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to continue</p>
+
+        <form id="signin-form" class="auth-form" novalidate>
+          <div class="auth-field">
+            <label class="auth-label" for="email">Email</label>
+            <input
+              id="email"
+              class="auth-input"
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              autocomplete="email"
+              required
+              inputmode="email"
+            />
+          </div>
+
+          <div class="auth-field">
+            <label class="auth-label" for="password">Password</label>
+            <div class="auth-input-wrap" style="position: relative; display: flex; align-items: center;">
+              <input
+                id="password"
+                class="auth-input"
+                type="password"
+                name="password"
+                placeholder="••••••••"
+                autocomplete="current-password"
+                required
+                style="padding-right: 72px;"
+              />
+              <button type="button" id="toggle-password" aria-label="Show password" style="position: absolute; right: 10px; height: 36px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; cursor: pointer;">Show</button>
+            </div>
+          </div>
+
+          <button type="submit" class="auth-button">Sign In</button>
+          <div id="auth-error" class="auth-error" style="display:none;"></div>
+          <div class="auth-links" aria-label="Helpful links">
+            <a href="#" id="forgot-link">Forgot password?</a>
+            <a href="#" id="create-link">Create account</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="include-header.js"></script>
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    // Clear stale/invalid local session to avoid 400 token errors
+    (async () => {
+      try {
+        if (!window.sb) return;
+        const { data, error } = await window.sb.auth.getSession();
+        if (error) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        }
+      } catch {}
+    })();
+  </script>
+  <script>
+    // Supabase email/password sign-in
+    document.getElementById('signin-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('auth-error');
+      err.style.display = 'none';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!email || !password) {
+        err.textContent = 'Please enter your email and password.';
+        err.style.display = 'block';
+        return;
+      }
+
+      try {
+        if (!window.sb) throw new Error('Auth not initialized.');
+        const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // On success, go to cabinet
+        document.body.classList.add('page-exit-right');
+        setTimeout(() => { window.location.href = 'cabinet.html'; }, 180);
+      } catch (e) {
+        err.textContent = e.message || 'Sign-in failed.';
+        err.style.display = 'block';
+      }
+    });
+
+    // Toggle password visibility
+    (function () {
+      const btn = document.getElementById('toggle-password');
+      const input = document.getElementById('password');
+      if (!btn || !input) return;
+      btn.addEventListener('click', () => {
+        const isPw = input.type === 'password';
+        input.type = isPw ? 'text' : 'password';
+        btn.textContent = isPw ? 'Hide' : 'Show';
+        btn.setAttribute('aria-label', isPw ? 'Hide password' : 'Show password');
+      });
+    })();
+  </script>
+  <script src="site.js"></script>
+</body>
+</html>
