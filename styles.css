@@ -550,7 +550,7 @@ body.index .category-grid {
 body.index .category-card {
     height: 100%; /* fill grid cell so content can be centered from edges */
     padding: 16px; /* reduced padding */
-    gap: 16px; /* reduce space between title and icons */
+    gap: 20px; /* a bit more space between title and icons */
 }
 
 /* Smaller tab bar on index */
@@ -559,8 +559,8 @@ body.index .tabbar .tab { font-size: 16px; padding: 6px 10px; }
 
 /* Slightly smaller category typography/icons on index for tighter fit */
 body.index .category-title { font-size: 20px; }
-body.index .category-icons { font-size: 44px; }
-body.index .category-icons img { width: 52px; height: 52px; }
+body.index .category-icons { font-size: 48px; }
+body.index .category-icons img { width: 58px; height: 58px; }
 
 /* Slightly smaller section header spacing on index */
 body.index .section-header { margin-bottom: 12px; }
