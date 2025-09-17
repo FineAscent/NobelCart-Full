@@ -560,7 +560,7 @@ body.index .tabbar .tab { font-size: 16px; padding: 6px 10px; }
 /* Slightly smaller category typography/icons on index for tighter fit */
 body.index .category-title { font-size: 20px; }
 body.index .category-icons { font-size: 48px; }
-body.index .category-icons img { width: 62px; height: 62px; }
+body.index .category-icons img { width: 69px; height: 69px; }
 
 /* Slightly smaller section header spacing on index */
 body.index .section-header { margin-bottom: 12px; }
