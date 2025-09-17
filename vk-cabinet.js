@@ -62,7 +62,14 @@
       const code = btn.dataset.key;
       if (!input) return;
 
-      if (code === 'DONE') { hide(); return; }
+      if (code === 'DONE') {
+        try {
+          const ev = new CustomEvent('vk:done', { bubbles: true });
+          (input || document).dispatchEvent(ev);
+        } catch(_) {}
+        hide();
+        return;
+      }
       if (code === 'SPACE') { insert(' '); return; }
       if (code === '←') { backspace(); return; }
       insert(btn.textContent.length === 1 ? btn.textContent : '');

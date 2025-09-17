@@ -13,6 +13,20 @@
       const text = await res.text().catch(() => '');
       throw new Error(`API ${opts.method} ${path} failed: ${res.status} ${text}`);
     }
+
+  // Listen for our virtual keyboard Done event to collapse search cleanly
+  try {
+    document.addEventListener('vk:done', () => {
+      const input = document.querySelector('.search-input');
+      const icon = document.querySelector('.search-icon');
+      if (!input || !icon) return;
+      const sectionHeader = icon.closest('.section-header');
+      input.classList.remove('expanded');
+      if (sectionHeader) sectionHeader.classList.remove('expanded');
+      const left = document.querySelector('.left-section');
+      if (left) left.classList.remove('searching');
+    });
+  } catch (_) {}
     const ct = res.headers.get('content-type') || '';
     return ct.includes('application/json') ? res.json() : res.text();
   }
@@ -589,6 +603,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const sectionHeader = searchIcon.closest('.section-header');
       searchInput.classList.toggle('expanded');
       sectionHeader.classList.toggle('expanded');
+      // Add/remove searching class on the left section so CSS can hide back/tabs on iPad
+      const left = document.querySelector('.left-section');
+      if (left) {
+        if (searchInput.classList.contains('expanded')) left.classList.add('searching');
+        else left.classList.remove('searching');
+      }
       if (searchInput.classList.contains('expanded')) {
         searchInput.focus();
       }
@@ -599,6 +619,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const sectionHeader = searchIcon.closest('.section-header');
       searchInput.classList.remove('expanded');
       sectionHeader.classList.remove('expanded');
+      const left = document.querySelector('.left-section');
+      if (left) left.classList.remove('searching');
     });
 
     // Keypress retained for accessibility logging; actual filtering wired below for category page

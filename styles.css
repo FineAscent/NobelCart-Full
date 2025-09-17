@@ -460,6 +460,12 @@ body.page-exit-right .container {
     color: #333;
 }
 
+/* When searching (iPad virtual keyboard mode), hide back button & tabbar and let search grow */
+.left-section.searching .back-btn { display: none; }
+.left-section.searching .tabbar { display: none; }
+.left-section.searching .section-header { justify-content: center; }
+.left-section.searching .search-input.expanded { width: 100%; max-width: 720px; }
+
 /* Category grid and cards (index.html) */
 .category-grid {
     display: grid;
@@ -558,9 +564,9 @@ body.index .tabbar { padding: 4px; gap: 4px; }
 body.index .tabbar .tab { font-size: 16px; padding: 6px 10px; }
 
 /* Slightly smaller category typography/icons on index for tighter fit */
-body.index .category-title { font-size: 30px; }
+body.index .category-title { font-size: 20px; }
 body.index .category-icons { font-size: 48px; }
-body.index .category-icons img { width: 73px; height: 73px; }
+body.index .category-icons img { width: 68px; height: 68px; }
 
 /* Slightly smaller section header spacing on index */
 body.index .section-header { margin-bottom: 12px; }
