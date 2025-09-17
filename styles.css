@@ -558,7 +558,7 @@ body.index .tabbar { padding: 4px; gap: 4px; }
 body.index .tabbar .tab { font-size: 16px; padding: 6px 10px; }
 
 /* Slightly smaller category typography/icons on index for tighter fit */
-body.index .category-title { font-size: 27px; }
+body.index .category-title { font-size: 30px; }
 body.index .category-icons { font-size: 48px; }
 body.index .category-icons img { width: 73px; height: 73px; }
 
