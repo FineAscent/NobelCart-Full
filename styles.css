@@ -532,24 +532,38 @@ body.index .left-section {
     overflow-y: hidden;
     display: flex;
     flex-direction: column;
-    padding-top: 14px; /* tighter top padding for section title */
+    padding: 12px 18px 10px 18px; /* tighter paddings to avoid vertical scroll */
 }
 
 /* Ensure index content sits slightly below the header without adding space to the header itself */
 body.index .container {
-    padding-top: 20px; /* slight offset under the header */
+    padding-top: 10px; /* smaller offset under the header */
 }
 
 body.index .category-grid {
     flex: 1;
     grid-template-rows: repeat(3, 1fr);
+    gap: 12px; /* tighter gap for compact fit */
 }
 
 /* Make cards fluid in the 3x3 grid */
 body.index .category-card {
     height: 100%; /* fill grid cell so content can be centered from edges */
-    padding: 24px; /* keep content away from edges for readability */
+    padding: 16px; /* reduced padding */
+    gap: 16px; /* reduce space between title and icons */
 }
+
+/* Smaller tab bar on index */
+body.index .tabbar { padding: 4px; gap: 4px; }
+body.index .tabbar .tab { font-size: 16px; padding: 6px 10px; }
+
+/* Slightly smaller category typography/icons on index for tighter fit */
+body.index .category-title { font-size: 20px; }
+body.index .category-icons { font-size: 44px; }
+body.index .category-icons img { width: 52px; height: 52px; }
+
+/* Slightly smaller section header spacing on index */
+body.index .section-header { margin-bottom: 12px; }
 
 /* Hint toast for single-tap guidance on index */
 .hint-toast {
