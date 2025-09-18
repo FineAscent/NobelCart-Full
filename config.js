@@ -30,6 +30,13 @@
             storageKey: 'nc_cart_auth',            // avoid sharing with other apps
           },
         });
+        try {
+          // Expose a readiness promise for pages to await before using sb
+          window.sbReady = (async () => {
+            try { await window.sb.auth.getSession(); } catch (_) {}
+            return window.sb;
+          })();
+        } catch (_) {}
       }
     }
   } catch (_) {}

@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const label = document.getElementById('header-user-label');
       if (!label) return;
+      if (window.sbReady) { try { await window.sbReady; } catch(_){} }
       if (window.sb) {
         const { data } = await window.sb.auth.getUser();
         const email = data?.user?.email;
