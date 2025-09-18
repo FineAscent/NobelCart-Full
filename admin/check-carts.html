@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • Check Carts</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    body.refunds-standalone { background: #f7fafc; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; }
+    .admin-wrap { max-width: 1100px; width: 100%; padding: 24px 16px; }
+    .admin-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; display:flex; align-items:center; gap:12px; }
+    .admin-sub { color:#6b7280; margin-bottom: 16px; }
+    .toolbar { display:flex; gap:10px; align-items:center; margin-bottom: 12px; }
+    .toolbar input { height: 38px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .grid { background:#fff; border:1px solid #e5e7eb; border-radius: 12px; overflow:hidden; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th, .table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; text-align: left; }
+    .table th { background:#f9fafb; font-size: 12px; color:#6b7280; text-transform: uppercase; letter-spacing: .04em; }
+    .status-pill { display:inline-flex; align-items:center; gap:6px; padding: 4px 8px; border-radius: 999px; font-weight:600; font-size:12px; }
+    .status-on { background: #ecfdf5; color: #065f46; border:1px solid #a7f3d0; }
+    .status-off { background: #fef2f2; color: #991b1b; border:1px solid #fecaca; }
+    .muted { color:#6b7280; }
+  </style>
+</head>
+<body class="refunds-standalone">
+  <div class="admin-wrap">
+    <div class="admin-title">
+      <span>Check Carts</span>
+      <a href="index.html" style="font-weight:600; font-size:14px; color:#2563eb; text-decoration:none">← Back to Admin</a>
+    </div>
+    <div class="admin-sub">Shows whether a user is signed in (cart active) or signed out (inactive). Updates live.</div>
+
+    <div class="toolbar">
+      <input id="search" type="text" placeholder="Filter by email..." />
+      <button id="refresh" class="auth-button" style="height:38px">Refresh</button>
+    </div>
+
+    <div class="grid">
+      <table class="table" aria-label="Active carts table">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th>User</th>
+            <th>Status</th>
+            <th>Last Seen</th>
+            <th>User ID</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="5" class="muted" style="padding:16px">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script>
+    (async () => {
+      // Require an authenticated admin session (reuse same guard pattern)
+      try {
+        if (!window.sb) return (window.location.href = '../signin.html');
+        const { data, error } = await window.sb.auth.getSession();
+        const session = data && data.session;
+        if (error || !session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+          return (window.location.href = '../signin.html');
+        }
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        return (window.location.href = '../signin.html');
+      }
+
+      const rowsEl = document.getElementById('rows');
+      const searchEl = document.getElementById('search');
+      const refreshBtn = document.getElementById('refresh');
+      let all = [];
+
+      function fmtDate(iso) {
+        if (!iso) return '—';
+        try { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso)); } catch { return iso; }
+      }
+
+      function render(list) {
+        const q = (searchEl.value || '').trim().toLowerCase();
+        const filtered = q ? list.filter(r => (r.email || '').toLowerCase().includes(q)) : list;
+        if (!filtered.length) {
+          rowsEl.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px">No matching users</td></tr>';
+          return;
+        }
+        const now = Date.now();
+        const FRESH_MS = 45 * 1000; // consider inactive if last_seen older than this
+        rowsEl.innerHTML = filtered.map((r, i) => {
+          const serverActive = !!r.active;
+          const seenMs = r.last_seen ? new Date(r.last_seen).getTime() : 0;
+          const fresh = seenMs && (now - seenMs) < FRESH_MS;
+          const effectiveActive = serverActive && fresh;
+          const pill = effectiveActive
+            ? '<span class="status-pill status-on">Active</span>'
+            : '<span class="status-pill status-off">Inactive</span>';
+          return `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${(r.email || '—').replace(/</g, '&lt;')}</td>
+              <td>${pill}</td>
+              <td>${fmtDate(r.last_seen)}</td>
+              <td class="muted" style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px;">${r.id}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      async function load() {
+        rowsEl.innerHTML = '<tr><td colspan="5" class="muted" style="padding:16px">Loading...</td></tr>';
+        try {
+          const { data, error } = await window.sb.from('profiles')
+            .select('id, email, active, last_seen')
+            .order('active', { ascending: false })
+            .order('last_seen', { ascending: false });
+          if (error) throw error;
+          all = Array.isArray(data) ? data : [];
+          render(all);
+        } catch (e) {
+          rowsEl.innerHTML = `<tr><td colspan="5" style="color:#b91c1c; padding:16px;">Failed to load profiles: ${(e && e.message) || e}</td></tr>`;
+        }
+      }
+
+      searchEl.addEventListener('input', () => render(all));
+      refreshBtn.addEventListener('click', load);
+
+      // Live updates via Realtime
+      try {
+        window.sb.channel('profiles-changes')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+            const row = payload.new || payload.old;
+            if (!row) return;
+            const idx = all.findIndex(x => x.id === row.id);
+            if (payload.eventType === 'DELETE') {
+              if (idx !== -1) all.splice(idx, 1);
+            } else {
+              const rec = { id: row.id, email: row.email, active: row.active, last_seen: row.last_seen };
+              if (idx === -1) all.unshift(rec); else all[idx] = rec;
+            }
+            render(all);
+          })
+          .subscribe();
+      } catch {}
+
+      // Ensure the current user appears immediately: mark active then load
+      try { if (window.markProfileActive) await window.markProfileActive(); } catch {}
+
+      // Also reload when auth state changes (e.g., sign in/out in another tab)
+      try {
+        window.sb.auth.onAuthStateChange(() => { try { load(); } catch (e) {} });
+      } catch {}
+
+      // Periodic lightweight refresh as a fallback if Realtime isn't enabled
+      try { setInterval(() => { try { load(); } catch (_) {} }, 10000); } catch {}
+
+      load();
+    })();
+  </script>
+</body>
+</html>

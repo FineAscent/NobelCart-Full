@@ -234,6 +234,8 @@
         err.style.display = 'none';
         ok.style.display = 'none';
         try {
+          // Mark inactive then sign out locally
+          try { if (window.markProfileInactive) await window.markProfileInactive(); } catch {}
           await window.sb.auth.signOut({ scope: 'local' });
           ok.style.display = 'block';
           setTimeout(() => { window.location.href = 'signin.html'; }, 300);

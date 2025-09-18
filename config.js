@@ -28,6 +28,84 @@
             detectSessionInUrl: false,
           },
         });
+        // Wrap signOut globally to ensure inactive flag is updated everywhere
+        try {
+          const originalSignOut = window.sb.auth.signOut.bind(window.sb.auth);
+          window.sb.auth.signOut = async function wrappedSignOut(options) {
+            try { if (window.markProfileInactive) await window.markProfileInactive(); } catch {}
+            return originalSignOut(options);
+          };
+        } catch (_) {}
+        // Helpers to mark profile active/inactive
+        window.markProfileActive = async function markProfileActive() {
+          try {
+            const { data: u } = await window.sb.auth.getUser();
+            const uid = u?.user?.id;
+            const email = u?.user?.email || null;
+            if (!uid) return;
+            try { localStorage.setItem('nc_last_uid', uid); } catch {}
+            try { if (email) localStorage.setItem('nc_last_email', email); } catch {}
+            await window.sb.from('profiles').upsert({ id: uid, email, active: true, last_seen: new Date().toISOString() });
+          } catch (_) {}
+        };
+        window.markProfileInactive = async function markProfileInactive() {
+          try {
+            let uid = null, email = null;
+            try {
+              const { data: u } = await window.sb.auth.getUser();
+              uid = u?.user?.id || null;
+              email = u?.user?.email || null;
+            } catch {}
+            if (!uid) { try { uid = localStorage.getItem('nc_last_uid') || null; } catch {} }
+            if (!email) { try { email = localStorage.getItem('nc_last_email') || null; } catch {} }
+            if (!uid) return;
+            await window.sb.from('profiles').upsert({ id: uid, email, active: false, last_seen: new Date().toISOString() });
+          } catch (_) {}
+        };
+        // Listen to auth state changes globally
+        try {
+          window.sb.auth.onAuthStateChange(async (event) => {
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              try { await window.markProfileActive(); } catch {}
+              // Start heartbeat when signed in
+              try {
+                if (window.__ncHeartbeat) clearInterval(window.__ncHeartbeat);
+                window.__ncHeartbeat = setInterval(async () => {
+                  try {
+                    const { data } = await window.sb.auth.getSession();
+                    if (data && data.session) {
+                      // Refresh last_seen and keep active true
+                      await window.markProfileActive();
+                    }
+                  } catch {}
+                }, 20000); // every 20s
+              } catch {}
+            } else if (event === 'SIGNED_OUT') {
+              try { await window.markProfileInactive(); } catch {}
+              try { if (window.__ncHeartbeat) { clearInterval(window.__ncHeartbeat); window.__ncHeartbeat = null; } } catch {}
+            }
+          });
+        } catch (_) {}
+        // If a session already exists on load, mark active
+        try {
+          window.sb.auth.getSession().then(async ({ data }) => {
+            if (data && data.session) {
+              try { await window.markProfileActive(); } catch {}
+              // Start heartbeat immediately on load if already signed in
+              try {
+                if (window.__ncHeartbeat) clearInterval(window.__ncHeartbeat);
+                window.__ncHeartbeat = setInterval(async () => {
+                  try {
+                    const { data } = await window.sb.auth.getSession();
+                    if (data && data.session) {
+                      await window.markProfileActive();
+                    }
+                  } catch {}
+                }, 20000);
+              } catch {}
+            }
+          }).catch(() => {});
+        } catch (_) {}
       }
     }
   } catch (_) {}
