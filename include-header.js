@@ -29,8 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch {}
   };
 
+  const resolveHeaderPath = () => {
+    // On GitHub Pages project sites the site is served under /<repo>/...
+    // Use relative paths so it works both at project root and in subfolders like /admin/.
+    const path = window.location.pathname || '';
+    if (/\/(admin|supabase)\//.test(path)) return '../header.html';
+    return 'header.html';
+  };
+
   const loadViaFetch = () =>
-    fetch('/header.html', { cache: 'no-store' })
+    fetch(resolveHeaderPath(), { cache: 'no-store' })
       .then((resp) => {
         if (!resp.ok) throw new Error('Failed to load header.html');
         return resp.text();
