@@ -94,8 +94,14 @@
         if (!window.sb) throw new Error('Auth not initialized.');
         const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        // Mark profile active on sign-in (idempotent)
-        try { if (window.markProfileActive) await window.markProfileActive(); } catch {}
+        // Mark profile active on sign-in (idempotent upsert)
+        try {
+          const uid = data?.user?.id;
+          const em = data?.user?.email || email;
+          if (uid) {
+            await window.sb.from('profiles').upsert({ id: uid, email: em, active: true });
+          }
+        } catch (_) {}
         // On success, go to cabinet
         document.body.classList.add('page-exit-right');
         setTimeout(() => { window.location.href = 'cabinet.html'; }, 180);
