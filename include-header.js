@@ -29,22 +29,35 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch {}
   };
 
-  const loadViaFetch = () =>
-    fetch('/header.html', { cache: 'no-store' })
-      .then((resp) => {
-        if (!resp.ok) throw new Error('Failed to load header.html');
-        return resp.text();
-      })
-      .then((html) => { 
-        placeholder.innerHTML = html; 
-        applyUserLabel(); 
-      })
-      .catch((err) => {
-        console.error('Header include error:', err);
-        // Fallback for file:// or any CORS/permissions issues
-        placeholder.innerHTML = inlineHeader;
-        applyUserLabel();
-      });
+  async function tryFetch(url) {
+    try {
+      const resp = await fetch(url, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('not ok');
+      return await resp.text();
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadHeader() {
+    // Try relative paths based on current page depth
+    const candidates = [
+      'header.html',        // pages in root
+      '../header.html',     // pages in /admin
+      './header.html'       // generic relative
+    ];
+    for (const url of candidates) {
+      const html = await tryFetch(url);
+      if (html) {
+        placeholder.innerHTML = html;
+        await applyUserLabel();
+        return;
+      }
+    }
+    // Fallback: inline
+    placeholder.innerHTML = inlineHeader;
+    await applyUserLabel();
+  }
 
   // If running from file:// protocol, fetch will typically fail due to CORS.
   // Inject inline header immediately; otherwise try fetch first.
@@ -52,7 +65,6 @@ document.addEventListener('DOMContentLoaded', () => {
     placeholder.innerHTML = inlineHeader;
     applyUserLabel();
   } else {
-    loadViaFetch();
+    loadHeader();
   }
 });
-
