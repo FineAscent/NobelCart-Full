@@ -28,11 +28,20 @@
             detectSessionInUrl: false,
           },
         });
+        // Attempt to recover from any broken local session causing 400/invalid token errors
+        (async () => {
+          try {
+            const { error } = await window.sb.auth.getSession();
+            if (error) {
+              try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+            }
+          } catch {}
+        })();
         // Wrap signOut globally to ensure inactive flag is updated everywhere
         try {
           const originalSignOut = window.sb.auth.signOut.bind(window.sb.auth);
           window.sb.auth.signOut = async function wrappedSignOut(options) {
-            try { if (window.markProfileInactive) await window.markProfileInactive(); } catch {}
+            try { if (window.markProfileInactive) window.markProfileInactive(); } catch {}
             return originalSignOut(options);
           };
         } catch (_) {}
@@ -45,7 +54,7 @@
             if (!uid) return;
             try { localStorage.setItem('nc_last_uid', uid); } catch {}
             try { if (email) localStorage.setItem('nc_last_email', email); } catch {}
-            await window.sb.from('profiles').upsert({ id: uid, email, active: true, last_seen: new Date().toISOString() });
+            window.sb.from('profiles').upsert({ id: uid, email, active: true, last_seen: new Date().toISOString() }).then(() => {}).catch(() => {});
           } catch (_) {}
         };
         window.markProfileInactive = async function markProfileInactive() {
@@ -59,7 +68,7 @@
             if (!uid) { try { uid = localStorage.getItem('nc_last_uid') || null; } catch {} }
             if (!email) { try { email = localStorage.getItem('nc_last_email') || null; } catch {} }
             if (!uid) return;
-            await window.sb.from('profiles').upsert({ id: uid, email, active: false, last_seen: new Date().toISOString() });
+            window.sb.from('profiles').upsert({ id: uid, email, active: false, last_seen: new Date().toISOString() }).then(() => {}).catch(() => {});
           } catch (_) {}
         };
         // Listen to auth state changes globally

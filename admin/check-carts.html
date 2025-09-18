@@ -30,6 +30,12 @@
     </div>
     <div class="admin-sub">Shows whether a user is signed in (cart active) or signed out (inactive). Updates live.</div>
 
+    <div id="statusbar" style="display:flex; gap:8px; align-items:center; margin: 8px 0 14px; color:#6b7280;">
+      <span id="sb-state">Checking session…</span>
+      <button id="btn-refresh" class="auth-button" style="height:30px; padding: 0 8px;">Force Refresh</button>
+      <button id="btn-signout-local" class="auth-button" style="height:30px; padding: 0 8px; background:#ef4444; border-color:#ef4444">Force Local Sign Out</button>
+    </div>
+
     <div class="toolbar">
       <input id="search" type="text" placeholder="Filter by email..." />
       <button id="refresh" class="auth-button" style="height:38px">Refresh</button>
@@ -74,6 +80,9 @@
       const rowsEl = document.getElementById('rows');
       const searchEl = document.getElementById('search');
       const refreshBtn = document.getElementById('refresh');
+      const btnRefresh2 = document.getElementById('btn-refresh');
+      const btnSignoutLocal = document.getElementById('btn-signout-local');
+      const sbState = document.getElementById('sb-state');
       let all = [];
 
       function fmtDate(iso) {
@@ -121,12 +130,20 @@
           all = Array.isArray(data) ? data : [];
           render(all);
         } catch (e) {
-          rowsEl.innerHTML = `<tr><td colspan="5" style="color:#b91c1c; padding:16px;">Failed to load profiles: ${(e && e.message) || e}</td></tr>`;
+          const msg = (e && (e.message || e.error_description)) || String(e || 'Unknown error');
+          rowsEl.innerHTML = `<tr><td colspan="5" style="color:#b91c1c; padding:16px;">Failed to load profiles: ${msg}</td></tr>`;
         }
       }
 
       searchEl.addEventListener('input', () => render(all));
       refreshBtn.addEventListener('click', load);
+      btnRefresh2.addEventListener('click', load);
+      btnSignoutLocal.addEventListener('click', async () => {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        try { sessionStorage.clear(); } catch {}
+        try { localStorage.removeItem('nc_last_uid'); localStorage.removeItem('nc_last_email'); } catch {}
+        sbState.textContent = 'Signed out locally. Please sign in again.';
+      });
 
       // Live updates via Realtime
       try {
@@ -146,8 +163,8 @@
           .subscribe();
       } catch {}
 
-      // Ensure the current user appears immediately: mark active then load
-      try { if (window.markProfileActive) await window.markProfileActive(); } catch {}
+      // Ensure the current user appears: mark active (non-blocking) then load
+      try { if (window.markProfileActive) window.markProfileActive(); } catch {}
 
       // Also reload when auth state changes (e.g., sign in/out in another tab)
       try {
@@ -157,7 +174,25 @@
       // Periodic lightweight refresh as a fallback if Realtime isn't enabled
       try { setInterval(() => { try { load(); } catch (_) {} }, 10000); } catch {}
 
-      load();
+      // Update status bar with current session state
+      try {
+        const updateSbState = async () => {
+          try {
+            const { data, error } = await window.sb.auth.getSession();
+            if (error) { sbState.textContent = 'Auth error. Try Force Local Sign Out.'; return; }
+            sbState.textContent = data && data.session ? 'Signed in' : 'Not signed in';
+          } catch { sbState.textContent = 'Auth unknown'; }
+        };
+        window.sb.auth.onAuthStateChange(updateSbState);
+        updateSbState();
+      } catch {}
+
+      // If Supabase client is missing, show a clear message, otherwise load
+      if (!window.sb) {
+        rowsEl.innerHTML = '<tr><td colspan="5" style="color:#b91c1c; padding:16px;">Supabase client not initialized. Ensure the CDN and config.js are loaded.</td></tr>';
+      } else {
+        load();
+      }
     })();
   </script>
 </body>
