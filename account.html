@@ -51,17 +51,7 @@
     // Route guard and populate account info
     (async () => {
       try {
-        // Wait briefly for Supabase client to be initialized
-        const start = Date.now();
-        while (!window.sb && Date.now() - start < 3000) {
-          await new Promise(r => setTimeout(r, 100));
-        }
-        if (!window.sb) {
-          // Show friendly message then navigate
-          document.getElementById('acct-email').textContent = 'Not connected';
-          setTimeout(() => { window.location.href = 'signin.html'; }, 300);
-          return;
-        }
+        if (!window.sb) return (window.location.href = 'signin.html');
         const { data, error } = await window.sb.auth.getSession();
         if (error || !data?.session) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
@@ -93,7 +83,6 @@
         const { data: rows, error } = await window.sb
           .from('receipts')
           .select('session_id, created_at, items, currency, amount_total_cents')
-          .eq('user_id', uid)
           .order('created_at', { ascending: false })
           .limit(10);
         if (error) throw error;
@@ -245,16 +234,6 @@
         err.style.display = 'none';
         ok.style.display = 'none';
         try {
-          // Mark profile inactive before signing out
-          try {
-            if (window.sb) {
-              const { data: u } = await window.sb.auth.getUser();
-              const uid = u?.user?.id;
-              if (uid) {
-                await window.sb.from('profiles').update({ active: false }).eq('id', uid);
-              }
-            }
-          } catch(_) {}
           await window.sb.auth.signOut({ scope: 'local' });
           ok.style.display = 'block';
           setTimeout(() => { window.location.href = 'signin.html'; }, 300);
@@ -265,15 +244,9 @@
       }
     });
 
-    // Kick off purchases load when page is ready and react to auth changes
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Wait briefly for sb
-      const start = Date.now();
-      while (!window.sb && Date.now() - start < 3000) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-      try { await loadPreviousPurchases(); } catch (_) {}
-      try { window.sb?.auth.onAuthStateChange(() => { loadPreviousPurchases(); }); } catch (_) {}
+    // Kick off purchases load when page is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      try { loadPreviousPurchases(); } catch (_) {}
     });
   </script>
   <script src="site.js"></script>
