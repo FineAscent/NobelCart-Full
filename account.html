@@ -36,12 +36,6 @@
         </div>
       </div>
 
-      <!-- Active cart status for this device/app only -->
-      <div class="account-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:520px; margin-top:12px;">
-        <div style="margin-bottom:8px; color:#6b7280">Active Cart (this device)</div>
-        <div id="active-cart-status" style="font-size:16px; color:#111827">Checking…</div>
-      </div>
-
       <h2 class="section-title" style="font-size: 22px; margin: 18px 0 10px;">Previous Purchases</h2>
       <div id="purchases-status" style="color:#6b7280; margin-bottom:8px;">Loading...</div>
       <div id="purchases-list" style="display:flex;flex-direction:column;gap:10px;width:100%;max-height:60vh;overflow-y:auto;padding-right:6px"></div>
@@ -63,35 +57,6 @@
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
           return (window.location.href = 'signin.html');
         }
-
-    // Load active cart status for this device/app only
-    async function loadActiveCartStatus() {
-      const el = document.getElementById('active-cart-status');
-      if (!el) return;
-      try {
-        if (!window.sb) throw new Error('Not signed in');
-        const { data: u } = await window.sb.auth.getUser();
-        const uid = u?.user?.id || null;
-        const email = u?.user?.email || null;
-        if (!uid) throw new Error('No user');
-        const clientId = (window.ncGetClientId ? window.ncGetClientId() : null) || 'unknown-client';
-        const { data, error } = await window.sb
-          .from('active_carts')
-          .select('subtotal_cents, status, updated_at')
-          .eq('user_id', uid)
-          .eq('client_id', clientId)
-          .maybeSingle();
-        if (error) throw error;
-        if (!data || data.status !== 'active') {
-          el.textContent = 'No active cart on this device.';
-          return;
-        }
-        el.textContent = `Cart is active — user ${email || ''}`;
-      } catch (e) {
-        const el = document.getElementById('active-cart-status');
-        if (el) el.textContent = 'Unable to determine active cart status.';
-      }
-    }
         const { data: u } = await window.sb.auth.getUser();
         const email = u?.user?.email || '(unknown)';
         const uid = u?.user?.id || '';
@@ -282,7 +247,6 @@
     // Kick off purchases load when page is ready
     document.addEventListener('DOMContentLoaded', () => {
       try { loadPreviousPurchases(); } catch (_) {}
-      try { loadActiveCartStatus(); } catch (_) {}
     });
   </script>
   <script src="site.js"></script>

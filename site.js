@@ -230,11 +230,6 @@ function showWeightModal({ name, unit, onConfirm }) {
 
   function saveCart(items) {
     try { localStorage.setItem(CART_KEY, JSON.stringify(items || [])); } catch (_) {}
-    // After saving, compute subtotal and send update (renderCart will also do this on next render)
-    try {
-      const subtotal = (items || []).reduce((acc, it) => acc + (Number(it.price)||0) * (Number(it.qty)||1), 0);
-      updateActiveCartSubtotal(Math.round(subtotal * 100));
-    } catch (_) {}
   }
 
   function formatMoney(n) {
@@ -274,8 +269,6 @@ function showWeightModal({ name, unit, onConfirm }) {
       container.appendChild(div);
     });
     if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
-    // Also update active cart tracker if signed-in
-    try { updateActiveCartSubtotal(Math.round(subtotal * 100)); } catch (_) {}
   }
 
   function removeFromCartByKey(key) {
@@ -496,87 +489,6 @@ function showWeightModal({ name, unit, onConfirm }) {
     }
   }
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Active cart tracking helpers ---
-  function getClientId() {
-    try {
-      const KEY = 'nc_cart_client';
-      let id = localStorage.getItem(KEY);
-      if (!id) {
-        id = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-          (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-        );
-        localStorage.setItem(KEY, id);
-      }
-      return id;
-    } catch (_) { return 'unknown-client'; }
-  }
-  try { window.ncGetClientId = getClientId; } catch (_) {}
-
-  async function updateActiveCartSubtotal(subtotal_cents) {
-    try {
-      if (!window.sb) return;
-      const { data: sess } = await window.sb.auth.getSession();
-      if (!sess?.session?.user) return; // only when signed in
-      const { data: u } = await window.sb.auth.getUser();
-      const email = u?.user?.email || null;
-      const user_id = u?.user?.id;
-      const client_id = getClientId();
-      await window.sb.from('active_carts').upsert({
-        user_id,
-        client_id,
-        email,
-        subtotal_cents: Number(subtotal_cents)||0,
-        status: 'active',
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,client_id' });
-    } catch (_) {}
-  }
-
-  async function markCartInactive() {
-    try {
-      if (!window.sb) return;
-      const { data: u } = await window.sb.auth.getUser();
-      const user_id = u?.user?.id;
-      if (!user_id) return;
-      const client_id = getClientId();
-      await window.sb.from('active_carts').update({ status: 'inactive', updated_at: new Date().toISOString() })
-        .eq('user_id', user_id).eq('client_id', client_id);
-    } catch (_) {}
-  }
-
-  // On load, if signed in, ensure a row exists and push current subtotal
-  (async () => {
-    try {
-      if (!window.sb) return;
-      const { data: sess } = await window.sb.auth.getSession();
-      if (sess?.session?.user) {
-        const items = loadCart();
-        const subtotal = (items || []).reduce((acc, it) => acc + (Number(it.price)||0) * (Number(it.qty)||1), 0);
-        await updateActiveCartSubtotal(Math.round(subtotal * 100));
-      }
-    } catch (_) {}
-  })();
-
-  // React to auth changes: when signed in, push current subtotal; when signed out, mark inactive
-  try {
-    if (window.sb && typeof window.sb.auth.onAuthStateChange === 'function') {
-      window.sb.auth.onAuthStateChange(async (event) => {
-        try {
-          if (event === 'SIGNED_IN') {
-            const items = loadCart();
-            const subtotal = (items || []).reduce((acc, it) => acc + (Number(it.price)||0) * (Number(it.qty)||1), 0);
-            await updateActiveCartSubtotal(Math.round(subtotal * 100));
-          } else if (event === 'SIGNED_OUT') {
-            await markCartInactive();
-          }
-        } catch (_) {}
-      });
-    }
-  } catch (_) {}
-
-  // Expose helpers for other pages (e.g., account)
-  try { window.ncUpdateActiveCartSubtotal = updateActiveCartSubtotal; } catch (_) {}
-  try { window.ncMarkCartInactive = markCartInactive; } catch (_) {}
   // simple debounce helper
   function debounce(fn, wait = 250) {
     let t = null;
