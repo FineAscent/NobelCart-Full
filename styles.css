@@ -556,17 +556,18 @@ body.index .category-grid {
 body.index .category-card {
     height: 100%; /* fill grid cell so content can be centered from edges */
     padding: 16px; /* reduced padding */
-    gap: 20px; /* a bit more space between title and icons */
+    gap: 28px; /* a bit more space between title and icons */
 }
 
 /* Smaller tab bar on index */
-body.index .tabbar { padding: 4px; gap: 4px; }
-body.index .tabbar .tab { font-size: 16px; padding: 6px 10px; }
+body.index .tabbar { padding: 6px; gap: 6px; }
+body.index .tabbar .tab { font-size: 16px; padding: 4px 8px; border-radius: 9px; }
+body.index .tabbar .tab.active { border-radius: 12px; }
 
 /* Slightly smaller category typography/icons on index for tighter fit */
 body.index .category-title { font-size: 20px; }
 body.index .category-icons { font-size: 48px; }
-body.index .category-icons img { width: 68px; height: 68px; }
+body.index .category-icons img { width: 70px; height: 70px; }
 
 /* Slightly smaller section header spacing on index */
 body.index .section-header { margin-bottom: 12px; }
@@ -943,4 +944,15 @@ body.signin .right-section { display: none; }
 .purchase-price {
   color: #111827;
   font-weight: 700;
+}
+
+/* Refund tile (Account previous purchases) */
+.refund-tile {
+  background: #ecfdf5;           /* light green */
+  border: 1px solid #a7f3d0;     /* green border */
+  color: #065f46;                /* dark green text */
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+  margin: 6px 0 8px;
 }

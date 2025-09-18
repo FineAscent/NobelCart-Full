@@ -26,6 +26,8 @@
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: false,
+            storage: window.sessionStorage,        // scope session to this tab/app
+            storageKey: 'nc_cart_auth',            // avoid sharing with other apps
           },
         });
       }

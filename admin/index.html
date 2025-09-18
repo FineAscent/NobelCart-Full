@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • Menu</title>
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body class="refunds-standalone">
+  <style>
+    /* Admin menu shares the simple centered layout from refunds */
+    body.refunds-standalone { background: #f7fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .admin-wrap { max-width: 980px; width: 100%; padding: 24px 16px; }
+    .admin-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; }
+    .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .admin-card { background:#ffffff; border:1px solid #e5e7eb; border-radius: 12px; padding:16px; text-decoration:none; color:#111827; display:block; }
+    .admin-card:hover { background:#f9fafb; }
+    .admin-card h3 { margin: 0 0 6px; font-size: 20px; }
+    .admin-card p { margin: 0; color:#6b7280; font-size:14px; }
+  </style>
+
+  <div class="admin-wrap">
+    <div class="admin-title">Admin</div>
+    <div class="admin-grid">
+      <a class="admin-card" href="refund.html">
+        <h3>Refunds</h3>
+        <p>Search receipts and issue item-level refunds.</p>
+      </a>
+      <a class="admin-card" href="monitor.html">
+        <h3>Monitor Active Carts</h3>
+        <p>View signed-in customers and their live cart subtotals.</p>
+      </a>
+    </div>
+  </div>
+
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <!-- Route guard: require active session to access admin -->
+  <script>
+    (async () => {
+      try {
+        if (!window.sb) return (window.location.href = '../signin.html');
+        const { data, error } = await window.sb.auth.getSession();
+        const session = data && data.session;
+        if (error || !session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+          return (window.location.href = '../signin.html');
+        }
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        return (window.location.href = '../signin.html');
+      }
+    })();
+  </script>
+</body>
+</html>
