@@ -702,15 +702,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cabinet data load (prefer Supabase if available)
     if (isCabinetPage) {
-      if (window.sb) loadCabinetFromSupabase();
-      else {
-        // fallback: no Supabase, clear sections
-        const sectionIds = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'];
+      const sectionIds = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'];
+      const showConnectMsg = (msg = 'Connect to view your cabinet.') => {
         for (const s of sectionIds) {
           const grid = document.getElementById(`grid-${s}`);
-          if (grid) grid.innerHTML = '<div style="color:#6b7280;">Connect to view your cabinet.</div>';
+          if (grid) grid.innerHTML = `<div style="color:#6b7280;">${msg}</div>`;
+        }
+      };
+
+      async function tryLoadCabinetWithWait(maxMs = 3000) {
+        const start = Date.now();
+        while (!window.sb && (Date.now() - start) < maxMs) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+        if (!window.sb) {
+          showConnectMsg('Supabase not initialized. Please refresh.');
+          return;
+        }
+        try {
+          await loadCabinetFromSupabase();
+        } catch (e) {
+          console.error('Cabinet load error', e);
+          showConnectMsg('Failed to load your cabinet.');
         }
       }
+
+      tryLoadCabinetWithWait();
     }
 
     // Category data load: fetch & render only selected category, wire search filter
