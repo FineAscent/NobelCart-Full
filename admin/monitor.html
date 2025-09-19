@@ -94,8 +94,8 @@
       const status = el('status');
       status.textContent = 'Loading…';
       try {
-        // Only consider sessions that have heartbeated recently (last 2 minutes)
-        const nowMinus2Min = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        // Only consider sessions that have heartbeated recently (last 1 minute)
+        const nowMinus2Min = new Date(Date.now() - 1 * 60 * 1000).toISOString();
         const { data, error } = await window.sb
           .from('active_sessions')
           .select('*')
