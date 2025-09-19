@@ -14,78 +14,6 @@
       throw new Error(`API ${opts.method} ${path} failed: ${res.status} ${text}`);
     }
 
-  // Fallback polling: check if this device has been flagged for force sign-out
-  async function checkForceSignout() {
-    try {
-      if (!window.sb || __forceSignoutActive) return;
-      const { data } = await window.sb.auth.getSession();
-      const user = data?.session?.user;
-      if (!user) return;
-      const deviceId = getDeviceId();
-      const { data: rows, error } = await window.sb
-        .from('active_sessions')
-        .select('force_sign_out')
-        .eq('user_id', user.id)
-        .eq('device_id', deviceId)
-        .limit(1);
-      if (error) return;
-      const flagged = Array.isArray(rows) && rows[0]?.force_sign_out;
-      if (flagged) {
-        // Clear flag and sign out with countdown
-        try {
-          await window.sb
-            .from('active_sessions')
-            .update({ force_sign_out: false })
-            .eq('user_id', user.id)
-            .eq('device_id', deviceId);
-        } catch (_) {}
-        try { showForcedSignoutCountdown(4); } catch (_) {}
-        setTimeout(() => {
-          try { localStorage.removeItem(CART_KEY); } catch (_) {}
-          try { sessionStorage.clear(); } catch (_) {}
-          try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) {}
-          window.location.href = 'signin.html';
-        }, 4000);
-      }
-    } catch (_) {}
-  }
-
-// --- Forced sign-out modal (admin-initiated) ---
-let __forceSignoutActive = false;
-function showForcedSignoutCountdown(seconds = 4) {
-  if (__forceSignoutActive) return;
-  __forceSignoutActive = true;
-  ensureModalRoot();
-  const root = document.querySelector('#modal-root');
-  if (!root) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.style.backdropFilter = 'blur(1px)';
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.innerHTML = `
-    <div class="modal-header">Signing you out…</div>
-    <div class="modal-body">
-      <div class="modal-product" id="fs-countdown-text">You are being signed out in ${seconds} sec</div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" disabled>OK</button>
-    </div>
-  `;
-  overlay.appendChild(modal);
-  root.appendChild(overlay);
-
-  let remaining = seconds;
-  const label = modal.querySelector('#fs-countdown-text');
-  const interval = setInterval(() => {
-    remaining -= 1;
-    if (label) label.textContent = `You are being signed out in ${remaining} sec`;
-    if (remaining <= 0) {
-      clearInterval(interval);
-    }
-  }, 1000);
-}
-
   // Listen for our virtual keyboard Done event to collapse search cleanly
   try {
     document.addEventListener('vk:done', () => {
@@ -401,16 +329,12 @@ function showWeightModal({ name, unit, onConfirm }) {
                   .eq('user_id', user.id)
                   .eq('device_id', deviceId);
               } catch (_) {}
-              // Show countdown popup then sign out after 4 seconds
-              try { showForcedSignoutCountdown(4); } catch (_) {}
-              setTimeout(() => {
-                // Admin requested sign-out: clear local state and sign out
-                try { localStorage.removeItem(CART_KEY); } catch (_) {}
-                try { sessionStorage.clear(); } catch (_) {}
-                try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) {}
-                // Redirect to sign-in
-                window.location.href = 'signin.html';
-              }, 4000);
+              // Admin requested sign-out: clear local state and sign out
+              try { localStorage.removeItem(CART_KEY); } catch (_) {}
+              try { sessionStorage.clear(); } catch (_) {}
+              try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) {}
+              // Redirect to sign-in
+              window.location.href = 'signin.html';
             }
           } catch (_) {}
         })
@@ -708,14 +632,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize force sign-out realtime watcher and send an initial heartbeat
   try { ensureForceSignoutWatcher(); } catch (_) {}
   try { upsertActiveSession(getCartSubtotal()); } catch (_) {}
-  // Also check immediately in case realtime missed earlier
-  try { checkForceSignout(); } catch (_) {}
   // Periodic heartbeat to keep last_seen fresh and subtotal up to date
   try {
     setInterval(() => {
       try { upsertActiveSession(getCartSubtotal()); } catch (_) {}
-      // Poll for force sign-out flag as a fallback
-      try { checkForceSignout(); } catch (_) {}
     }, 20000);
   } catch (_) {}
   // Ensure weight modal root exists
