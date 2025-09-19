@@ -81,7 +81,7 @@
       e.preventDefault();
       const err = document.getElementById('auth-error');
       err.style.display = 'none';
-      const email = document.getElementById('email').value.trim();
+      let email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value.trim();
 
       if (!email || !password) {
@@ -92,14 +92,37 @@
 
       try {
         if (!window.sb) throw new Error('Auth not initialized.');
-        const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        // Normalize simple admin handle to an email for login
+        if (email && !email.includes('@') && email.toLowerCase() === 'admin') {
+          email = 'admin@example.com';
+        }
+        let { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+        if (error) {
+          // If logging in as admin and user doesn't exist, try to create it on the fly
+          const isAdminHandle = (email.toLowerCase() === 'admin@example.com');
+          if (isAdminHandle && /Invalid login credentials/i.test(error.message || '')) {
+            const signup = await window.sb.auth.signUp({ email, password });
+            if (signup.error) throw signup.error;
+            data = signup.data;
+            // If email confirmation is required, session may be null
+            if (!data.session) {
+              err.textContent = 'Admin user created. Please verify the email sent to ' + email + ' to proceed.';
+              err.style.display = 'block';
+              return;
+            }
+          } else {
+            throw error;
+          }
+        }
         // Mark profile active on sign-in (idempotent upsert)
         try {
           const uid = data?.user?.id;
           const em = data?.user?.email || email;
           if (uid) {
-            await window.sb.from('profiles').upsert({ id: uid, email: em, active: true });
+            const isAdmin = (em && em.toLowerCase() === 'admin@example.com');
+            const payload = { id: uid, email: em, active: true };
+            if (isAdmin) payload.is_admin = true;
+            await window.sb.from('profiles').upsert(payload);
           }
         } catch (_) {}
         // On success, go to cabinet

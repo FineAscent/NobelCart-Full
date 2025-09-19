@@ -36,6 +36,14 @@
         </div>
       </div>
 
+      <!-- Admin tools (visible only if profiles.is_admin = true) -->
+      <div id="admin-tools" style="display:none; margin-top: 14px;">
+        <div style="font-size: 14px; color:#6b7280; margin-bottom:6px;">Admin Tools</div>
+        <div style="display:flex; gap:8px;">
+          <a href="admin/index.html" class="btn" style="height:32px; padding:6px 10px; display:inline-flex; align-items:center;">Admin</a>
+        </div>
+      </div>
+
       <h2 class="section-title" style="font-size: 22px; margin: 18px 0 10px;">Previous Purchases</h2>
       <div id="purchases-status" style="color:#6b7280; margin-bottom:8px;">Loading...</div>
       <div id="purchases-list" style="display:flex;flex-direction:column;gap:10px;width:100%;max-height:60vh;overflow-y:auto;padding-right:6px"></div>
@@ -62,6 +70,15 @@
         const uid = u?.user?.id || '';
         document.getElementById('acct-email').textContent = email;
         document.getElementById('acct-id').textContent = uid;
+
+        // Check admin and show admin tools
+        try {
+          const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
+          if (prof && prof.is_admin) {
+            const adminBox = document.getElementById('admin-tools');
+            if (adminBox) adminBox.style.display = 'block';
+          }
+        } catch (_) {}
       } catch (e) {
         try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
         return (window.location.href = 'signin.html');

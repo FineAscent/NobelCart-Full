@@ -29,6 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch {}
   };
 
+  // Admin Monitor button moved to Account page; no header injection here.
+
   const loadViaFetch = () =>
     fetch('/header.html', { cache: 'no-store' })
       .then((resp) => {
@@ -37,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .then((html) => { 
         placeholder.innerHTML = html; 
-        applyUserLabel(); 
+        applyUserLabel();
       })
       .catch((err) => {
         console.error('Header include error:', err);

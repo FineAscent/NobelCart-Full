@@ -8,8 +8,8 @@
 </head>
 <body class="refunds-standalone">
   <style>
-    /* Standalone Refunds view overrides: keep font from styles.css but own layout/colors */
-    body.refunds-standalone { background: #f7fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    /* Standalone Refunds view: centered, white background */
+    body.refunds-standalone { background: #ffffff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .rf-wrap { max-width: 980px; width: 100%; padding: 24px 16px; }
     .rf-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; }
     .rf-card { background:#ffffff; border:1px solid #e5e7eb; border-radius: 12px; padding:16px; }
@@ -22,7 +22,10 @@
   </style>
 
   <div class="rf-wrap">
-    <div class="rf-title">Refunds (Back Office)</div>
+    <div class="rf-title" style="display:flex; align-items:center; gap:10px;">
+      <span>Refunds (Back Office)</span>
+      <a href="../admin/index.html" class="btn" style="margin-left:auto; height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Back to Home</a>
+    </div>
 
     <form id="refund-search-form" class="rf-card">
       <label for="refund-transcript" class="auth-label">Enter Receipt/Session ID</label>

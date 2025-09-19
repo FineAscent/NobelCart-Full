@@ -14,6 +14,78 @@
       throw new Error(`API ${opts.method} ${path} failed: ${res.status} ${text}`);
     }
 
+  // Fallback polling: check if this device has been flagged for force sign-out
+  async function checkForceSignout() {
+    try {
+      if (!window.sb || __forceSignoutActive) return;
+      const { data } = await window.sb.auth.getSession();
+      const user = data?.session?.user;
+      if (!user) return;
+      const deviceId = getDeviceId();
+      const { data: rows, error } = await window.sb
+        .from('active_sessions')
+        .select('force_sign_out')
+        .eq('user_id', user.id)
+        .eq('device_id', deviceId)
+        .limit(1);
+      if (error) return;
+      const flagged = Array.isArray(rows) && rows[0]?.force_sign_out;
+      if (flagged) {
+        // Clear flag and sign out with countdown
+        try {
+          await window.sb
+            .from('active_sessions')
+            .update({ force_sign_out: false })
+            .eq('user_id', user.id)
+            .eq('device_id', deviceId);
+        } catch (_) {}
+        try { showForcedSignoutCountdown(4); } catch (_) {}
+        setTimeout(() => {
+          try { localStorage.removeItem(CART_KEY); } catch (_) {}
+          try { sessionStorage.clear(); } catch (_) {}
+          try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) {}
+          window.location.href = 'signin.html';
+        }, 4000);
+      }
+    } catch (_) {}
+  }
+
+// --- Forced sign-out modal (admin-initiated) ---
+let __forceSignoutActive = false;
+function showForcedSignoutCountdown(seconds = 4) {
+  if (__forceSignoutActive) return;
+  __forceSignoutActive = true;
+  ensureModalRoot();
+  const root = document.querySelector('#modal-root');
+  if (!root) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.backdropFilter = 'blur(1px)';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-header">Signing you out…</div>
+    <div class="modal-body">
+      <div class="modal-product" id="fs-countdown-text">You are being signed out in ${seconds} sec</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" disabled>OK</button>
+    </div>
+  `;
+  overlay.appendChild(modal);
+  root.appendChild(overlay);
+
+  let remaining = seconds;
+  const label = modal.querySelector('#fs-countdown-text');
+  const interval = setInterval(() => {
+    remaining -= 1;
+    if (label) label.textContent = `You are being signed out in ${remaining} sec`;
+    if (remaining <= 0) {
+      clearInterval(interval);
+    }
+  }, 1000);
+}
+
   // Listen for our virtual keyboard Done event to collapse search cleanly
   try {
     document.addEventListener('vk:done', () => {
@@ -219,6 +291,29 @@ function showWeightModal({ name, unit, onConfirm }) {
 
   // --- Cart (Total sidebar) ---
   const CART_KEY = 'nc_cart_v1';
+  // Per-device identifier for tracking sessions across tabs
+  const DEVICE_KEY = 'nc_device_id_v1';
+
+  let __deviceId = null;
+  function getDeviceId() {
+    if (__deviceId) return __deviceId;
+    try {
+      let id = localStorage.getItem(DEVICE_KEY);
+      if (!id) {
+        // generate a lightweight random id
+        const rnd = Math.random().toString(36).slice(2);
+        const t = Date.now().toString(36);
+        id = `${t}-${rnd}`;
+        localStorage.setItem(DEVICE_KEY, id);
+      }
+      __deviceId = id;
+      return id;
+    } catch (_) {
+      // fallback ephemeral id
+      __deviceId = 'ephem-' + Math.random().toString(36).slice(2);
+      return __deviceId;
+    }
+  }
 
   function loadCart() {
     try {
@@ -230,6 +325,99 @@ function showWeightModal({ name, unit, onConfirm }) {
 
   function saveCart(items) {
     try { localStorage.setItem(CART_KEY, JSON.stringify(items || [])); } catch (_) {}
+  }
+
+  function getCartSubtotal() {
+    const items = loadCart();
+    let subtotal = 0;
+    for (const it of items) {
+      const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
+      subtotal += line;
+    }
+    return Number(subtotal || 0);
+  }
+
+  // Heartbeat: upsert session row with latest subtotal and last_seen
+  let __hbScheduled = false;
+  let __hbLastSubtotal = 0;
+  async function upsertActiveSession(subtotal) {
+    try {
+      if (!window.sb) return;
+      const { data } = await window.sb.auth.getSession();
+      const session = data && data.session;
+      const user = session && session.user;
+      if (!user) return;
+      const deviceId = getDeviceId();
+      const email = user.email || null;
+      const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : null;
+      await window.sb
+        .from('active_sessions')
+        .upsert({
+          user_id: user.id,
+          device_id: deviceId,
+          email,
+          subtotal: Number(subtotal || 0),
+          last_seen: new Date().toISOString(),
+          user_agent: ua,
+        });
+    } catch (_) {}
+  }
+
+  function scheduleHeartbeat(subtotal) {
+    __hbLastSubtotal = Number(subtotal || 0);
+    if (__hbScheduled) return;
+    __hbScheduled = true;
+    setTimeout(async () => {
+      __hbScheduled = false;
+      try { await upsertActiveSession(__hbLastSubtotal); } catch (_) {}
+    }, 300);
+  }
+
+  // Set up a realtime watcher that listens for admin-triggered force sign-out
+  let __forceWatcherInited = false;
+  async function ensureForceSignoutWatcher() {
+    if (__forceWatcherInited) return;
+    try {
+      if (!window.sb) return;
+      const { data } = await window.sb.auth.getSession();
+      const user = data?.session?.user;
+      if (!user) return;
+      const deviceId = getDeviceId();
+      const channel = window.sb.channel('active_sessions_watch_' + deviceId)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'active_sessions',
+          filter: `user_id=eq.${user.id}`,
+        }, (payload) => {
+          try {
+            const row = payload?.new || {};
+            if (row && row.force_sign_out && row.device_id === deviceId && row.user_id === user.id) {
+              // Clear the flag for this row first so future sessions don't instantly sign out
+              try {
+                window.sb
+                  .from('active_sessions')
+                  .update({ force_sign_out: false })
+                  .eq('user_id', user.id)
+                  .eq('device_id', deviceId);
+              } catch (_) {}
+              // Show countdown popup then sign out after 4 seconds
+              try { showForcedSignoutCountdown(4); } catch (_) {}
+              setTimeout(() => {
+                // Admin requested sign-out: clear local state and sign out
+                try { localStorage.removeItem(CART_KEY); } catch (_) {}
+                try { sessionStorage.clear(); } catch (_) {}
+                try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) {}
+                // Redirect to sign-in
+                window.location.href = 'signin.html';
+              }, 4000);
+            }
+          } catch (_) {}
+        })
+        .subscribe();
+      __forceWatcherInited = true;
+      return channel;
+    } catch (_) {}
   }
 
   function formatMoney(n) {
@@ -269,6 +457,8 @@ function showWeightModal({ name, unit, onConfirm }) {
       container.appendChild(div);
     });
     if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
+    // Push a heartbeat with latest subtotal (debounced)
+    try { scheduleHeartbeat(subtotal); } catch (_) {}
   }
 
   function removeFromCartByKey(key) {
@@ -515,6 +705,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   // Initialize cart UI from storage and bind any existing grids
   try { renderCart(); } catch (_) {}
+  // Initialize force sign-out realtime watcher and send an initial heartbeat
+  try { ensureForceSignoutWatcher(); } catch (_) {}
+  try { upsertActiveSession(getCartSubtotal()); } catch (_) {}
+  // Also check immediately in case realtime missed earlier
+  try { checkForceSignout(); } catch (_) {}
+  // Periodic heartbeat to keep last_seen fresh and subtotal up to date
+  try {
+    setInterval(() => {
+      try { upsertActiveSession(getCartSubtotal()); } catch (_) {}
+      // Poll for force sign-out flag as a fallback
+      try { checkForceSignout(); } catch (_) {}
+    }, 20000);
+  } catch (_) {}
   // Ensure weight modal root exists
   try { ensureModalRoot(); } catch (_) {}
   try {

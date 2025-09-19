@@ -8,8 +8,8 @@
 </head>
 <body class="refunds-standalone">
   <style>
-    /* Admin menu shares the simple centered layout from refunds */
-    body.refunds-standalone { background: #f7fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    /* Standalone admin layout: centered, white background */
+    body.refunds-standalone { background: #ffffff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .admin-wrap { max-width: 980px; width: 100%; padding: 24px 16px; }
     .admin-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; }
     .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -20,7 +20,10 @@
   </style>
 
   <div class="admin-wrap">
-    <div class="admin-title">Admin</div>
+    <div class="admin-title" style="display:flex; align-items:center; gap:10px;">
+      <a href="../account.html" class="btn" style="height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Account</a>
+      <span>Admin</span>
+    </div>
     <div class="admin-grid">
       <a class="admin-card" href="refund.html">
         <h3>Refunds</h3>
