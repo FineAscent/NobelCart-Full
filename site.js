@@ -1,35 +1,22 @@
   // --- API helpers ---
-  const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-  async function apiFetch(path, options = {}) {
-    const url = API_BASE + path;
-    const opts = {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    };
-    if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
-    const res = await fetch(url, opts);
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`API ${opts.method} ${path} failed: ${res.status} ${text}`);
-    }
-
-  // Listen for our virtual keyboard Done event to collapse search cleanly
-  try {
-    document.addEventListener('vk:done', () => {
-      const input = document.querySelector('.search-input');
-      const icon = document.querySelector('.search-icon');
-      if (!input || !icon) return;
-      const sectionHeader = icon.closest('.section-header');
-      input.classList.remove('expanded');
-      if (sectionHeader) sectionHeader.classList.remove('expanded');
-      const left = document.querySelector('.left-section');
-      if (left) left.classList.remove('searching');
-    });
-  } catch (_) {}
-    const ct = res.headers.get('content-type') || '';
-    return ct.includes('application/json') ? res.json() : res.text();
+const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+async function apiFetch(path, options = {}) {
+  const url = API_BASE + path;
+  const opts = {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  };
+  if (opts.body && typeof opts.body !== 'string') opts.body = JSON.stringify(opts.body);
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`API ${opts.method} ${path} failed: ${res.status} ${text}`);
   }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : res.text();
+}
+// presence modal is defined after ensureModalRoot()
 
 // ---- Lightweight modal for weight input (top-level) ----
 function ensureModalRoot() {
@@ -38,6 +25,34 @@ function ensureModalRoot() {
     root.id = 'modal-root';
     document.body.appendChild(root);
   }
+}
+
+// ---- Lightweight modal for presence check (are you still there?) ----
+function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm here", onConfirm, onRender } = {}) {
+  ensureModalRoot();
+  const root = document.querySelector('#modal-root');
+  if (!root) return null;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-header">Session Check</div>
+    <div class="modal-body">
+      <div class="modal-product">${String(message).replace(/</g, '&lt;')}</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary presence-ok">${String(buttonText).replace(/</g, '&lt;')}</button>
+    </div>
+  `;
+  overlay.appendChild(modal);
+  root.appendChild(overlay);
+
+  const btnOk = modal.querySelector('.presence-ok');
+  const close = () => { try { root.removeChild(overlay); } catch(_){} };
+  if (btnOk) btnOk.addEventListener('click', () => { try { onConfirm && onConfirm(); } finally { close(); } });
+  if (onRender) { try { onRender({ close, overlay, modal }); } catch(_){} }
+  return { close, overlay, modal };
 }
 
 function showWeightModal({ name, unit, onConfirm }) {
@@ -704,6 +719,65 @@ document.addEventListener('DOMContentLoaded', () => {
       if (nameEl) console.log('Product clicked:', nameEl.textContent.trim());
     });
   });
+
+  // Inactivity monitor (non-admin pages only)
+  try {
+    const isAdminPath = /(^|\/)admin\//.test(location.pathname);
+    if (!isAdminPath) {
+      let idleTimer = null;
+      let graceTimer = null;
+      let presenceShown = false;
+      let presenceHandle = null;
+
+      const IDLE_MS = 4 * 60 * 1000;   // 4 minutes inactivity to prompt
+      const GRACE_MS = 30 * 1000;      // 30 seconds after prompt to sign out
+
+      const clearPresence = () => {
+        if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+        if (presenceHandle && typeof presenceHandle.close === 'function') {
+          try { presenceHandle.close(); } catch(_){}
+        }
+        presenceHandle = null;
+        presenceShown = false;
+      };
+
+      const resetIdleTimer = () => {
+        // Any activity dismisses prompt and cancels pending logout
+        clearPresence();
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          // Show presence modal
+          presenceShown = true;
+          presenceHandle = showPresenceModal({
+            message: 'Are you still there? We will sign you out for security if you are inactive.',
+            buttonText: "I'm here",
+            onConfirm: () => {
+              // User confirmed presence — just reset timers
+              resetIdleTimer();
+            },
+          });
+          // Start grace period: if no response within GRACE_MS, sign out
+          graceTimer = setTimeout(async () => {
+            try {
+              // Clear any local state and sign out locally
+              try { localStorage.removeItem('nc_cart_v1'); } catch(_){ }
+              try { sessionStorage.clear(); } catch(_){ }
+              if (window.sb) {
+                try { await window.sb.auth.signOut({ scope: 'local' }); } catch(_){ }
+              }
+            } finally {
+              window.location.href = 'account.html';
+            }
+          }, GRACE_MS);
+        }, IDLE_MS);
+      };
+
+      const activityEvents = ['click','mousemove','keydown','touchstart','scroll','focus'];
+      activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+      // Start monitoring
+      resetIdleTimer();
+    }
+  } catch (_) {}
 
   // Add click functionality to checkout button
   const checkoutBtn = document.querySelector('.checkout-btn');
