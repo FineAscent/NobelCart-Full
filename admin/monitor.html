@@ -94,12 +94,27 @@
       const status = el('status');
       status.textContent = 'Loading…';
       try {
+        // Only consider sessions that have heartbeated recently (last 2 minutes)
+        const nowMinus2Min = new Date(Date.now() - 2 * 60 * 1000).toISOString();
         const { data, error } = await window.sb
           .from('active_sessions')
           .select('*')
+          .gte('last_seen', nowMinus2Min)
           .order('last_seen', { ascending: false });
         if (error) throw error;
-        renderRows(data || []);
+        // Deduplicate by user (keep the most recent row per user_id)
+        const rows = Array.isArray(data) ? data : [];
+        const byUser = new Map();
+        for (const r of rows) {
+          if (!byUser.has(r.user_id)) {
+            byUser.set(r.user_id, { ...r, __device_count: 1 });
+          } else {
+            // Increment device count for this user; keep the first (most recent) row
+            const cur = byUser.get(r.user_id);
+            cur.__device_count = (cur.__device_count || 1) + 1;
+          }
+        }
+        renderRows(Array.from(byUser.values()));
         status.textContent = 'Updated ' + new Date().toLocaleTimeString();
       } catch (e) {
         console.error(e);
@@ -117,10 +132,13 @@
         const last = new Date(r.last_seen).toLocaleTimeString();
         const ua = (r.user_agent || '').slice(0, 48).replace(/</g,'&lt;');
         const email = (r.email || '').replace(/</g,'&lt;');
+        const deviceTxt = (r.__device_count && r.__device_count > 1)
+          ? `${r.__device_count} devices`
+          : r.device_id;
         return `
           <tr data-user-id="${r.user_id}" data-device-id="${r.device_id}">
             <td class="nowrap">${email || '<span class="muted">(no email)</span>'}</td>
-            <td><span class="pill">${r.device_id}</span></td>
+            <td><span class="pill">${deviceTxt}</span></td>
             <td class="right">${fmt(r.subtotal)}</td>
             <td class="nowrap">${last}</td>
             <td class="nowrap muted" title="${(r.user_agent||'').replace(/"/g,'&quot;')}">${ua}</td>
