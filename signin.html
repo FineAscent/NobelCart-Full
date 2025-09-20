@@ -54,6 +54,11 @@
             <a href="#" id="forgot-link">Forgot password?</a>
             <a href="#" id="create-link">Create account</a>
           </div>
+          <div style="margin-top: 12px; text-align:center;">
+            <button type="button" id="qr-signin-btn" class="auth-button" style="background:#111827;">
+              Sign in with QR
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -63,6 +68,7 @@
   <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
+  <script src="vk-auth.js"></script>
   <script>
     // Clear stale/invalid local session to avoid 400 token errors
     (async () => {
@@ -145,6 +151,177 @@
         btn.textContent = isPw ? 'Hide' : 'Show';
         btn.setAttribute('aria-label', isPw ? 'Hide password' : 'Show password');
       });
+    })();
+  </script>
+  <script>
+    // QR Sign-in flow using Supabase Realtime broadcast and WebCrypto (AES-GCM)
+    (function(){
+      const btn = document.getElementById('qr-signin-btn');
+      if (!btn) return;
+
+      // Minimal modal for QR display
+      function ensureModalRoot(){
+        if (!document.querySelector('#modal-root')){
+          const root = document.createElement('div');
+          root.id = 'modal-root';
+          document.body.appendChild(root);
+        }
+      }
+      function showQRModal(html){
+        ensureModalRoot();
+        const root = document.querySelector('#modal-root');
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = html;
+        overlay.appendChild(modal);
+        root.appendChild(overlay);
+        overlay.addEventListener('click', (e)=>{ if(e.target===overlay){ try{ root.removeChild(overlay);}catch(_){} } });
+        const closeBtn = modal.querySelector('.qr-close');
+        if (closeBtn) closeBtn.addEventListener('click', ()=>{ try{ root.removeChild(overlay);}catch(_){} });
+        return { overlay, modal, close: ()=>{ try{ root.removeChild(overlay);}catch(_){} } };
+      }
+
+      function randString(len){
+        const arr = new Uint8Array(len);
+        crypto.getRandomValues(arr);
+        return btoa(String.fromCharCode(...arr)).replace(/[^a-zA-Z0-9]/g,'').slice(0,len);
+      }
+
+      async function sha256Hex(str){
+        const enc = new TextEncoder();
+        const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+        return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      }
+      async function deriveKey(secret){
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveKey']);
+        return crypto.subtle.deriveKey({ name:'PBKDF2', salt: enc.encode('nc-qr-salt'), iterations: 100000, hash:'SHA-256' }, keyMaterial, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+      }
+      async function encryptJson(secret, obj){
+        const key = await deriveKey(secret);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = new TextEncoder();
+        const data = enc.encode(JSON.stringify(obj));
+        const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, data));
+        return { iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...ct)) };
+      }
+
+      async function startQrSignin(){
+        try{
+          if (!window.sb) throw new Error('Auth not initialized');
+          // Create a short code (channel name) and a longer secret for encryption
+          const code = randString(10);
+          const secret = randString(24);
+          const channelName = 'qr_login_' + code;
+
+          const baseOrigin = window.location.origin.replace(/\/$/, '');
+          let approveUrl = baseOrigin + '/qr-approve.html?code=' + encodeURIComponent(code) + '&secret=' + encodeURIComponent(secret);
+
+          const html = `
+            <div class="modal-header">Scan to Sign In</div>
+            <div class="modal-body">
+              <div id="qr-canvas" style="display:flex; flex-direction:column; align-items:center; padding:6px;"></div>
+              <div style="font-size: 13px; color:#4b5563; margin-top:6px; text-align:center;">
+                Open your phone camera and scan. Then sign in on your phone to approve this device.
+              </div>
+              <div style="margin-top:10px; font-size:12px; color:#4b5563;">
+                If this page shows <code>localhost</code>, your phone won't be able to reach it. Enter your computer's LAN IP or hostname below and update the QR:
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                  <input id="qr-host" class="auth-input" placeholder="e.g. 192.168.1.23" style="flex:1;" />
+                  <button type="button" id="qr-update" class="btn btn-primary">Update</button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-actions" style="justify-content: center;">
+              <button class="btn btn-secondary qr-close">Close</button>
+            </div>`;
+
+          const modal = showQRModal(html);
+          function renderQR(targetEl, url){
+            const img = new Image();
+            img.alt = 'QR code';
+            img.width = 224;
+            const qrApi = 'https://api.qrserver.com/v1/create-qr-code/?size=224x224&data=' + encodeURIComponent(url);
+            img.src = qrApi;
+            targetEl.innerHTML = '';
+            targetEl.appendChild(img);
+            const link = document.createElement('div');
+            link.style.cssText = 'margin-top:8px; font-size:12px; color:#4b5563; word-break:break-all; text-align:center;';
+            link.innerHTML = '<a href="'+url+'" target="_blank" rel="noopener">'+url+'</a>';
+            targetEl.appendChild(link);
+            if (baseOrigin.startsWith('file:')){
+              const warn = document.createElement('div');
+              warn.style.cssText = 'margin-top:6px; color:#b91c1c; font-size:12px; text-align:center;';
+              warn.textContent = 'Warning: You are opening this page from a local file. Your phone cannot access file:// links. Please serve the site over http(s).';
+              targetEl.appendChild(warn);
+            }
+          }
+
+          // Initial render
+          (function(){
+            const target = document.getElementById('qr-canvas');
+            if (!target) return;
+            renderQR(target, approveUrl);
+          })();
+
+          // Allow overriding host for mobile accessibility
+          (function(){
+            const updateBtn = document.getElementById('qr-update');
+            const hostInput = document.getElementById('qr-host');
+            const target = document.getElementById('qr-canvas');
+            if (!updateBtn || !hostInput || !target) return;
+            updateBtn.addEventListener('click', () => {
+              const host = (hostInput.value || '').trim();
+              if (!host) return;
+              try{
+                const u = new URL(baseOrigin);
+                u.hostname = host;
+                approveUrl = u.origin + '/qr-approve.html?code=' + encodeURIComponent(code) + '&secret=' + encodeURIComponent(secret);
+                renderQR(target, approveUrl);
+              } catch (_) {}
+            });
+          })();
+
+          // Subscribe to realtime channel waiting for encrypted session payload
+          const channel = window.sb.channel(channelName, { config: { broadcast: { ack: true } } });
+          channel.on('broadcast', { event: 'login_session' }, async (payload)=>{
+            try{
+              const { iv, ct } = payload?.payload || {};
+              if (!iv || !ct) return;
+              // Decrypt
+              const decKey = await deriveKey(secret);
+              const ivBytes = Uint8Array.from(atob(iv), c=>c.charCodeAt(0));
+              const ctBytes = Uint8Array.from(atob(ct), c=>c.charCodeAt(0));
+              const plainBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv: ivBytes }, decKey, ctBytes);
+              const txt = new TextDecoder().decode(plainBuf);
+              const obj = JSON.parse(txt);
+              const { access_token, refresh_token } = obj || {};
+              if (access_token && refresh_token){
+                // Set session locally
+                const { error } = await window.sb.auth.setSession({ access_token, refresh_token });
+                if (error) throw error;
+                // Close modal and go to cabinet
+                try { modal.close(); } catch(_){ }
+                document.body.classList.add('page-exit-right');
+                setTimeout(()=>{ window.location.href = 'cabinet.html'; }, 180);
+              }
+            } catch (e) {
+              console.error('QR decrypt/setSession failed', e);
+            }
+          });
+          await channel.subscribe(async (status)=>{
+            // no-op; waiting for broadcast
+          });
+
+        }catch(e){
+          const err = document.getElementById('auth-error');
+          if (err){ err.textContent = e.message || 'QR sign-in failed.'; err.style.display = 'block'; }
+        }
+      }
+
+      btn.addEventListener('click', startQrSignin);
     })();
   </script>
   <script src="site.js"></script>

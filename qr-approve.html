@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approve Login</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .auth-wrapper { display:flex; align-items:center; justify-content:center; min-height: 70vh; }
+    .auth-card { max-width: 420px; width: 100%; }
+  </style>
+</head>
+<body class="signin">
+  <div class="container">
+    <div class="auth-wrapper" role="main">
+      <div class="auth-card" aria-labelledby="approve-title">
+        <h1 id="approve-title" class="auth-title">Approve Login</h1>
+        <p class="auth-subtitle">Sign in on your phone to approve the desktop session.</p>
+
+        <div id="status" class="auth-error" style="display:none;"></div>
+
+        <form id="phone-signin-form" class="auth-form" novalidate>
+          <div class="auth-field">
+            <label class="auth-label" for="email">Email</label>
+            <input id="email" class="auth-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+          <div class="auth-field">
+            <label class="auth-label" for="password">Password</label>
+            <input id="password" class="auth-input" type="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+          </div>
+          <button type="submit" class="auth-button">Sign In</button>
+        </form>
+
+        <div style="margin-top: 12px; text-align:center;">
+          <button id="approve-btn" class="auth-button" style="background:#111827; display:none;">Approve and Send</button>
+        </div>
+
+        <p id="hint" style="margin-top:10px; color:#4b5563; font-size:13px; text-align:center;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    function cryptoSupported(){
+      return !!(window.isSecureContext && window.crypto && window.crypto.subtle);
+    }
+    // Helpers: parse query, crypto, realtime broadcast
+    function getQuery() {
+      const p = new URLSearchParams(location.search);
+      return { code: p.get('code') || '', secret: p.get('secret') || '' };
+    }
+    function showError(msg){
+      const s = document.getElementById('status');
+      s.textContent = msg;
+      s.style.display = 'block';
+    }
+    function hideError(){ const s=document.getElementById('status'); s.style.display='none'; }
+
+    async function deriveKey(secret){
+      if (!cryptoSupported()) throw new Error('Secure context required: open this link over HTTPS so we can encrypt.');
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveKey']);
+      return crypto.subtle.deriveKey({ name:'PBKDF2', salt: enc.encode('nc-qr-salt'), iterations: 100000, hash:'SHA-256' }, keyMaterial, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+    }
+    async function encryptJson(secret, obj){
+      if (!cryptoSupported()) throw new Error('Secure context required: open this link over HTTPS so we can encrypt.');
+      const key = await deriveKey(secret);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const enc = new TextEncoder();
+      const data = enc.encode(JSON.stringify(obj));
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, data));
+      return { iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...ct)) };
+    }
+
+    async function ensureSignedIn(){
+      if (!window.sb) throw new Error('Auth not initialized');
+      const { data } = await window.sb.auth.getSession();
+      if (data && data.session && data.session.user) return data.session;
+      // Not signed in yet, wait for form submission
+      return null;
+    }
+
+    async function sendApproval(code, secret){
+      try{
+        hideError();
+        if (!window.sb) throw new Error('Auth not initialized');
+        const { data, error } = await window.sb.auth.getSession();
+        if (error) throw error;
+        const session = data && data.session;
+        if (!session) throw new Error('Not signed in');
+        const access_token = session.access_token;
+        const refresh_token = session.refresh_token;
+        if (!access_token || !refresh_token) throw new Error('Missing session tokens');
+
+        const payload = await encryptJson(secret, { access_token, refresh_token });
+        const channel = window.sb.channel('qr_login_' + code, { config: { broadcast: { ack: true } } });
+        await channel.subscribe();
+        const ok = await channel.send({ type: 'broadcast', event: 'login_session', payload });
+        if (!ok) throw new Error('Failed to send approval');
+        document.getElementById('hint').textContent = 'Approval sent. You can close this page.';
+      }catch(e){
+        showError(e.message || 'Failed to approve.');
+      }
+    }
+
+    // Wire up form and approve button
+    (async function(){
+      const { code, secret } = getQuery();
+      const approveBtn = document.getElementById('approve-btn');
+      const form = document.getElementById('phone-signin-form');
+      const hint = document.getElementById('hint');
+
+      if (!code || !secret){
+        showError('Invalid QR link.');
+        form.style.display = 'none';
+        return;
+      }
+
+      if (!cryptoSupported()){
+        showError('Your browser does not provide Web Crypto in this context. On iOS Safari this happens over plain HTTP. Please use an HTTPS URL (e.g., via a temporary tunnel) and open this link again.');
+        hint.textContent = 'Option A: Use an HTTPS tunnel (Cloudflare Tunnel, ngrok) and re-scan. Option B: Open the desktop site on your phone and sign in directly.';
+      } else {
+        hideError();
+        hint.textContent = 'After signing in, tap "Approve and Send" to finish.';
+      }
+
+      // If already signed in on phone, show approve button directly
+      try{
+        const sess = await ensureSignedIn();
+        if (sess){ approveBtn.style.display = 'inline-block'; }
+      } catch (e) { /* ignore */ }
+
+      form.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        hideError();
+        try{
+          const email = document.getElementById('email').value.trim();
+          const password = document.getElementById('password').value.trim();
+          if (!email || !password) { showError('Enter email and password.'); return; }
+          const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          approveBtn.style.display = 'inline-block';
+          hint.textContent = 'Signed in. Tap "Approve and Send" to finish.';
+        }catch(err){
+          showError(err.message || 'Sign-in failed.');
+        }
+      });
+
+      approveBtn.addEventListener('click', async ()=>{
+        await sendApproval(code, secret);
+      });
+    })();
+  </script>
+</body>
+</html>

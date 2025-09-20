@@ -1,0 +1,30 @@
+services:
+  - type: static
+    name: nobelcart
+    env: static
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: true
+    routes:
+      # Serve all files as-is from the repository root
+      - type: rewrite
+        source: "/"
+        destination: "/index.html"
+      - type: rewrite
+        source: "/signin"
+        destination: "/signin.html"
+      - type: rewrite
+        source: "/qr-approve"
+        destination: "/qr-approve.html"
+      - type: rewrite
+        source: "/cabinet"
+        destination: "/cabinet.html"
+      - type: rewrite
+        source: "/account"
+        destination: "/account.html"
+      - type: rewrite
+        source: "/refund"
+        destination: "/refund.html"
+      - type: rewrite
+        source: "/admin"
+        destination: "/admin/index.html"
