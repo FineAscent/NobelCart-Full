@@ -82,6 +82,47 @@
     })();
   </script>
   <script>
+    // Minimal full-screen loading overlay (supports centered logo)
+    function showLoadingOverlay(message, opts){
+      const options = opts || {};
+      try {
+        let ov = document.getElementById('nc-loading-overlay');
+        if (!ov){
+          ov = document.createElement('div');
+          ov.id = 'nc-loading-overlay';
+          ov.setAttribute('aria-live','polite');
+          ov.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:99999;';
+          const inner = document.createElement('div');
+          inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;';
+          if (options.logo){
+            const img = document.createElement('img');
+            img.src = 'Images/logo.gif';
+            img.alt = 'Loading';
+            img.style.cssText = 'max-width:72%;max-height:42vh;height:auto;width:auto;display:block;';
+            inner.appendChild(img);
+          } else {
+            const spinner = document.createElement('div');
+            spinner.style.cssText = 'width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#111;border-radius:50%;animation: ncspin 0.9s linear infinite;';
+            inner.appendChild(spinner);
+          }
+          const text = document.createElement('div');
+          text.className = 'nc-loading-text';
+          text.textContent = message || (options.logo ? '' : 'Loading…');
+          if (text.textContent) inner.appendChild(text);
+          ov.appendChild(inner);
+          const style = document.createElement('style');
+          style.textContent = '@keyframes ncspin{to{transform:rotate(360deg)}}';
+          document.head.appendChild(style);
+          document.body.appendChild(ov);
+        } else {
+          const t = ov.querySelector('.nc-loading-text');
+          if (t) t.textContent = message || 'Loading…';
+          ov.style.display = 'flex';
+        }
+        return ov;
+      } catch (_) { }
+    }
+
     // Supabase email/password sign-in
     document.getElementById('signin-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -131,9 +172,9 @@
             await window.sb.from('profiles').upsert(payload);
           }
         } catch (_) {}
-        // On success, go to cabinet
-        document.body.classList.add('page-exit-right');
-        setTimeout(() => { window.location.href = 'cabinet.html'; }, 180);
+        // On success, show logo overlay for 4 seconds, then go to cabinet
+        try { showLoadingOverlay('', { logo: true }); } catch(_){ }
+        setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
       } catch (e) {
         err.textContent = e.message || 'Sign-in failed.';
         err.style.display = 'block';
@@ -302,10 +343,10 @@
                 // Set session locally
                 const { error } = await window.sb.auth.setSession({ access_token, refresh_token });
                 if (error) throw error;
-                // Close modal and go to cabinet
+                // Close modal, show logo overlay for 4 seconds, then go to cabinet
                 try { modal.close(); } catch(_){ }
-                document.body.classList.add('page-exit-right');
-                setTimeout(()=>{ window.location.href = 'cabinet.html'; }, 180);
+                try { showLoadingOverlay('', { logo: true }); } catch(_){ }
+                setTimeout(()=>{ window.location.href = 'cabinet.html'; }, 4000);
               }
             } catch (e) {
               console.error('QR decrypt/setSession failed', e);
