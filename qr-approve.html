@@ -16,8 +16,11 @@
     .auth-field { margin-top: 10px; }
     .auth-label { font-size: 13px; color:#374151; display:block; margin-bottom:6px; }
     .auth-input { width:100%; height:48px; font-size:16px; padding: 10px 12px; border-radius:10px; border:1px solid #d1d5db; box-sizing:border-box; }
-    .auth-button { width:100%; height:48px; font-size:16px; border-radius:10px; }
-    #approve-btn { height:48px; font-size:16px; border-radius:10px; }
+    .auth-button { width:100%; height:48px; font-size:16px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+    #approve-btn { height:48px; font-size:16px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+    .btn { display:flex; align-items:center; justify-content:center; }
+    .auth-input-wrap { position: relative; display:flex; align-items:center; }
+    .toggle-password-btn { position:absolute; right:8px; height:34px; padding: 0 10px; border:1px solid #d1d5db; border-radius:8px; background:#fff; color:#111827; cursor:pointer; font-size:12px; }
     .auth-error { text-align:center; }
     /* Modal overrides for clean mobile look */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; padding: 16px; }
@@ -48,7 +51,10 @@
           </div>
           <div class="auth-field">
             <label class="auth-label" for="password">Password</label>
-            <input id="password" class="auth-input" type="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+            <div class="auth-input-wrap">
+              <input id="password" class="auth-input" type="password" name="password" placeholder="••••••••" autocomplete="current-password" required style="padding-right:84px;" />
+              <button type="button" id="toggle-password-phone" class="toggle-password-btn" aria-label="Show password">Show</button>
+            </div>
           </div>
           <button type="submit" class="auth-button">Sign In</button>
         </form>
@@ -223,6 +229,19 @@
           showError(err.message || 'Sign-in failed.');
         }
       });
+
+      // Show/Hide password toggle for phone
+      (function(){
+        const btn = document.getElementById('toggle-password-phone');
+        const input = document.getElementById('password');
+        if (!btn || !input) return;
+        btn.addEventListener('click', ()=>{
+          const isPw = input.type === 'password';
+          input.type = isPw ? 'text' : 'password';
+          btn.textContent = isPw ? 'Hide' : 'Show';
+          btn.setAttribute('aria-label', isPw ? 'Hide password' : 'Show password');
+        });
+      })();
 
       approveBtn.addEventListener('click', async ()=>{
         await sendApproval(code, secret);
