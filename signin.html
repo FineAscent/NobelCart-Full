@@ -91,9 +91,9 @@
           ov = document.createElement('div');
           ov.id = 'nc-loading-overlay';
           ov.setAttribute('aria-live','polite');
-          ov.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:99999;';
+          ov.style.cssText = 'position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:99999;';
           const inner = document.createElement('div');
-          inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;';
+          inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#fff;';
           if (options.logo){
             const img = document.createElement('img');
             img.src = 'Images/logo.gif';
@@ -102,7 +102,7 @@
             inner.appendChild(img);
           } else {
             const spinner = document.createElement('div');
-            spinner.style.cssText = 'width:32px;height:32px;border:3px solid #e5e7eb;border-top-color:#111;border-radius:50%;animation: ncspin 0.9s linear infinite;';
+            spinner.style.cssText = 'width:32px;height:32px;border:3px solid #444;border-top-color:#fff;border-radius:50%;animation: ncspin 0.9s linear infinite;';
             inner.appendChild(spinner);
           }
           const text = document.createElement('div');
@@ -117,6 +117,8 @@
         } else {
           const t = ov.querySelector('.nc-loading-text');
           if (t) t.textContent = message || 'Loading…';
+          // Ensure text is readable on dark bg
+          const inner = ov.firstElementChild; if (inner) inner.style.color = '#fff';
           ov.style.display = 'flex';
         }
         return ov;
