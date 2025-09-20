@@ -1,7 +1,7 @@
 services:
-  - type: static
+  - type: web
     name: nobelcart
-    env: static
+    rootDir: .
     buildCommand: ""
     staticPublishPath: .
     pullRequestPreviewsEnabled: true
@@ -28,3 +28,7 @@ services:
       - type: rewrite
         source: "/admin"
         destination: "/admin/index.html"
+      # Catch-all to index.html (optional; helps with unknown paths)
+      - type: rewrite
+        source: "/(.*)"
+        destination: "/index.html"
