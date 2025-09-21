@@ -170,6 +170,12 @@
             color: white;
         }
 
+        /* New keys near space bar */
+        .key.mode-toggle,
+        .key.done {
+            min-width: 5rem;
+        }
+
         @media (max-width: 768px) {
             .container, .keyboard {
                 padding: 1.5rem;
@@ -202,7 +208,7 @@
     </div>
 
     <div class="keyboard" id="keyboard">
-        <div class="keyboard-row">
+        <div class="keyboard-row" id="numbersRow">
             <div class="key" onclick="insertText('1')">1</div>
             <div class="key" onclick="insertText('2')">2</div>
             <div class="key" onclick="insertText('3')">3</div>
@@ -216,48 +222,52 @@
             <div class="key backspace" onclick="backspace()">Backspace</div>
         </div>
 
-        <div class="keyboard-row">
-            <div class="key tab" onclick="insertText('\t')">Tab</div>
-            <div class="key" onclick="insertText('q')">Q</div>
-            <div class="key" onclick="insertText('w')">W</div>
-            <div class="key" onclick="insertText('e')">E</div>
-            <div class="key" onclick="insertText('r')">R</div>
-            <div class="key" onclick="insertText('t')">T</div>
-            <div class="key" onclick="insertText('y')">Y</div>
-            <div class="key" onclick="insertText('u')">U</div>
-            <div class="key" onclick="insertText('i')">I</div>
-            <div class="key" onclick="insertText('o')">O</div>
-            <div class="key" onclick="insertText('p')">P</div>
+        <div id="lettersRows">
+            <div class="keyboard-row">
+                <div class="key tab" onclick="insertText('\t')">Tab</div>
+                <div class="key" onclick="insertText('q')">Q</div>
+                <div class="key" onclick="insertText('w')">W</div>
+                <div class="key" onclick="insertText('e')">E</div>
+                <div class="key" onclick="insertText('r')">R</div>
+                <div class="key" onclick="insertText('t')">T</div>
+                <div class="key" onclick="insertText('y')">Y</div>
+                <div class="key" onclick="insertText('u')">U</div>
+                <div class="key" onclick="insertText('i')">I</div>
+                <div class="key" onclick="insertText('o')">O</div>
+                <div class="key" onclick="insertText('p')">P</div>
+            </div>
+
+            <div class="keyboard-row">
+                <div class="key caps-lock" onclick="toggleCapsLock()" id="capsLock">Caps Lock</div>
+                <div class="key" onclick="insertText('a')">A</div>
+                <div class="key" onclick="insertText('s')">S</div>
+                <div class="key" onclick="insertText('d')">D</div>
+                <div class="key" onclick="insertText('f')">F</div>
+                <div class="key" onclick="insertText('g')">G</div>
+                <div class="key" onclick="insertText('h')">H</div>
+                <div class="key" onclick="insertText('j')">J</div>
+                <div class="key" onclick="insertText('k')">K</div>
+                <div class="key" onclick="insertText('l')">L</div>
+                <div class="key enter" onclick="insertText('\n')">Enter</div>
+            </div>
+
+            <div class="keyboard-row">
+                <div class="key shift" onclick="toggleShift()" id="leftShift">Shift</div>
+                <div class="key" onclick="insertText('z')">Z</div>
+                <div class="key" onclick="insertText('x')">X</div>
+                <div class="key" onclick="insertText('c')">C</div>
+                <div class="key" onclick="insertText('v')">V</div>
+                <div class="key" onclick="insertText('b')">B</div>
+                <div class="key" onclick="insertText('n')">N</div>
+                <div class="key" onclick="insertText('m')">M</div>
+                <div class="key shift" onclick="toggleShift()" id="rightShift">Shift</div>
+            </div>
         </div>
 
         <div class="keyboard-row">
-            <div class="key caps-lock" onclick="toggleCapsLock()" id="capsLock">Caps Lock</div>
-            <div class="key" onclick="insertText('a')">A</div>
-            <div class="key" onclick="insertText('s')">S</div>
-            <div class="key" onclick="insertText('d')">D</div>
-            <div class="key" onclick="insertText('f')">F</div>
-            <div class="key" onclick="insertText('g')">G</div>
-            <div class="key" onclick="insertText('h')">H</div>
-            <div class="key" onclick="insertText('j')">J</div>
-            <div class="key" onclick="insertText('k')">K</div>
-            <div class="key" onclick="insertText('l')">L</div>
-            <div class="key enter" onclick="insertText('\n')">Enter</div>
-        </div>
-
-        <div class="keyboard-row">
-            <div class="key shift" onclick="toggleShift()" id="leftShift">Shift</div>
-            <div class="key" onclick="insertText('z')">Z</div>
-            <div class="key" onclick="insertText('x')">X</div>
-            <div class="key" onclick="insertText('c')">C</div>
-            <div class="key" onclick="insertText('v')">V</div>
-            <div class="key" onclick="insertText('b')">B</div>
-            <div class="key" onclick="insertText('n')">N</div>
-            <div class="key" onclick="insertText('m')">M</div>
-            <div class="key shift" onclick="toggleShift()" id="rightShift">Shift</div>
-        </div>
-
-        <div class="keyboard-row">
+            <div class="key mode-toggle" id="modeToggleKey" onclick="toggleKeyboardMode()">123</div>
             <div class="key space" onclick="insertText(' ')">Space</div>
+            <div class="key done" onclick="doneKey()">Done</div>
         </div>
     </div>
 
@@ -268,10 +278,14 @@
         const capsLockKey = document.getElementById('capsLock');
         const leftShift = document.getElementById('leftShift');
         const rightShift = document.getElementById('rightShift');
+        const lettersRows = document.getElementById('lettersRows');
+        const numbersRow = document.getElementById('numbersRow');
+        const modeToggleKey = document.getElementById('modeToggleKey');
 
         let isKeyboardVisible = false;
         let isCapsLock = false;
         let isShift = false;
+        let isNumbersMode = false;
 
         function toggleKeyboard() {
             isKeyboardVisible = !isKeyboardVisible;
@@ -282,6 +296,21 @@
                 keyboard.classList.remove('show');
                 toggleText.textContent = 'Show Keyboard';
             }
+        }
+
+        function applyMode() {
+            // In numbers mode, hide letter rows; otherwise show them
+            if (lettersRows) {
+                lettersRows.style.display = isNumbersMode ? 'none' : 'block';
+            }
+            if (modeToggleKey) {
+                modeToggleKey.textContent = isNumbersMode ? 'ABC' : '123';
+            }
+        }
+
+        function toggleKeyboardMode() {
+            isNumbersMode = !isNumbersMode;
+            applyMode();
         }
 
         function insertText(text) {
@@ -348,10 +377,21 @@
             rightShift.classList.toggle('active', isShift);
         }
 
+        function doneKey() {
+            // Hide keyboard and remove focus from textarea
+            isKeyboardVisible = false;
+            keyboard.classList.remove('show');
+            toggleText.textContent = 'Show Keyboard';
+            textArea.blur();
+        }
+
         // Focus text area when clicking on it
         textArea.addEventListener('click', () => {
             textArea.focus();
         });
+
+        // Initialize mode UI
+        applyMode();
     </script>
 </body>
 </html>

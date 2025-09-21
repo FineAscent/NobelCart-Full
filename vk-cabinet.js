@@ -28,10 +28,7 @@
     const row3 = vkEl.querySelector('[data-row="3"]');
     const row4 = vkEl.querySelector('[data-row="4"]');
 
-    const r1 = ['q','w','e','r','t','y','u','i','o','p'];
-    const r2 = ['a','s','d','f','g','h','j','k','l','←'];
-    const r3 = ['z','x','c','v','b','n','m'];
-    const r4 = [' ','Done'];
+    let isNumbersMode = false;
 
     function key(label, opts={}) {
       const btn = document.createElement('button');
@@ -42,14 +39,33 @@
       return btn;
     }
 
-    r1.forEach(k => row1.appendChild(key(k)));
-    r2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
-    r3.forEach(k => row3.appendChild(key(k)));
-    r4.forEach(k => {
-      if (k === ' ') row4.appendChild(key('Space', { space: true, code: 'SPACE', special: true }));
-      else if (k === 'Done') row4.appendChild(key('Done', { done: true, code: 'DONE', special: true }));
-      else row4.appendChild(key(k));
-    });
+    function renderRows(){
+      [row1,row2,row3,row4].forEach(r => { if (r) r.innerHTML = ''; });
+
+      if (!isNumbersMode) {
+        const r1 = ['q','w','e','r','t','y','u','i','o','p'];
+        const r2 = ['a','s','d','f','g','h','j','k','l','←'];
+        const r3 = ['z','x','c','v','b','n','m','@','.'];
+        r1.forEach(k => row1.appendChild(key(k)));
+        r2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
+        r3.forEach(k => row3.appendChild(key(k)));
+      } else {
+        const n1 = ['1','2','3','4','5','6','7','8','9','0'];
+        const n2 = ['-','_','/','\\',':',';','(',' )','$','&','←'];
+        const n3 = ['@','.','!','?','#','%','+','=','*',','];
+        n1.forEach(k => row1.appendChild(key(k)));
+        n2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
+        n3.forEach(k => row3.appendChild(key(k)));
+      }
+
+      const modeLabel = isNumbersMode ? 'ABC' : '123';
+      row4.appendChild(key(modeLabel, { special: true, code: 'MODE' }));
+      row4.appendChild(key('Space', { space: true, code: 'SPACE', special: true }));
+      row4.appendChild(key('Done', { done: true, code: 'DONE', special: true }));
+    }
+
+    // initial render
+    renderRows();
 
     vkEl.addEventListener('mousedown', (e) => {
       // Prevent focus loss from input when clicking keyboard
@@ -62,6 +78,12 @@
       const code = btn.dataset.key;
       if (!input) return;
 
+      if (code === 'MODE') {
+        isNumbersMode = !isNumbersMode;
+        renderRows();
+        if (input) { try { input.focus(); } catch(_){} }
+        return;
+      }
       if (code === 'DONE') {
         try {
           const ev = new CustomEvent('vk:done', { bubbles: true });
