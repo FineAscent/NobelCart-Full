@@ -2,8 +2,8 @@
   // Basic environment config for the customer site (read-only endpoints)
   const ENV = 'prod'; // change to 'dev' for dev stack
   const BASES = {
-    prod: 'https://w2bspt32w4.execute-api.us-east-1.amazonaws.com/prod',
-    dev: 'https://w2bspt32w4.execute-api.us-east-1.amazonaws.com/dev'
+    prod: 'https://ov07pqkx1d.execute-api.us-east-1.amazonaws.com/dev',
+    dev: 'https://ov07pqkx1d.execute-api.us-east-1.amazonaws.com/dev'
   };
 
   // Supabase configuration (client-safe)
