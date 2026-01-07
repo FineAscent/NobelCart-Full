@@ -1,4 +1,4 @@
-  // --- API helpers ---
+// --- API helpers ---
 const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
 async function apiFetch(path, options = {}) {
   const url = API_BASE + path;
@@ -49,9 +49,9 @@ function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm
   root.appendChild(overlay);
 
   const btnOk = modal.querySelector('.presence-ok');
-  const close = () => { try { root.removeChild(overlay); } catch(_){} };
+  const close = () => { try { root.removeChild(overlay); } catch (_) { } };
   if (btnOk) btnOk.addEventListener('click', () => { try { onConfirm && onConfirm(); } finally { close(); } });
-  if (onRender) { try { onRender({ close, overlay, modal }); } catch(_){} }
+  if (onRender) { try { onRender({ close, overlay, modal }); } catch (_) { } }
   return { close, overlay, modal };
 }
 
@@ -82,7 +82,7 @@ function showWeightModal({ name, unit, onConfirm }) {
   const input = modal.querySelector('.modal-input');
   const btnCancel = modal.querySelector('.btn-secondary');
   const btnOk = modal.querySelector('.btn-primary');
-  const close = () => { try { root.removeChild(overlay); } catch(_){} };
+  const close = () => { try { root.removeChild(overlay); } catch (_) { } };
   btnCancel.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   btnOk.addEventListener('click', () => {
@@ -93,76 +93,76 @@ function showWeightModal({ name, unit, onConfirm }) {
   setTimeout(() => { input.focus(); input.select?.(); }, 0);
 }
 
-  async function fetchProducts({ availability = 'In Stock', limit = 24 } = {}) {
+async function fetchProducts({ availability = 'In Stock', limit = 24 } = {}) {
+  const params = new URLSearchParams();
+  if (availability) params.set('availability', availability);
+  if (limit) params.set('limit', String(limit));
+  const data = await apiFetch(`/products?${params.toString()}`);
+  return Array.isArray(data.items) ? data.items : [];
+}
+
+// Fetch products by IDs without loading the entire catalog
+async function fetchProductsByIds(ids = []) {
+  const unique = Array.from(new Set(ids)).filter(Boolean).map(String);
+  if (unique.length === 0) return [];
+
+  // 1) Preferred: GET /products?ids=ID1,ID2,...
+  try {
     const params = new URLSearchParams();
-    if (availability) params.set('availability', availability);
-    if (limit) params.set('limit', String(limit));
+    params.set('ids', unique.join(','));
     const data = await apiFetch(`/products?${params.toString()}`);
-    return Array.isArray(data.items) ? data.items : [];
-  }
+    if (data && Array.isArray(data.items)) return data.items;
+  } catch (_) { }
 
-  // Fetch products by IDs without loading the entire catalog
-  async function fetchProductsByIds(ids = []) {
-    const unique = Array.from(new Set(ids)).filter(Boolean).map(String);
-    if (unique.length === 0) return [];
+  // 2) Alternative: POST /products/by-ids { ids: [...] }
+  try {
+    const data = await apiFetch(`/products/by-ids`, { method: 'POST', body: { ids: unique } });
+    if (data && Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data)) return data; // some backends may return array directly
+  } catch (_) { }
 
-    // 1) Preferred: GET /products?ids=ID1,ID2,...
+  // 3) Fallback: GET each /products/{id} with limited concurrency
+  const results = [];
+  const concurrency = 8;
+  let i = 0;
+  async function next() {
+    const idx = i++;
+    if (idx >= unique.length) return;
+    const id = encodeURIComponent(unique[idx]);
     try {
-      const params = new URLSearchParams();
-      params.set('ids', unique.join(','));
-      const data = await apiFetch(`/products?${params.toString()}`);
-      if (data && Array.isArray(data.items)) return data.items;
-    } catch (_) {}
-
-    // 2) Alternative: POST /products/by-ids { ids: [...] }
-    try {
-      const data = await apiFetch(`/products/by-ids`, { method: 'POST', body: { ids: unique } });
-      if (data && Array.isArray(data.items)) return data.items;
-      if (Array.isArray(data)) return data; // some backends may return array directly
-    } catch (_) {}
-
-    // 3) Fallback: GET each /products/{id} with limited concurrency
-    const results = [];
-    const concurrency = 8;
-    let i = 0;
-    async function next() {
-      const idx = i++;
-      if (idx >= unique.length) return;
-      const id = encodeURIComponent(unique[idx]);
-      try {
-        const item = await apiFetch(`/products/${id}`);
-        if (item) results.push(item);
-      } catch (_) {}
-      return next();
-    }
-    await Promise.all(Array.from({ length: Math.min(concurrency, unique.length) }, next));
-    return results;
+      const item = await apiFetch(`/products/${id}`);
+      if (item) results.push(item);
+    } catch (_) { }
+    return next();
   }
+  await Promise.all(Array.from({ length: Math.min(concurrency, unique.length) }, next));
+  return results;
+}
 
-  async function getImageUrlForKey(key) {
-    if (!key) return null;
-    try {
-      const data = await apiFetch('/image-url', { method: 'POST', body: { key } });
-      return data && data.url ? data.url : null;
-    } catch (e) {
-      console.warn('image-url failed for key', key, e);
-      return null;
-    }
+async function getImageUrlForKey(key) {
+  if (!key) return null;
+  try {
+    const data = await apiFetch('/image-url', { method: 'POST', body: { key } });
+    return data && data.url ? data.url : null;
+  } catch (e) {
+    console.warn('image-url failed for key', key, e);
+    return null;
   }
+}
 
-  function productCardHTML(p) {
-    const price = (p.price != null) ? `$${Number(p.price).toFixed(2)}` : '';
-    const unit = p.priceUnit ? `/${p.priceUnit}` : '';
-    const status = p.availability || '';
-    const name = p.name || '';
-    const area = p.areaLocation || '';
-    const idAttr = p.id ? ` data-id="${String(p.id)}"` : '';
-    const nameAttr = name ? ` data-name="${String(name).replace(/"/g, '&quot;')}"` : '';
-    const priceAttr = (p.price != null) ? ` data-price="${Number(p.price)}"` : '';
-    const areaAttr = area ? ` data-area="${area}"` : '';
-    const unitAttr = p.priceUnit ? ` data-unit="${String(p.priceUnit)}"` : '';
-    const scaleAttr = p.scaleNeed ? ` data-scale="1"` : ' data-scale="0"';
-    return `
+function productCardHTML(p) {
+  const price = (p.price != null) ? `$${Number(p.price).toFixed(2)}` : '';
+  const unit = p.priceUnit ? `/${p.priceUnit}` : '';
+  const status = p.availability || '';
+  const name = p.name || '';
+  const area = p.areaLocation || '';
+  const idAttr = p.id ? ` data-id="${String(p.id)}"` : '';
+  const nameAttr = name ? ` data-name="${String(name).replace(/"/g, '&quot;')}"` : '';
+  const priceAttr = (p.price != null) ? ` data-price="${Number(p.price)}"` : '';
+  const areaAttr = area ? ` data-area="${area}"` : '';
+  const unitAttr = p.priceUnit ? ` data-unit="${String(p.priceUnit)}"` : '';
+  const scaleAttr = p.scaleNeed ? ` data-scale="1"` : ' data-scale="0"';
+  return `
       <div class="product-card"${idAttr}${nameAttr}${priceAttr}${areaAttr}${unitAttr}${scaleAttr}>
         <div class="product-info">
           <div class="product-image"></div>
@@ -171,452 +171,454 @@ function showWeightModal({ name, unit, onConfirm }) {
           <div class="product-status">${status}</div>
         </div>
       </div>`;
-  }
+}
 
-  async function renderProductsToGrid(gridEl, items) {
-    if (!gridEl) return;
-    gridEl.innerHTML = items.map(productCardHTML).join('');
-    // Bind add-to-cart interactions for this grid
-    try { bindGridForCart(gridEl); } catch (_) {}
-    // Resolve images asynchronously
-    const cards = Array.from(gridEl.querySelectorAll('.product-card'));
-    await Promise.all(cards.map(async (card, idx) => {
-      const p = items[idx];
-      const key = Array.isArray(p.imageKeys) && p.imageKeys.length ? p.imageKeys[0] : null;
-      let url = null;
-      // Prefer existing API image resolver when key is provided
-      if (key) {
-        url = await getImageUrlForKey(key);
-      } else if (p.image_url) {
-        // image_url may be a full URL OR an external key that the API can sign
-        if (/^https?:\/\//i.test(p.image_url)) {
-          url = p.image_url;
-        } else {
-          try { url = await getImageUrlForKey(p.image_url); } catch {}
-        }
+async function renderProductsToGrid(gridEl, items) {
+  if (!gridEl) return;
+  gridEl.innerHTML = items.map(productCardHTML).join('');
+  // Bind add-to-cart interactions for this grid
+  try { bindGridForCart(gridEl); } catch (_) { }
+  // Resolve images asynchronously
+  const cards = Array.from(gridEl.querySelectorAll('.product-card'));
+  await Promise.all(cards.map(async (card, idx) => {
+    const p = items[idx];
+    const key = Array.isArray(p.imageKeys) && p.imageKeys.length ? p.imageKeys[0] : null;
+    let url = null;
+    // Prefer existing API image resolver when key is provided
+    if (key) {
+      url = await getImageUrlForKey(key);
+    } else if (p.image_url) {
+      // image_url may be a full URL OR an external key that the API can sign
+      if (/^https?:\/\//i.test(p.image_url)) {
+        url = p.image_url;
+      } else {
+        try { url = await getImageUrlForKey(p.image_url); } catch { }
       }
-      const imgDiv = card.querySelector('.product-image');
-      if (imgDiv) {
-        // If Supabase storage path provided, attempt signed URL
-        if (!url && p.image_url && typeof p.image_url === 'string' && window.sb) {
-          try {
-            // Expect p.image_url like: 'cabinet-uploads/<uid>/file.jpg' or full URL
-            if (/^https?:\/\//i.test(p.image_url)) {
-              url = p.image_url;
-            } else {
-              const path = p.image_url.replace(/^cabinet-uploads\//, '');
-              const { data, error } = await window.sb.storage
-                .from('cabinet-uploads')
-                .createSignedUrl(path, 3600);
-              if (!error && data && data.signedUrl) url = data.signedUrl;
-            }
-          } catch {}
-        }
-        if (url) {
-          imgDiv.style.backgroundImage = `url('${url}')`;
-          imgDiv.style.backgroundSize = 'cover';
-          imgDiv.style.backgroundPosition = 'center';
-        }
-      }
-      // add/override location-tag with areaLocation if present
-      const area = p.areaLocation;
-      if (area) {
-        let tag = card.querySelector('.location-tag');
-        if (!tag) {
-          tag = document.createElement('div');
-          tag.className = 'location-tag';
-          card.appendChild(tag);
-        }
-        tag.textContent = area;
-      }
-    }));
-  }
-
-  // --- Cart (Total sidebar) ---
-  const CART_KEY = 'nc_cart_v1';
-  // Per-device identifier for tracking sessions across tabs
-  const DEVICE_KEY = 'nc_device_id_v1';
-
-  let __deviceId = null;
-  function getDeviceId() {
-    if (__deviceId) return __deviceId;
-    try {
-      let id = localStorage.getItem(DEVICE_KEY);
-      if (!id) {
-        // generate a lightweight random id
-        const rnd = Math.random().toString(36).slice(2);
-        const t = Date.now().toString(36);
-        id = `${t}-${rnd}`;
-        localStorage.setItem(DEVICE_KEY, id);
-      }
-      __deviceId = id;
-      return id;
-    } catch (_) {
-      // fallback ephemeral id
-      __deviceId = 'ephem-' + Math.random().toString(36).slice(2);
-      return __deviceId;
     }
-  }
-
-  function loadCart() {
-    try {
-      const raw = localStorage.getItem(CART_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    } catch (_) { return []; }
-  }
-
-  function saveCart(items) {
-    try { localStorage.setItem(CART_KEY, JSON.stringify(items || [])); } catch (_) {}
-  }
-
-  function getCartSubtotal() {
-    const items = loadCart();
-    let subtotal = 0;
-    for (const it of items) {
-      const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
-      subtotal += line;
-    }
-    return Number(subtotal || 0);
-  }
-
-  // Heartbeat: upsert session row with latest subtotal and last_seen
-  let __hbScheduled = false;
-  let __hbLastSubtotal = 0;
-  async function upsertActiveSession(subtotal) {
-    try {
-      if (!window.sb) return;
-      const { data } = await window.sb.auth.getSession();
-      const session = data && data.session;
-      const user = session && session.user;
-      if (!user) return;
-      const deviceId = getDeviceId();
-      const email = user.email || null;
-      const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : null;
-      await window.sb
-        .from('active_sessions')
-        .upsert({
-          user_id: user.id,
-          device_id: deviceId,
-          email,
-          subtotal: Number(subtotal || 0),
-          last_seen: new Date().toISOString(),
-          user_agent: ua,
-        });
-    } catch (_) {}
-  }
-
-  function scheduleHeartbeat(subtotal) {
-    __hbLastSubtotal = Number(subtotal || 0);
-    if (__hbScheduled) return;
-    __hbScheduled = true;
-    setTimeout(async () => {
-      __hbScheduled = false;
-      try { await upsertActiveSession(__hbLastSubtotal); } catch (_) {}
-    }, 300);
-  }
-
-  // Set up a realtime watcher that listens for admin-triggered force sign-out
-  let __forceWatcherInited = false;
-  async function ensureForceSignoutWatcher() {
-    if (__forceWatcherInited) return;
-    try {
-      if (!window.sb) return;
-      const { data } = await window.sb.auth.getSession();
-      const user = data?.session?.user;
-      if (!user) return;
-      const deviceId = getDeviceId();
-      const channel = window.sb.channel('active_sessions_watch_' + deviceId)
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'active_sessions',
-          filter: `user_id=eq.${user.id}`,
-        }, (payload) => {
-          try {
-            const row = payload?.new || {};
-            if (row && row.force_sign_out && row.device_id === deviceId && row.user_id === user.id) {
-              // Clear the flag for this row first so future sessions don't instantly sign out
-              try {
-                window.sb
-                  .from('active_sessions')
-                  .update({ force_sign_out: false })
-                  .eq('user_id', user.id)
-                  .eq('device_id', deviceId);
-              } catch (_) {}
-              // Admin requested sign-out: clear local state and sign out
-              try { localStorage.removeItem(CART_KEY); } catch (_) {}
-              try { sessionStorage.clear(); } catch (_) {}
-              try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) {}
-              // Redirect to sign-in
-              window.location.href = 'signin.html';
-            }
-          } catch (_) {}
-        })
-        .subscribe();
-      __forceWatcherInited = true;
-      return channel;
-    } catch (_) {}
-  }
-
-  function formatMoney(n) {
-    const v = Number(n || 0);
-    return `$${v.toFixed(2)}`;
-  }
-
-  function renderCart() {
-    const container = document.querySelector('.right-section .cart-items');
-    const subtotalEl = document.querySelector('.right-section .subtotal-amount');
-    if (!container) return;
-    const items = loadCart();
-    container.innerHTML = '';
-    let subtotal = 0;
-    items.forEach((it, idx) => {
-      const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
-      subtotal += line;
-      const div = document.createElement('div');
-      div.className = 'cart-item';
-      const key = (it.id != null) ? String(it.id) : `name:${it.name}`;
-      div.setAttribute('data-key', key);
-      const qty = Number(it.qty) || 1;
-      let labelText = (it.name || 'item');
-      if (it.weighted) {
-        const shown = qty % 1 === 0 ? qty.toString() : qty.toFixed(3).replace(/\.0+$/, '');
-        const u = it.unit ? ` ${it.unit}` : '';
-        labelText = `${labelText} ${shown}${u}`;
-      } else if (qty > 1) {
-        labelText = `${labelText} x${qty}`;
+    const imgDiv = card.querySelector('.product-image');
+    if (imgDiv) {
+      // If Supabase storage path provided, attempt signed URL
+      if (!url && p.image_url && typeof p.image_url === 'string' && window.sb) {
+        try {
+          // Expect p.image_url like: 'cabinet-uploads/<uid>/file.jpg' or full URL
+          if (/^https?:\/\//i.test(p.image_url)) {
+            url = p.image_url;
+          } else {
+            const path = p.image_url.replace(/^cabinet-uploads\//, '');
+            const { data, error } = await window.sb.storage
+              .from('cabinet-uploads')
+              .createSignedUrl(path, 3600);
+            if (!error && data && data.signedUrl) url = data.signedUrl;
+          }
+        } catch { }
       }
-      div.innerHTML = `
+      if (url) {
+        imgDiv.style.backgroundImage = `url('${url}')`;
+        imgDiv.style.backgroundSize = 'cover';
+        imgDiv.style.backgroundPosition = 'center';
+      }
+    }
+    // add/override location-tag with areaLocation if present
+    const area = p.areaLocation;
+    if (area) {
+      let tag = card.querySelector('.location-tag');
+      if (!tag) {
+        tag = document.createElement('div');
+        tag.className = 'location-tag';
+        card.appendChild(tag);
+      }
+      tag.textContent = area;
+    }
+  }));
+}
+
+// --- Cart (Total sidebar) ---
+const CART_KEY = 'nc_cart_v1';
+// Per-device identifier for tracking sessions across tabs
+const DEVICE_KEY = 'nc_device_id_v1';
+
+let __deviceId = null;
+function getDeviceId() {
+  if (__deviceId) return __deviceId;
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      // generate a lightweight random id
+      const rnd = Math.random().toString(36).slice(2);
+      const t = Date.now().toString(36);
+      id = `${t}-${rnd}`;
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    __deviceId = id;
+    return id;
+  } catch (_) {
+    // fallback ephemeral id
+    __deviceId = 'ephem-' + Math.random().toString(36).slice(2);
+    return __deviceId;
+  }
+}
+
+function loadCart() {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) { return []; }
+}
+
+function saveCart(items) {
+  try { localStorage.setItem(CART_KEY, JSON.stringify(items || [])); } catch (_) { }
+}
+
+function getCartSubtotal() {
+  const items = loadCart();
+  let subtotal = 0;
+  for (const it of items) {
+    const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
+    subtotal += line;
+  }
+  return Number(subtotal || 0);
+}
+
+// Heartbeat: upsert session row with latest subtotal and last_seen
+let __hbScheduled = false;
+let __hbLastSubtotal = 0;
+async function upsertActiveSession(subtotal) {
+  try {
+    if (!window.sb) return;
+    const { data } = await window.sb.auth.getSession();
+    const session = data && data.session;
+    const user = session && session.user;
+    if (!user) return;
+    const deviceId = getDeviceId();
+    const email = user.email || null;
+    const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : null;
+    await window.sb
+      .from('active_sessions')
+      .upsert({
+        user_id: user.id,
+        device_id: deviceId,
+        email,
+        subtotal: Number(subtotal || 0),
+        last_seen: new Date().toISOString(),
+        user_agent: ua,
+      });
+  } catch (_) { }
+}
+
+function scheduleHeartbeat(subtotal) {
+  __hbLastSubtotal = Number(subtotal || 0);
+  if (__hbScheduled) return;
+  __hbScheduled = true;
+  setTimeout(async () => {
+    __hbScheduled = false;
+    try { await upsertActiveSession(__hbLastSubtotal); } catch (_) { }
+  }, 300);
+}
+
+// Set up a realtime watcher that listens for admin-triggered force sign-out
+let __forceWatcherInited = false;
+async function ensureForceSignoutWatcher() {
+  if (__forceWatcherInited) return;
+  try {
+    if (!window.sb) return;
+    const { data } = await window.sb.auth.getSession();
+    const user = data?.session?.user;
+    if (!user) return;
+    const deviceId = getDeviceId();
+    const channel = window.sb.channel('active_sessions_watch_' + deviceId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'active_sessions',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        try {
+          const row = payload?.new || {};
+          if (row && row.force_sign_out && row.device_id === deviceId && row.user_id === user.id) {
+            // Clear the flag for this row first so future sessions don't instantly sign out
+            try {
+              window.sb
+                .from('active_sessions')
+                .update({ force_sign_out: false })
+                .eq('user_id', user.id)
+                .eq('device_id', deviceId);
+            } catch (_) { }
+            // Admin requested sign-out: clear local state and sign out
+            try { localStorage.removeItem(CART_KEY); } catch (_) { }
+            try { sessionStorage.clear(); } catch (_) { }
+            try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+            // Redirect to sign-in
+            window.location.href = 'signin.html';
+          }
+        } catch (_) { }
+      })
+      .subscribe();
+    __forceWatcherInited = true;
+    return channel;
+  } catch (_) { }
+}
+
+function formatMoney(n) {
+  const v = Number(n || 0);
+  return `$${v.toFixed(2)}`;
+}
+
+function renderCart() {
+  const container = document.querySelector('.right-section .cart-items');
+  const subtotalEl = document.querySelector('.right-section .subtotal-amount');
+  if (!container) return;
+  const items = loadCart();
+  container.innerHTML = '';
+  let subtotal = 0;
+  items.forEach((it, idx) => {
+    const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
+    subtotal += line;
+    const div = document.createElement('div');
+    div.className = 'cart-item';
+    const key = (it.id != null) ? String(it.id) : `name:${it.name}`;
+    div.setAttribute('data-key', key);
+    const qty = Number(it.qty) || 1;
+    let labelText = (it.name || 'item');
+    if (it.weighted) {
+      const shown = qty % 1 === 0 ? qty.toString() : qty.toFixed(3).replace(/\.0+$/, '');
+      const u = it.unit ? ` ${it.unit}` : '';
+      labelText = `${labelText} ${shown}${u}`;
+    } else if (qty > 1) {
+      labelText = `${labelText} x${qty}`;
+    }
+    div.innerHTML = `
         <div class="item-number">${idx + 1}</div>
         <div class="item-label">${labelText}</div>
         <div class="item-price">${formatMoney(line)}</div>
         <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
       `;
-      container.appendChild(div);
-    });
-    if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
-    // Push a heartbeat with latest subtotal (debounced)
-    try { scheduleHeartbeat(subtotal); } catch (_) {}
-  }
+    container.appendChild(div);
+  });
+  if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
+  // Push a heartbeat with latest subtotal (debounced)
+  try { scheduleHeartbeat(subtotal); } catch (_) { }
+}
 
-  function removeFromCartByKey(key) {
-    if (!key) return;
-    const items = loadCart();
-    const next = items.filter(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) !== key);
-    saveCart(next);
-    renderCart();
-  }
+function removeFromCartByKey(key) {
+  if (!key) return;
+  const items = loadCart();
+  const next = items.filter(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) !== key);
+  saveCart(next);
+  renderCart();
+}
 
-  function decrementCartItemByKey(key) {
-    if (!key) return;
-    const items = loadCart();
-    let changed = false;
-    for (const it of items) {
-      const k = (it.id != null) ? String(it.id) : `name:${it.name}`;
-      if (k === key) {
-        if (it.weighted) {
-          // For weighted items, remove entirely instead of decrementing
-          const next = items.filter(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) !== key);
-          saveCart(next);
-          renderCart();
-          return 'removed';
-        }
-        const q = Number(it.qty) || 1;
-        if (q > 1) {
-          it.qty = q - 1;
-          changed = true;
-        } else {
-          // qty would hit 0: remove entirely
-          const next = items.filter(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) !== key);
-          saveCart(next);
-          renderCart();
-          return 'removed';
-        }
-        break;
+function decrementCartItemByKey(key) {
+  if (!key) return;
+  const items = loadCart();
+  let changed = false;
+  for (const it of items) {
+    const k = (it.id != null) ? String(it.id) : `name:${it.name}`;
+    if (k === key) {
+      if (it.weighted) {
+        // For weighted items, remove entirely instead of decrementing
+        const next = items.filter(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) !== key);
+        saveCart(next);
+        renderCart();
+        return 'removed';
       }
-    }
-    if (changed) {
-      saveCart(items);
-      renderCart();
-      return 'decremented';
-    }
-    return null;
-  }
-
-  function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, unitPrice = null }) {
-    const items = loadCart();
-    const key = (id != null) ? String(id) : `name:${name}`;
-    const existing = items.find(it => (it.id != null ? String(it.id) : `name:${it.name}`) === key);
-    if (existing) {
-      if (weighted) {
-        // Sum weights when adding the same weighted item again
-        const addQty = Number(qty) || 0;
-        const perUnit = Number(unitPrice != null ? unitPrice : price) || 0;
-        existing.qty = (Number(existing.qty) || 0) + addQty;
-        if (!existing.weighted) existing.weighted = true;
-        existing.price = perUnit; // keep per-unit price
-        if (unit) existing.unit = unit;
+      const q = Number(it.qty) || 1;
+      if (q > 1) {
+        it.qty = q - 1;
+        changed = true;
       } else {
-        existing.qty = (existing.qty || 1) + 1;
+        // qty would hit 0: remove entirely
+        const next = items.filter(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) !== key);
+        saveCart(next);
+        renderCart();
+        return 'removed';
       }
-    } else {
-      if (weighted) {
-        items.push({ id, name, price: Number(unitPrice != null ? unitPrice : price) || 0, qty: Number(qty) || 0, weighted: true, unit: unit || null });
-      } else {
-        items.push({ id, name, price: Number(price) || 0, qty: 1 });
-      }
+      break;
     }
+  }
+  if (changed) {
     saveCart(items);
     renderCart();
-    // Animate the added item
-    try {
-      const container = document.querySelector('.right-section .cart-items');
-      const el = container ? container.querySelector(`.cart-item[data-key="${CSS.escape(key)}"]`) : null;
-      if (el) {
-        el.classList.add('added');
-        setTimeout(() => el.classList.remove('added'), 350);
-      }
-    } catch (_) {}
+    return 'decremented';
   }
+  return null;
+}
 
-  // Hoisted function declaration so it can be called before definition
-  function bindGridForCart(gridEl) {
-    if (!gridEl || gridEl.dataset.cartBound === '1') return;
-    gridEl.dataset.cartBound = '1';
-    // Single click hint
-    gridEl.addEventListener('click', (e) => {
-      const card = e.target.closest('.product-card');
-      if (!card || !gridEl.contains(card)) return;
-      try { showHintToast('Double tap to add'); } catch (_) {}
-    });
-    // Double click add
-    gridEl.addEventListener('dblclick', (e) => {
-      const card = e.target.closest('.product-card');
-      if (!card || !gridEl.contains(card)) return;
-      const id = card.getAttribute('data-id');
-      const name = card.getAttribute('data-name') || (card.querySelector('.product-name')?.textContent || '').trim();
-      const priceAttr = card.getAttribute('data-price');
-      let price = priceAttr != null ? Number(priceAttr) : null;
-      if (price == null || Number.isNaN(price)) {
-        // Parse from visible price text like "$2.00"
-        const priceText = (card.querySelector('.product-price')?.textContent || '').replace(/[^0-9.\-]/g, '');
-        price = Number(priceText) || 0;
-      }
-      const needsScale = card.getAttribute('data-scale') === '1';
-      const unit = card.getAttribute('data-unit');
-      if (needsScale) {
-        showWeightModal({ name, unit, onConfirm: (weightVal) => {
+function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, unitPrice = null }) {
+  const items = loadCart();
+  const key = (id != null) ? String(id) : `name:${name}`;
+  const existing = items.find(it => (it.id != null ? String(it.id) : `name:${it.name}`) === key);
+  if (existing) {
+    if (weighted) {
+      // Sum weights when adding the same weighted item again
+      const addQty = Number(qty) || 0;
+      const perUnit = Number(unitPrice != null ? unitPrice : price) || 0;
+      existing.qty = (Number(existing.qty) || 0) + addQty;
+      if (!existing.weighted) existing.weighted = true;
+      existing.price = perUnit; // keep per-unit price
+      if (unit) existing.unit = unit;
+    } else {
+      existing.qty = (existing.qty || 1) + 1;
+    }
+  } else {
+    if (weighted) {
+      items.push({ id, name, price: Number(unitPrice != null ? unitPrice : price) || 0, qty: Number(qty) || 0, weighted: true, unit: unit || null });
+    } else {
+      items.push({ id, name, price: Number(price) || 0, qty: 1 });
+    }
+  }
+  saveCart(items);
+  renderCart();
+  // Animate the added item
+  try {
+    const container = document.querySelector('.right-section .cart-items');
+    const el = container ? container.querySelector(`.cart-item[data-key="${CSS.escape(key)}"]`) : null;
+    if (el) {
+      el.classList.add('added');
+      setTimeout(() => el.classList.remove('added'), 350);
+    }
+  } catch (_) { }
+}
+
+// Hoisted function declaration so it can be called before definition
+function bindGridForCart(gridEl) {
+  if (!gridEl || gridEl.dataset.cartBound === '1') return;
+  gridEl.dataset.cartBound = '1';
+  // Single click hint
+  gridEl.addEventListener('click', (e) => {
+    const card = e.target.closest('.product-card');
+    if (!card || !gridEl.contains(card)) return;
+    try { showHintToast('Double tap to add'); } catch (_) { }
+  });
+  // Double click add
+  gridEl.addEventListener('dblclick', (e) => {
+    const card = e.target.closest('.product-card');
+    if (!card || !gridEl.contains(card)) return;
+    const id = card.getAttribute('data-id');
+    const name = card.getAttribute('data-name') || (card.querySelector('.product-name')?.textContent || '').trim();
+    const priceAttr = card.getAttribute('data-price');
+    let price = priceAttr != null ? Number(priceAttr) : null;
+    if (price == null || Number.isNaN(price)) {
+      // Parse from visible price text like "$2.00"
+      const priceText = (card.querySelector('.product-price')?.textContent || '').replace(/[^0-9.\-]/g, '');
+      price = Number(priceText) || 0;
+    }
+    const needsScale = card.getAttribute('data-scale') === '1';
+    const unit = card.getAttribute('data-unit');
+    if (needsScale) {
+      showWeightModal({
+        name, unit, onConfirm: (weightVal) => {
           const w = Number(weightVal);
           if (!w || w <= 0) return; // ignore invalid
           addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price });
-        }});
-      } else {
-        addToCart({ id, name, price });
-      }
-    });
+        }
+      });
+    } else {
+      addToCart({ id, name, price });
+    }
+  });
+}
+
+// Supabase-backed Cabinet fetch (IDs from Supabase, details from AWS) into sections A1..A10
+async function loadCabinetFromSupabase() {
+  const sectionIds = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10'];
+  const grids = Object.fromEntries(sectionIds.map(s => [s, document.getElementById(`grid-${s}`)]));
+  const haveAnyGrid = Object.values(grids).some(Boolean);
+  if (!haveAnyGrid) return;
+
+  const loading = '<div class="product-card"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div><div class="product-price"></div><div class="product-status"></div></div></div>';
+  // Per-section loading placeholders
+  for (const s of sectionIds) {
+    if (grids[s]) grids[s].innerHTML = loading.repeat(3);
   }
 
-  // Supabase-backed Cabinet fetch (IDs from Supabase, details from AWS) into sections A1..A10
-  async function loadCabinetFromSupabase() {
-    const sectionIds = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'];
-    const grids = Object.fromEntries(sectionIds.map(s => [s, document.getElementById(`grid-${s}`)]));
-    const haveAnyGrid = Object.values(grids).some(Boolean);
-    if (!haveAnyGrid) return;
-
-    const loading = '<div class="product-card"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div><div class="product-price"></div><div class="product-status"></div></div></div>';
-    // Per-section loading placeholders
-    for (const s of sectionIds) {
-      if (grids[s]) grids[s].innerHTML = loading.repeat(3);
-    }
-
-    try {
-      if (!window.sb) throw new Error('Supabase not initialized');
-      // 1) Get only the user's cabinet IDs (ordered by updated_at desc)
-      const { data: cabinetRows, error } = await window.sb
-        .from('cabinet_items')
-        .select('id, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      const ids = (cabinetRows || []).map(r => r.id);
-      console.debug('[Cabinet] Supabase IDs count:', ids.length, ids.slice(0, 10));
-      if (!ids.length) {
-        const emptyHtml = '<div style="color:#6b7280;">No saved items yet.</div>';
-        for (const s of sectionIds) {
-          if (grids[s]) grids[s].innerHTML = emptyHtml;
-        }
-        return;
-      }
-
-      // 2) Fetch full AWS products by those IDs (single batch; backend may return extras)
-      let awsItems = await fetchProductsByIds(ids);
-      console.debug('[Cabinet] AWS items fetched (raw):', awsItems.length);
-      // Enforce strict filter to Supabase IDs
-      const idSet = new Set(ids.map(String));
-      awsItems = (awsItems || []).filter(p => idSet.has(String(p.id)));
-      console.debug('[Cabinet] AWS items after filter:', awsItems.length);
-
-      // 3) Keep the order based on Supabase updated_at
-      const orderMap = new Map(ids.map((id, idx) => [String(id), idx]));
-      awsItems.sort((a, b) => (orderMap.get(String(a.id)) ?? 0) - (orderMap.get(String(b.id)) ?? 0));
-
-      // 4) Group by areaLocation into sections A1..A10
-      const groups = Object.fromEntries(sectionIds.map(s => [s, []]));
-      for (const p of awsItems) {
-        const raw = (p.areaLocation || p.area || '').toString().trim().toUpperCase();
-        const sec = sectionIds.includes(raw) ? raw : 'A1'; // default to A1 if unknown/missing
-        groups[sec].push(p);
-      }
-
-      // 5) Render into each section grid
+  try {
+    if (!window.sb) throw new Error('Supabase not initialized');
+    // 1) Get only the user's cabinet IDs (ordered by updated_at desc)
+    const { data: cabinetRows, error } = await window.sb
+      .from('cabinet_items')
+      .select('id, updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    const ids = (cabinetRows || []).map(r => r.id);
+    console.debug('[Cabinet] Supabase IDs count:', ids.length, ids.slice(0, 10));
+    if (!ids.length) {
+      const emptyHtml = '<div style="color:#6b7280;">No saved items yet.</div>';
       for (const s of sectionIds) {
-        const grid = grids[s];
-        if (!grid) continue;
-        const items = groups[s] || [];
-        if (items.length === 0) {
-          grid.innerHTML = '<div style="color:#6b7280;">No items in this section.</div>';
-        } else {
-          await renderProductsToGrid(grid, items);
-        }
+        if (grids[s]) grids[s].innerHTML = emptyHtml;
       }
-    } catch (e) {
-      console.error('Supabase cabinet load failed', e);
-      const err = '<div style="color:#b91c1c;">Failed to load your cabinet.</div>';
-      for (const s of Object.keys(grids)) {
-        if (grids[s]) grids[s].innerHTML = err;
+      return;
+    }
+
+    // 2) Fetch full AWS products by those IDs (single batch; backend may return extras)
+    let awsItems = await fetchProductsByIds(ids);
+    console.debug('[Cabinet] AWS items fetched (raw):', awsItems.length);
+    // Enforce strict filter to Supabase IDs
+    const idSet = new Set(ids.map(String));
+    awsItems = (awsItems || []).filter(p => idSet.has(String(p.id)));
+    console.debug('[Cabinet] AWS items after filter:', awsItems.length);
+
+    // 3) Keep the order based on Supabase updated_at
+    const orderMap = new Map(ids.map((id, idx) => [String(id), idx]));
+    awsItems.sort((a, b) => (orderMap.get(String(a.id)) ?? 0) - (orderMap.get(String(b.id)) ?? 0));
+
+    // 4) Group by areaLocation into sections A1..A10
+    const groups = Object.fromEntries(sectionIds.map(s => [s, []]));
+    for (const p of awsItems) {
+      const raw = (p.areaLocation || p.area || '').toString().trim().toUpperCase();
+      const sec = sectionIds.includes(raw) ? raw : 'A1'; // default to A1 if unknown/missing
+      groups[sec].push(p);
+    }
+
+    // 5) Render into each section grid
+    for (const s of sectionIds) {
+      const grid = grids[s];
+      if (!grid) continue;
+      const items = groups[s] || [];
+      if (items.length === 0) {
+        grid.innerHTML = '<div style="color:#6b7280;">No items in this section.</div>';
+      } else {
+        await renderProductsToGrid(grid, items);
       }
     }
-  }
-
-  async function loadCabinetSections() {
-    try {
-      const gridNew = document.getElementById('whats-new-grid');
-      const gridTop = document.getElementById('top-selling-grid');
-      if (!gridNew && !gridTop) return; // not on cabinet
-
-      // Loading placeholders
-      const loading = '<div class="product-card"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div><div class="product-price"></div><div class="product-status"></div></div></div>';
-      if (gridNew) gridNew.innerHTML = loading.repeat(3);
-      if (gridTop) gridTop.innerHTML = loading.repeat(3);
-
-      const items = await fetchProducts({ availability: 'In Stock', limit: 24 });
-      // Derive sections: newest by createdAt for What's New, then next chunk as Top Selling placeholder
-      const withDates = items.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      const whatsNew = withDates.slice(0, 6);
-      const topSelling = withDates.slice(6, 12); // placeholder until backend sections exist
-
-      if (gridNew) await renderProductsToGrid(gridNew, whatsNew);
-      if (gridTop) await renderProductsToGrid(gridTop, topSelling);
-    } catch (e) {
-      console.error('Failed to load cabinet sections', e);
-      const gridNew = document.getElementById('whats-new-grid');
-      const gridTop = document.getElementById('top-selling-grid');
-      const err = '<div style="color:#b91c1c;">Failed to load products.</div>';
-      if (gridNew) gridNew.innerHTML = err;
-      if (gridTop) gridTop.innerHTML = err;
+  } catch (e) {
+    console.error('Supabase cabinet load failed', e);
+    const err = '<div style="color:#b91c1c;">Failed to load your cabinet.</div>';
+    for (const s of Object.keys(grids)) {
+      if (grids[s]) grids[s].innerHTML = err;
     }
   }
+}
+
+async function loadCabinetSections() {
+  try {
+    const gridNew = document.getElementById('whats-new-grid');
+    const gridTop = document.getElementById('top-selling-grid');
+    if (!gridNew && !gridTop) return; // not on cabinet
+
+    // Loading placeholders
+    const loading = '<div class="product-card"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div><div class="product-price"></div><div class="product-status"></div></div></div>';
+    if (gridNew) gridNew.innerHTML = loading.repeat(3);
+    if (gridTop) gridTop.innerHTML = loading.repeat(3);
+
+    const items = await fetchProducts({ availability: 'In Stock', limit: 24 });
+    // Derive sections: newest by createdAt for What's New, then next chunk as Top Selling placeholder
+    const withDates = items.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const whatsNew = withDates.slice(0, 6);
+    const topSelling = withDates.slice(6, 12); // placeholder until backend sections exist
+
+    if (gridNew) await renderProductsToGrid(gridNew, whatsNew);
+    if (gridTop) await renderProductsToGrid(gridTop, topSelling);
+  } catch (e) {
+    console.error('Failed to load cabinet sections', e);
+    const gridNew = document.getElementById('whats-new-grid');
+    const gridTop = document.getElementById('top-selling-grid');
+    const err = '<div style="color:#b91c1c;">Failed to load products.</div>';
+    if (gridNew) gridNew.innerHTML = err;
+    if (gridTop) gridTop.innerHTML = err;
+  }
+}
 document.addEventListener('DOMContentLoaded', () => {
   // simple debounce helper
   function debounce(fn, wait = 250) {
@@ -643,22 +645,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1300);
   }
   // Initialize cart UI from storage and bind any existing grids
-  try { renderCart(); } catch (_) {}
+  try { renderCart(); } catch (_) { }
   // Initialize force sign-out realtime watcher and send an initial heartbeat
-  try { ensureForceSignoutWatcher(); } catch (_) {}
-  try { upsertActiveSession(getCartSubtotal()); } catch (_) {}
+  try { ensureForceSignoutWatcher(); } catch (_) { }
+  try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
   // Periodic heartbeat to keep last_seen fresh and subtotal up to date
   try {
     setInterval(() => {
-      try { upsertActiveSession(getCartSubtotal()); } catch (_) {}
+      try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
     }, 20000);
-  } catch (_) {}
+  } catch (_) { }
   // Ensure weight modal root exists
-  try { ensureModalRoot(); } catch (_) {}
+  try { ensureModalRoot(); } catch (_) { }
   try {
     const gridsNow = document.querySelectorAll('.products-grid');
-    gridsNow.forEach(g => { try { bindGridForCart(g); } catch (_) {} });
-  } catch (_) {}
+    gridsNow.forEach(g => { try { bindGridForCart(g); } catch (_) { } });
+  } catch (_) { }
   // Handle cart remove button clicks (delegated)
   try {
     const cartList = document.querySelector('.right-section .cart-items');
@@ -676,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const it = items.find(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) === key);
           qty = Number(it?.qty) || 1;
           isWeighted = !!it?.weighted;
-        } catch (_) {}
+        } catch (_) { }
 
         // Weighted items: remove entire line immediately
         if (isWeighted) {
@@ -699,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
               el.classList.add('added');
               setTimeout(() => el.classList.remove('added'), 350);
             }
-          } catch (_) {}
+          } catch (_) { }
         } else {
           // Animate out then remove
           if (row) {
@@ -711,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
-  } catch (_) {}
+  } catch (_) { }
   // Add click functionality to product cards (category view)
   document.querySelectorAll('.product-card').forEach(card => {
     card.addEventListener('click', function () {
@@ -735,10 +737,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const clearPresence = () => {
         if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
         if (presenceHandle && typeof presenceHandle.close === 'function') {
-          try { presenceHandle.close(); } catch(_){}
+          try { presenceHandle.close(); } catch (_) { }
         }
         presenceHandle = null;
         presenceShown = false;
+      };
+
+      const signOutForInactivity = async () => {
+        try { localStorage.removeItem('nc_cart_v1'); } catch (_) { }
+        try { sessionStorage.clear(); } catch (_) { }
+        if (window.sb) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+        }
+        window.location.href = 'signin.html?reason=inactive';
       };
 
       const resetIdleTimer = () => {
@@ -752,32 +763,39 @@ document.addEventListener('DOMContentLoaded', () => {
             message: 'Are you still there? We will sign you out for security if you are inactive.',
             buttonText: "I'm here",
             onConfirm: () => {
-              // User confirmed presence — just reset timers
+              // User confirmed presence — dismiss prompt and reset
+              clearPresence();
               resetIdleTimer();
             },
           });
-          // Start grace period: if no response within GRACE_MS, sign out
-          graceTimer = setTimeout(async () => {
-            try {
-              // Clear any local state and sign out locally
-              try { localStorage.removeItem('nc_cart_v1'); } catch(_){ }
-              try { sessionStorage.clear(); } catch(_){ }
-              if (window.sb) {
-                try { await window.sb.auth.signOut({ scope: 'local' }); } catch(_){ }
-              }
-            } finally {
-              window.location.href = 'account.html';
+
+          if (!presenceHandle) {
+            // Fallback in case modal could not render (e.g., missing styles)
+            const confirmed = window.confirm('Are you still there? You will be signed out for security if inactive.');
+            if (confirmed) {
+              clearPresence();
+              resetIdleTimer();
+            } else {
+              signOutForInactivity();
             }
+            return;
+          }
+
+          // Start grace period: if no response within GRACE_MS, sign out
+          graceTimer = setTimeout(() => {
+            if (!presenceShown) return; // user already dismissed prompt
+            clearPresence();
+            signOutForInactivity();
           }, GRACE_MS);
         }, IDLE_MS);
       };
 
-      const activityEvents = ['click','mousemove','keydown','touchstart','scroll','focus'];
+      const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
       activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
       // Start monitoring
       resetIdleTimer();
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Add click functionality to checkout button
   const checkoutBtn = document.querySelector('.checkout-btn');
@@ -787,46 +805,48 @@ document.addEventListener('DOMContentLoaded', () => {
         await startCheckout();
       } catch (e) {
         console.error('Checkout failed', e);
-        try { showHintToast('Checkout failed'); } catch (_) {}
+        try { showHintToast('Checkout failed'); } catch (_) { }
       }
     });
   }
 
   // Add click functionality to search icon (category view)
-  const searchIcon = document.querySelector('.search-icon');
-  const searchInput = document.querySelector('.search-input');
-  if (searchIcon && searchInput) {
-    searchIcon.addEventListener('click', function () {
-      const sectionHeader = searchIcon.closest('.section-header');
+  // Search interactions
+  document.addEventListener('click', (e) => {
+    const searchIcon = e.target.closest('.search-icon');
+    const searchInput = document.querySelector('.search-input');
+    const sectionHeader = document.querySelector('.section-header');
+    const leftSection = document.querySelector('.left-section');
+
+    if (searchIcon && searchInput && sectionHeader) {
       searchInput.classList.toggle('expanded');
       sectionHeader.classList.toggle('expanded');
-      // Add/remove searching class on the left section so CSS can hide back/tabs on iPad
-      const left = document.querySelector('.left-section');
-      if (left) {
-        if (searchInput.classList.contains('expanded')) left.classList.add('searching');
-        else left.classList.remove('searching');
-      }
-      if (searchInput.classList.contains('expanded')) {
-        searchInput.focus();
-      }
-    });
 
-    // Collapse search when clicking outside
-    searchInput.addEventListener('blur', function () {
-      const sectionHeader = searchIcon.closest('.section-header');
+      if (leftSection) {
+        if (searchInput.classList.contains('expanded')) {
+          leftSection.classList.add('searching');
+          setTimeout(() => searchInput.focus(), 100);
+        } else {
+          leftSection.classList.remove('searching');
+        }
+      }
+    }
+  });
+
+  // Collapse search when clicking outside
+  document.addEventListener('mousedown', (e) => {
+    const searchContainer = e.target.closest('.search-container');
+    const vkKeyboard = e.target.closest('.vk') || e.target.closest('#vk-cabinet');
+    const searchInput = document.querySelector('.search-input');
+    const sectionHeader = document.querySelector('.section-header');
+    const leftSection = document.querySelector('.left-section');
+
+    if (!searchContainer && !vkKeyboard && searchInput && searchInput.classList.contains('expanded')) {
       searchInput.classList.remove('expanded');
-      sectionHeader.classList.remove('expanded');
-      const left = document.querySelector('.left-section');
-      if (left) left.classList.remove('searching');
-    });
-
-    // Keypress retained for accessibility logging; actual filtering wired below for category page
-    searchInput.addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') {
-        // no-op: filtering happens on input
-      }
-    });
-  }
+      if (sectionHeader) sectionHeader.classList.remove('expanded');
+      if (leftSection) leftSection.classList.remove('searching');
+    }
+  });
 
   // Index page: bind to existing static category cards (preserve original look)
   if (document.body.classList.contains('index')) {
@@ -845,8 +865,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (navigating) return;
         navigating = true;
         const q = title ? ('?name=' + encodeURIComponent(title)) : '';
-        if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch {} }
-        try { sessionStorage.setItem('lastView', 'category'); } catch {}
+        if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch { } }
+        try { sessionStorage.setItem('lastView', 'category'); } catch { }
         document.body.classList.add('page-exit-right');
         setTimeout(() => { window.location.href = 'category.html' + q; }, 280);
       });
@@ -869,21 +889,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // store last category for later navigation from cabinet
       if (name) {
-        try { sessionStorage.setItem('lastCategoryName', name); } catch {}
+        try { sessionStorage.setItem('lastCategoryName', name); } catch { }
       }
-      try { sessionStorage.setItem('lastView', 'category'); } catch {}
+      try { sessionStorage.setItem('lastView', 'category'); } catch { }
     }
 
     // Back button: animate then navigate back to index
-    const backBtn = document.querySelector('.back-btn');
-    if (backBtn) {
-      backBtn.addEventListener('click', () => {
-        document.body.classList.add('page-exit-right');
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 280);
-      });
-    }
+    // Back button: animate then navigate back to index
+    // Back button: animate then navigate back to index
+    const setupBack = () => {
+      const backBtn = document.querySelector('.back-btn');
+      if (backBtn) {
+        backBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          document.body.classList.add('page-exit-right');
+          setTimeout(() => {
+            const currentPath = window.location.pathname;
+            const newPath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1) + 'index.html';
+            window.location.href = newPath;
+          }, 280);
+        });
+      }
+    };
+    setupBack();
 
     // Add location tag to each product card (placeholder "A1")
     const productCards = document.querySelectorAll('.products-grid .product-card');
@@ -899,7 +927,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cabinet data load (prefer Supabase if available)
     if (isCabinetPage) {
-      const sectionIds = ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'];
+      const sectionIds = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10'];
       const showConnectMsg = (msg = 'Connect to view your cabinet.') => {
         for (const s of sectionIds) {
           const grid = document.getElementById(`grid-${s}`);
@@ -986,7 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
             firstTabSpan.textContent = 'Pick A Category';
           }
         }
-      } catch {}
+      } catch { }
     }
 
     let tabNavigating = false;
@@ -1003,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             lastView = sessionStorage.getItem('lastView');
             lastName = sessionStorage.getItem('lastCategoryName');
-          } catch {}
+          } catch { }
           if (lastView === 'category' && lastName) {
             dest = 'category.html?name=' + encodeURIComponent(lastName);
           } else {
@@ -1014,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
           try {
             if (isIndex) sessionStorage.setItem('lastView', 'index');
             else if (isCategory) sessionStorage.setItem('lastView', 'category');
-          } catch {}
+          } catch { }
           dest = 'cabinet.html';
         } else if (label.includes('category') || label.includes('pick a category')) {
           // On cabinet: go back to the last selected category if known, else index
@@ -1024,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
               lastView = sessionStorage.getItem('lastView');
               lastName = sessionStorage.getItem('lastCategoryName');
-            } catch {}
+            } catch { }
             if (lastView === 'category' && lastName) dest = 'category.html?name=' + encodeURIComponent(lastName);
             else dest = 'index.html';
           } else if (isIndex || isCategory) {
@@ -1163,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     }
-  } catch {}
+  } catch { }
 });
 
 
@@ -1172,7 +1200,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function startCheckout() {
   const items = loadCart();
   if (!items || items.length === 0) {
-    try { showHintToast('Your cart is empty'); } catch (_) {}
+    try { showHintToast('Your cart is empty'); } catch (_) { }
     return;
   }
 
@@ -1221,7 +1249,7 @@ async function startCheckout() {
       user_id = u?.user?.id || null;
       user_email = u?.user?.email || null;
     }
-  } catch {}
+  } catch { }
 
   const payload = {
     currency: 'usd',
@@ -1341,7 +1369,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Clear cart after a successful checkout
-      try { saveCart([]); renderCart(); } catch {}
+      try { saveCart([]); renderCart(); } catch { }
       setStatus('Payment complete', 'success');
     } catch (e) {
       console.error('Failed to load receipt', e);

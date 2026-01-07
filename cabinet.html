@@ -1,18 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cabinet</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
   <div class="container">
     <div id="header-placeholder"></div>
 
     <div class="left-section">
-     
+
       <div class="section-header">
+        <button class="back-btn" aria-label="Back to categories">
+          <span class="back-icon">←</span>
+          <span class="back-text">Back</span>
+        </button>
         <div class="tabbar" role="tablist" aria-label="Cabinet navigation">
           <button class="tab" role="tab" aria-selected="false" tabindex="-1">
             <span>Category</span>
@@ -22,7 +28,8 @@
           </button>
         </div>
         <div class="search-container">
-          <input type="text" class="search-input" placeholder="Search products..." inputmode="none" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+          <input type="text" class="search-input" placeholder="Search products..." inputmode="none" readonly
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
           <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.35-4.35"></path>
@@ -119,11 +126,11 @@
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
           return (window.location.href = 'signin.html');
         }
       } catch (e) {
-        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
         return (window.location.href = 'signin.html');
       }
     })();
@@ -131,4 +138,5 @@
   <script src="site.js"></script>
   <script src="vk-cabinet.js"></script>
 </body>
+
 </html>

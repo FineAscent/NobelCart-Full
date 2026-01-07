@@ -1,5 +1,5 @@
 // Virtual keyboard for Cabinet search
-(function(){
+(function () {
   const VK_ID = 'vk-cabinet';
   let vkEl = null;
   let input = null;
@@ -30,7 +30,7 @@
 
     let isNumbersMode = false;
 
-    function key(label, opts={}) {
+    function key(label, opts = {}) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'vk-key' + (opts.special ? ' vk-key--special' : '') + (opts.space ? ' vk-key--space' : '') + (opts.done ? ' vk-key--done' : '');
@@ -39,22 +39,22 @@
       return btn;
     }
 
-    function renderRows(){
-      [row1,row2,row3,row4].forEach(r => { if (r) r.innerHTML = ''; });
+    function renderRows() {
+      [row1, row2, row3, row4].forEach(r => { if (r) r.innerHTML = ''; });
 
       if (!isNumbersMode) {
-        const r1 = ['q','w','e','r','t','y','u','i','o','p'];
-        const r2 = ['a','s','d','f','g','h','j','k','l','←'];
-        const r3 = ['z','x','c','v','b','n','m','@','.'];
+        const r1 = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+        const r2 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '←'];
+        const r3 = ['z', 'x', 'c', 'v', 'b', 'n', 'm', '@', '.'];
         r1.forEach(k => row1.appendChild(key(k)));
-        r2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
+        r2.forEach(k => row2.appendChild(key(k, { special: k === '←' })));
         r3.forEach(k => row3.appendChild(key(k)));
       } else {
-        const n1 = ['1','2','3','4','5','6','7','8','9','0'];
-        const n2 = ['-','_','/','\\',':',';','(',' )','$','&','←'];
-        const n3 = ['@','.','!','?','#','%','+','=','*',','];
+        const n1 = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+        const n2 = ['-', '_', '/', '\\', ':', ';', '(', ' )', '$', '&', '←'];
+        const n3 = ['@', '.', '!', '?', '#', '%', '+', '=', '*', ','];
         n1.forEach(k => row1.appendChild(key(k)));
-        n2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
+        n2.forEach(k => row2.appendChild(key(k, { special: k === '←' })));
         n3.forEach(k => row3.appendChild(key(k)));
       }
 
@@ -81,14 +81,14 @@
       if (code === 'MODE') {
         isNumbersMode = !isNumbersMode;
         renderRows();
-        if (input) { try { input.focus(); } catch(_){} }
+        if (input) { try { input.focus(); } catch (_) { } }
         return;
       }
       if (code === 'DONE') {
         try {
           const ev = new CustomEvent('vk:done', { bubbles: true });
           (input || document).dispatchEvent(ev);
-        } catch(_) {}
+        } catch (_) { }
         hide();
         return;
       }
@@ -107,7 +107,7 @@
     const val = input.value || '';
     input.value = val.slice(0, start) + text + val.slice(end);
     const pos = start + text.length;
-    try { input.setSelectionRange(pos, pos); } catch(_) {}
+    try { input.setSelectionRange(pos, pos); } catch (_) { }
     input.focus();
     // Trigger input event for any listeners (e.g. filtering)
     const ev = new Event('input', { bubbles: true });
@@ -122,10 +122,10 @@
     if (start === end && start > 0) {
       input.value = val.slice(0, start - 1) + val.slice(end);
       const pos = start - 1;
-      try { input.setSelectionRange(pos, pos); } catch(_) {}
+      try { input.setSelectionRange(pos, pos); } catch (_) { }
     } else if (start !== end) {
       input.value = val.slice(0, start) + val.slice(end);
-      try { input.setSelectionRange(start, start); } catch(_) {}
+      try { input.setSelectionRange(start, start); } catch (_) { }
     }
     input.focus();
     const ev = new Event('input', { bubbles: true });
@@ -169,20 +169,23 @@
     });
 
     // When the search icon is clicked, wait for site.js to toggle expansion, then decide
-    if (searchIcon) {
-      searchIcon.addEventListener('click', () => {
+    // When the search icon is clicked, wait for site.js to toggle expansion, then decide
+    document.addEventListener('click', (e) => {
+      const searchIcon = e.target.closest('.section-header .search-icon');
+      if (searchIcon) {
         setTimeout(() => {
+          const searchInput = document.querySelector('.section-header .search-input');
           const sectionHeader = searchIcon.closest('.section-header');
-          const expanded = searchInput.classList.contains('expanded') || sectionHeader?.classList.contains('expanded');
+          const expanded = searchInput?.classList.contains('expanded') || sectionHeader?.classList.contains('expanded');
           if (expanded) {
-            searchInput.focus();
+            searchInput?.focus();
             show(searchInput);
           } else {
             hide();
           }
-        }, 0);
-      });
-    }
+        }, 10);
+      }
+    });
 
     // Hide VK when pressing Escape
     document.addEventListener('keydown', (e) => {
