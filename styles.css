@@ -687,19 +687,18 @@ body.index .container {
 
 body.index .category-grid {
     flex: 1;
-    grid-template-rows: repeat(3, 1fr);
-    gap: 12px;
-    /* balanced gap for 10.1\" displays */
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0 6px;
+    /* ensure all 3 rows fit on 600px height */
 }
 
 /* Make cards fluid in the 3x3 grid */
 body.index .category-card {
     height: 100%;
     /* fill grid cell so content can be centered from edges */
-    padding: 14px;
-    /* reduced padding */
-    gap: 24px;
-    /* a bit more space between title and icons */
+    padding: 10px;
+    gap: 18px;
 }
 
 /* Smaller tab bar on index */
@@ -790,7 +789,7 @@ body.signin {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 90px 18px 40px;
+    padding: 72px 14px 32px;
     /* scaled spacing under fixed header */
 }
 
@@ -801,24 +800,24 @@ body.signin {
     border: 1px solid rgba(0, 0, 0, 0.06);
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-    padding: 32px 32px 26px;
+    padding: 26px 24px 22px;
     /* compact card */
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     /* tighter internal spacing */
     transition: transform 200ms ease;
 }
 
 .auth-title {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 700;
     color: #2d2a26;
     text-align: center;
 }
 
 .auth-subtitle {
-    font-size: 13px;
+    font-size: 12px;
     color: #6b6a67;
     text-align: center;
     margin-bottom: 12px;
@@ -831,7 +830,7 @@ body.signin {
     flex-direction: column;
     align-items: center;
     /* center children horizontally */
-    gap: 12px;
+    gap: 10px;
 }
 
 .auth-field {
@@ -861,9 +860,9 @@ body.signin {
     border: 1px solid rgba(0, 0, 0, 0.08);
     background: #f7f5f5;
     border-radius: 12px;
-    padding: 14px 16px;
+    padding: 12px 14px;
     /* comfortable touch target */
-    font-size: 16px;
+    font-size: 15px;
     color: #333;
     outline: none;
     transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
@@ -946,6 +945,48 @@ body.signin.keyboard-visible .auth-wrapper {
 @media (max-height: 700px) {
     body.signin.keyboard-visible .auth-card {
         transform: translateY(-12vh);
+    }
+}
+
+/* Extra-tight layout for 600px-tall displays (e.g., Pi 10.1" 1024x600) */
+@media (max-height: 640px) {
+    .auth-wrapper {
+        padding: 54px 12px 24px;
+    }
+
+    .auth-card {
+        max-width: 410px;
+        padding: 22px 20px 18px;
+        gap: 10px;
+    }
+
+    .auth-title {
+        font-size: 22px;
+    }
+
+    .auth-subtitle {
+        font-size: 11px;
+        margin-bottom: 10px;
+    }
+
+    .auth-form {
+        gap: 8px;
+    }
+
+    .auth-input {
+        padding: 11px 12px;
+        font-size: 14px;
+    }
+
+    .auth-label {
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .auth-actions .btn {
+        padding: 12px;
+        font-size: 14px;
+        border-radius: 12px;
     }
 }
 
