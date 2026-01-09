@@ -116,19 +116,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script>
-    // Route guard: require active session
+    // Soft check: attempt to refresh session silently; do not hard-redirect
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = 'signin.html');
-        const { data, error } = await window.sb.auth.getSession();
-        const session = data && data.session;
-        if (error || !session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-          return (window.location.href = 'signin.html');
-        }
-      } catch (e) {
-        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-        return (window.location.href = 'signin.html');
+        if (!window.sb) return;
+        await window.sb.auth.getSession();
+        // site.js inactivity monitor will sign out explicitly when needed
+      } catch (_) {
+        // ignore; allow page to continue for remembered devices
       }
     })();
   </script>
