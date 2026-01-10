@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Account</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body class="signin">
+  <div class="container">
+    <div class="auth-wrapper" role="main">
+      <div class="auth-card" aria-labelledby="create-title">
+        <h1 id="create-title" class="auth-title">Create your account</h1>
+        <p class="auth-subtitle">Use your email and a password to get started.</p>
+
+        <form id="create-form" class="auth-form" novalidate>
+          <div class="auth-field">
+            <label class="auth-label" for="create-email">Email</label>
+            <input id="create-email" class="auth-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required
+              inputmode="email" />
+          </div>
+
+          <div class="auth-field">
+            <label class="auth-label" for="create-password">Password</label>
+            <input id="create-password" class="auth-input" type="password" name="password" placeholder="Choose a password" autocomplete="new-password"
+              required minlength="6" />
+          </div>
+
+          <button type="submit" class="auth-button">Create account</button>
+          <div id="create-error" class="auth-error" style="display:none;"></div>
+          <div class="auth-links" aria-label="Auth links">
+            <a href="signin.html">Already have an account? Sign in</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="site.js"></script>
+  <script>
+    (function () {
+      const form = document.getElementById('create-form');
+      const emailEl = document.getElementById('create-email');
+      const pwEl = document.getElementById('create-password');
+      const errEl = document.getElementById('create-error');
+
+      const showError = (msg) => {
+        if (errEl) {
+          errEl.textContent = msg || 'Something went wrong.';
+          errEl.style.display = 'block';
+        }
+      };
+
+      form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (errEl) errEl.style.display = 'none';
+        const email = (emailEl?.value || '').trim();
+        const password = (pwEl?.value || '').trim();
+        if (!email || !password) {
+          showError('Please enter email and password.');
+          return;
+        }
+        try {
+          if (!window.sb) throw new Error('Auth not ready');
+          const { data, error } = await window.sb.auth.signUp({ email, password });
+          if (error) throw error;
+          // If email confirmation is enabled, session may be null
+          if (!data.session) {
+            alert('Account created. Please check your email to confirm before signing in.');
+            window.location.href = 'signin.html';
+            return;
+          }
+          window.location.href = 'index.html';
+        } catch (ex) {
+          showError(ex?.message || 'Failed to create account.');
+        }
+      });
+    })();
+  </script>
+</body>
+
+</html>
