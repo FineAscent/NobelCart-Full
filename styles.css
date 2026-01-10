@@ -1476,7 +1476,9 @@ screen and (max-height: 800px) {
     }
 
     .category-title {
-        font-size: 15.5px !important;
+        font-size: 16px !important;
+       font-family:  'Arial Narrow', sans-serif;
+        
         /* Slightly smaller */
         margin-top: 4px !important;
     }
