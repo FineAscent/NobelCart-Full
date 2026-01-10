@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controls</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body.controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #f5f2f2;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #2d2a26;
+    }
+
+    .controls-wrap {
+      width: min(540px, 100%);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    }
+
+    .control-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.12);
+      background: #fafafa;
+    }
+
+    .control-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: #efeaea;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      color: #5a4a36;
+    }
+
+    .control-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .control-desc {
+      font-size: 14px;
+      color: #6b6a67;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 720px) {
+      .controls-wrap {
+        width: min(480px, 100%);
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body class="controls">
+  <div class="controls-wrap">
+    <div class="control-card" id="control-refresh">
+      <div class="control-icon">⟳</div>
+      <div class="control-title">Refresh &amp; Go Home</div>
+      <div class="control-desc">Reload the app and return to the main categories.</div>
+    </div>
+
+    <div class="control-card" id="control-fullscreen">
+      <div class="control-icon">⤢</div>
+      <div class="control-title">Exit Fullscreen</div>
+      <div class="control-desc">Leave fullscreen mode if it’s active.</div>
+    </div>
+
+    <div class="control-card" id="control-account">
+      <div class="control-icon">👤</div>
+      <div class="control-title">Account</div>
+      <div class="control-desc">Open your account page.</div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const byId = (id) => document.getElementById(id);
+
+      const refreshBtn = byId('control-refresh');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+          window.location.href = 'index.html';
+        });
+      }
+
+      const fsBtn = byId('control-fullscreen');
+      if (fsBtn) {
+        fsBtn.addEventListener('click', async () => {
+          try {
+            if (document.fullscreenElement) {
+              await document.exitFullscreen();
+            } else if (document.webkitFullscreenElement && document.webkitExitFullscreen) {
+              await document.webkitExitFullscreen();
+            }
+          } catch (err) {
+            console.error('Exit fullscreen failed', err);
+          }
+        });
+      }
+
+      const acctBtn = byId('control-account');
+      if (acctBtn) {
+        acctBtn.addEventListener('click', () => {
+          window.location.href = 'account.html';
+        });
+      }
+    })();
+  </script>
+</body>
+
+</html>
