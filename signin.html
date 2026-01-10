@@ -32,7 +32,7 @@
 
           <div class="auth-field password-field">
             <label class="auth-label" for="password">Password</label>
-            <div class="auth-input-wrap" style="position: relative; display: flex; align-items: center;">
+            <div class="auth-input-wrap">
               <input
                 id="password"
                 class="auth-input"
@@ -41,10 +41,9 @@
                 placeholder="••••••••"
                 autocomplete="current-password"
                 required
-                style="padding-right: 72px;"
                 data-field="password"
               />
-              <button type="button" id="toggle-password" aria-label="Show password" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); height: 36px; padding: 0 10px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827; cursor: pointer;">Show</button>
+              <button type="button" id="toggle-password" class="password-toggle" aria-label="Show password">Show</button>
             </div>
           </div>
 
