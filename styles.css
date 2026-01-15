@@ -788,8 +788,8 @@ body.signin {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 72px 14px 32px;
-    /* scaled spacing under fixed header */
+    padding: 40px 14px 32px;
+    /* reduced top padding */
 }
 
 .auth-card {
@@ -992,12 +992,12 @@ body.signin.keyboard-visible .auth-wrapper {
 /* Extra-tight layout for 600px-tall displays (e.g., Pi 10.1" 1024x600) */
 @media (max-height: 640px) {
     .auth-wrapper {
-        padding: 54px 12px 24px;
+        padding: 34px 12px 24px;
     }
 
     .auth-card {
         max-width: 410px;
-        padding: 22px 20px 18px;
+        padding: 22px 20px 33px;
         gap: 10px;
     }
 
