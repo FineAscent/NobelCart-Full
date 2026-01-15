@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Idle Loop</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      overflow: hidden;
+    }
+
+    /* Container */
+    .idle {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      opacity: 1;
+      transition: opacity 1.2s ease-in-out;
+    }
+
+    /* Fade-out state */
+    .idle.fade-out {
+      opacity: 0;
+    }
+
+    /* Shared image styling */
+    .idle img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      animation-duration: 9s;
+      animation-iteration-count: infinite;
+      animation-timing-function: ease-in-out;
+    }
+
+    /* Image A */
+    .image-a {
+      animation-name: imageA;
+    }
+
+    /* Image B */
+    .image-b {
+      animation-name: imageB;
+    }
+
+    /* Keyframes */
+    @keyframes imageA {
+      0%   { opacity: 0; transform: scale(0.98); }
+      15%  { opacity: 1; transform: scale(1); }
+      35%  { opacity: 1; transform: scale(1); }
+      50%  { opacity: 0; transform: scale(0.98); }
+      100% { opacity: 0; transform: scale(0.98); }
+    }
+
+    @keyframes imageB {
+      0%   { opacity: 0; transform: scale(0.98); }
+      50%  { opacity: 0; transform: scale(0.98); }
+      65%  { opacity: 1; transform: scale(1); }
+      85%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.98); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="idle" id="idle">
+    <img src="noble.png" class="image-a" alt="">
+    <img src="image02.png" class="image-b" alt="">
+  </div>
+
+  <script>
+    const idle = document.getElementById("idle");
+    let triggered = false;
+
+    function goToSignin() {
+      if (triggered) return;
+      triggered = true;
+
+      idle.classList.add("fade-out");
+
+      setTimeout(() => {
+        window.location.href = "signin.html";
+      }, 1200); // must match CSS transition
+    }
+
+    document.addEventListener("click", goToSignin);
+    document.addEventListener("touchstart", goToSignin, { passive: true });
+  </script>
+</body>
+</html>

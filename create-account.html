@@ -16,16 +16,16 @@
         <p class="auth-subtitle">Use your email and a password to get started.</p>
 
         <form id="create-form" class="auth-form" novalidate>
-          <div class="auth-field">
+          <div class="auth-field email-field">
             <label class="auth-label" for="create-email">Email</label>
             <input id="create-email" class="auth-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required
-              inputmode="email" />
+              inputmode="email" data-field="email" />
           </div>
 
-          <div class="auth-field">
+          <div class="auth-field password-field">
             <label class="auth-label" for="create-password">Password</label>
             <input id="create-password" class="auth-input" type="password" name="password" placeholder="Choose a password" autocomplete="new-password"
-              required minlength="6" />
+              required minlength="6" data-field="password" />
           </div>
 
           <button type="submit" class="auth-button">Create account</button>
@@ -41,6 +41,51 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="site.js"></script>
+  <script src="vk-auth.js"></script>
+  <script>
+    // Elevate auth card when focusing inputs and spotlight focused field
+    (function () {
+      const body = document.body;
+      const inputs = Array.from(document.querySelectorAll('.auth-input'));
+      if (!inputs.length) return;
+
+      const focusClasses = ['focus-email', 'focus-password'];
+      const setFocusState = (field) => {
+        body.classList.remove(...focusClasses);
+        if (field === 'email' || field === 'password') {
+          body.classList.add(`focus-${field}`);
+        }
+      };
+
+      const handleBlur = () => {
+        setTimeout(() => {
+          const active = document.activeElement;
+          const next = inputs.find((input) => input === active);
+          if (next) {
+            setFocusState(next.dataset.field);
+            body.classList.add('keyboard-visible');
+          } else {
+            body.classList.remove('keyboard-visible', ...focusClasses);
+          }
+        }, 140);
+      };
+
+      inputs.forEach((input) => {
+        input.addEventListener('focus', () => {
+          body.classList.add('keyboard-visible');
+          setFocusState(input.dataset.field);
+        });
+        input.addEventListener('blur', handleBlur);
+      });
+
+      // If page loads with a field already focused (password manager), adjust immediately
+      const active = document.activeElement;
+      if (inputs.includes(active)) {
+        body.classList.add('keyboard-visible');
+        setFocusState(active.dataset.field);
+      }
+    })();
+  </script>
   <script>
     (function () {
       const form = document.getElementById('create-form');
