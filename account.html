@@ -14,7 +14,7 @@
           <button class="tab" role="tab" aria-selected="false" tabindex="0" onclick="window.location.href='index.html'">
             <span>Home</span>
           </button>
-          <button class="tab active" role="tab" aria-selected="true" tabindex="-1">
+          <button id="account-tab" class="tab active" role="tab" aria-selected="true" tabindex="-1">
             <span>Account</span>
           </button>
         </div>
@@ -47,7 +47,6 @@
       <div id="purchases-list" style="display:flex;flex-direction:column;gap:10px;width:100%;max-height:60vh;overflow-y:auto;padding-right:6px"></div>
     </div>
 
-    
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -264,5 +263,29 @@
     });
   </script>
   <script src="site.js"></script>
+  <script>
+    // Hidden navigation: robust double-tap/click on Account tab to open controls view
+    (function () {
+      const tab = document.getElementById('account-tab');
+      if (!tab) return;
+      const navigate = () => { window.location.href = 'controls.html'; };
+
+      // Native double-click
+      tab.addEventListener('dblclick', navigate);
+
+      // Fallback: two quick taps/clicks within 400ms
+      let lastTap = 0;
+      const detector = (e) => {
+        const now = Date.now();
+        if (now - lastTap < 400) {
+          e.preventDefault();
+          navigate();
+        }
+        lastTap = now;
+      };
+      tab.addEventListener('touchend', detector, { passive: false });
+      tab.addEventListener('click', detector);
+    })();
+  </script>
 </body>
 </html>

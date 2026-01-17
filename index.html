@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
+    
+  <link href='fonts.googleapis.com' rel='stylesheet'>
+
     <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -13,11 +16,14 @@
         <div class="left-section">
             <div class="section-header">
                 <div class="tabbar" role="tablist" aria-label="Home navigation">
-                    <button class="tab active" role="tab" aria-selected="true" tabindex="0">
+                    <button class="tab active" role="tab" aria-selected="true" tabindex="0" onclick="window.location.href='index.html'">
                         <span>Pick A Category</span>
                     </button>
-                    <button class="tab" role="tab" aria-selected="false" tabindex="-1">
+                    <button class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="window.location.href='cabinet.html'">
                         <span>Cabinet</span>
+                    </button>
+                    <button class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="window.location.href='account.html'">
+                        <span>Account</span>
                     </button>
                 </div>
                 <!-- Search bar intentionally omitted on index.html -->

@@ -153,8 +153,14 @@
   }
 
   function init() {
-    const email = document.getElementById('email');
-    const password = document.getElementById('password');
+    // Try signin page fields first
+    let email = document.getElementById('email');
+    let password = document.getElementById('password');
+    
+    // If not found, try create-account page fields
+    if (!email) email = document.getElementById('create-email');
+    if (!password) password = document.getElementById('create-password');
+    
     if (!email && !password) return;
 
     function bind(el) {
