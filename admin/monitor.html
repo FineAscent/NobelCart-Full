@@ -67,12 +67,12 @@
     // Route guard: require active session and admin role
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = '../signin.html');
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-          return (window.location.href = '../signin.html');
+          return (window.location.href = '../signin.html?admin=1');
         }
         const uid = session.user.id;
         const { data: prof } = await window.sb.from('profiles').select('is_admin, email').eq('id', uid).single();
@@ -82,7 +82,7 @@
         }
       } catch (e) {
         try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-        return (window.location.href = '../signin.html');
+        return (window.location.href = '../signin.html?admin=1');
       }
     })();
   </script>

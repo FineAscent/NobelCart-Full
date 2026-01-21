@@ -33,6 +33,10 @@
         <h3>Monitor Active Carts</h3>
         <p>View signed-in customers and their live cart subtotals.</p>
       </a>
+      <a class="admin-card" href="backup.html">
+        <h3>User Backups</h3>
+        <p>Snapshot and secure user profile data.</p>
+      </a>
     </div>
   </div>
 
@@ -43,16 +47,23 @@
   <script>
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = '../signin.html');
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-          return (window.location.href = '../signin.html');
+          return (window.location.href = '../signin.html?admin=1');
+        }
+        // Verify admin role
+        const uid = session.user.id;
+        const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
+        if (!prof || !prof.is_admin) {
+          alert('Admin access required.');
+          return (window.location.href = '../index.html');
         }
       } catch (e) {
         try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-        return (window.location.href = '../signin.html');
+        return (window.location.href = '../signin.html?admin=1');
       }
     })();
   </script>

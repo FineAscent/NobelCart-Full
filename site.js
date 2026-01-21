@@ -332,13 +332,13 @@ async function ensureForceSignoutWatcher() {
         schema: 'public',
         table: 'active_sessions',
         filter: `user_id=eq.${user.id}`,
-      }, (payload) => {
+      }, async (payload) => {
         try {
           const row = payload?.new || {};
           if (row && row.force_sign_out && row.device_id === deviceId && row.user_id === user.id) {
             // Clear the flag for this row first so future sessions don't instantly sign out
             try {
-              window.sb
+              await window.sb
                 .from('active_sessions')
                 .update({ force_sign_out: false })
                 .eq('user_id', user.id)
@@ -347,9 +347,15 @@ async function ensureForceSignoutWatcher() {
             // Admin requested sign-out: clear local state and sign out
             try { localStorage.removeItem(CART_KEY); } catch (_) { }
             try { sessionStorage.clear(); } catch (_) { }
-            try { window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
-            // Redirect to sign-in
-            window.location.href = 'signin.html';
+            try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+            // Redirect to sign-in if not already there
+            if (!location.pathname.includes('signin.html')) {
+              window.location.href = 'signin.html';
+            } else {
+              // We are already on signin.html, just ensure we are clean
+              // No need to reload as it causes a loop if the DB flag isn't cleared fast enough
+              console.debug('Force sign-out processed on signin page');
+            }
           }
         } catch (_) { }
       })
@@ -645,94 +651,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1300);
   }
   // Initialize cart UI from storage and bind any existing grids
-  try { renderCart(); } catch (_) { }
-  // Initialize force sign-out realtime watcher and send an initial heartbeat
-  try { ensureForceSignoutWatcher(); } catch (_) { }
-  try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
-  // Periodic heartbeat to keep last_seen fresh and subtotal up to date
-  try {
-    setInterval(() => {
-      try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
-    }, 20000);
-  } catch (_) { }
-  // Ensure weight modal root exists
-  try { ensureModalRoot(); } catch (_) { }
-  try {
-    const gridsNow = document.querySelectorAll('.products-grid');
-    gridsNow.forEach(g => { try { bindGridForCart(g); } catch (_) { } });
-  } catch (_) { }
-  // Handle cart remove button clicks (delegated)
-  try {
-    const cartList = document.querySelector('.right-section .cart-items');
-    if (cartList) {
-      cartList.addEventListener('click', (e) => {
-        const btn = e.target.closest('.remove-item');
-        if (!btn || !cartList.contains(btn)) return;
-        const key = btn.getAttribute('data-key');
-        const row = btn.closest('.cart-item');
-        // Determine current qty from storage
-        let qty = 1;
-        let isWeighted = false;
-        try {
-          const items = loadCart();
-          const it = items.find(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) === key);
-          qty = Number(it?.qty) || 1;
-          isWeighted = !!it?.weighted;
-        } catch (_) { }
-
-        // Weighted items: remove entire line immediately
-        if (isWeighted) {
-          if (row) {
-            row.classList.add('removing');
-            setTimeout(() => removeFromCartByKey(key), 190);
-          } else {
-            removeFromCartByKey(key);
-          }
-          return;
-        }
-
-        if (qty > 1) {
-          // Decrement and pulse row
-          decrementCartItemByKey(key);
+  const isAdminPath = /(^|\/)admin\//.test(location.pathname);
+  if (!isAdminPath) {
+    try { renderCart(); } catch (_) { }
+    // Initialize force sign-out realtime watcher and send an initial heartbeat
+    try { ensureForceSignoutWatcher(); } catch (_) { }
+    try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
+    // Periodic heartbeat to keep last_seen fresh and subtotal up to date
+    try {
+      setInterval(() => {
+        try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
+      }, 20000);
+    } catch (_) { }
+    // Ensure weight modal root exists
+    try { ensureModalRoot(); } catch (_) { }
+    try {
+      const gridsNow = document.querySelectorAll('.products-grid');
+      gridsNow.forEach(g => { try { bindGridForCart(g); } catch (_) { } });
+    } catch (_) { }
+    // Handle cart remove button clicks (delegated)
+    try {
+      const cartList = document.querySelector('.right-section .cart-items');
+      if (cartList) {
+        cartList.addEventListener('click', (e) => {
+          const btn = e.target.closest('.remove-item');
+          if (!btn || !cartList.contains(btn)) return;
+          const key = btn.getAttribute('data-key');
+          const row = btn.closest('.cart-item');
+          // Determine current qty from storage
+          let qty = 1;
+          let isWeighted = false;
           try {
-            const container = document.querySelector('.right-section .cart-items');
-            const el = container ? container.querySelector(`.cart-item[data-key="${CSS.escape(key)}"]`) : null;
-            if (el) {
-              el.classList.add('added');
-              setTimeout(() => el.classList.remove('added'), 350);
-            }
+            const items = loadCart();
+            const it = items.find(x => ((x.id != null) ? String(x.id) : `name:${x.name}`) === key);
+            qty = Number(it?.qty) || 1;
+            isWeighted = !!it?.weighted;
           } catch (_) { }
-        } else {
-          // Animate out then remove
-          if (row) {
-            row.classList.add('removing');
-            setTimeout(() => removeFromCartByKey(key), 190);
-          } else {
-            removeFromCartByKey(key);
+
+          // Weighted items: remove entire line immediately
+          if (isWeighted) {
+            if (row) {
+              row.classList.add('removing');
+              setTimeout(() => removeFromCartByKey(key), 190);
+            } else {
+              removeFromCartByKey(key);
+            }
+            return;
           }
-        }
+
+          if (qty > 1) {
+            // Decrement and pulse row
+            decrementCartItemByKey(key);
+            try {
+              const container = document.querySelector('.right-section .cart-items');
+              const el = container ? container.querySelector(`.cart-item[data-key="${CSS.escape(key)}"]`) : null;
+              if (el) {
+                el.classList.add('added');
+                setTimeout(() => el.classList.remove('added'), 350);
+              }
+            } catch (_) { }
+          } else {
+            // Animate out then remove
+            if (row) {
+              row.classList.add('removing');
+              setTimeout(() => removeFromCartByKey(key), 190);
+            } else {
+              removeFromCartByKey(key);
+            }
+          }
+        });
+      }
+    } catch (_) { }
+    // Add click functionality to product cards (category view)
+    document.querySelectorAll('.product-card').forEach(card => {
+      card.addEventListener('click', function () {
+        const nameEl = this.querySelector('.product-name');
+        if (nameEl) console.log('Product clicked:', nameEl.textContent.trim());
       });
-    }
-  } catch (_) { }
-  // Add click functionality to product cards (category view)
-  document.querySelectorAll('.product-card').forEach(card => {
-    card.addEventListener('click', function () {
-      const nameEl = this.querySelector('.product-name');
-      if (nameEl) console.log('Product clicked:', nameEl.textContent.trim());
     });
-  });
+  }
 
   // Inactivity monitor (non-admin pages only)
   try {
     const isAdminPath = /(^|\/)admin\//.test(location.pathname);
-    if (!isAdminPath) {
+    const isAdminMode = new URLSearchParams(window.location.search).has('admin');
+    
+    if (!isAdminPath && !isAdminMode) {
       let idleTimer = null;
       let graceTimer = null;
       let presenceShown = false;
       let presenceHandle = null;
+      let isUserSignedIn = false;
 
-      const IDLE_MS = 4 * 60 * 1000;   // 4 minutes inactivity to prompt
-      const GRACE_MS = 30 * 1000;      // 30 seconds after prompt to sign out
+      const AUTH_IDLE_MS = 8 * 60 * 1000;    // 8 mins for signed-in users
+      const AUTH_GRACE_MS = 60 * 1000;       // 1 min grace to respond
+      const GUEST_IDLE_MS = 3 * 60 * 1000;   // 3 mins for non-signed-in users
 
       const clearPresence = () => {
         if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
@@ -752,25 +765,21 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = 'signin.html?reason=inactive';
       };
 
-      const resetIdleTimer = () => {
-        // Any activity dismisses prompt and cancels pending logout
-        clearPresence();
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          // Show presence modal
+      const handleIdleTimeout = () => {
+        if (isUserSignedIn) {
+          // Signed-in user: Show presence modal
           presenceShown = true;
           presenceHandle = showPresenceModal({
             message: 'Are you still there? We will sign you out for security if you are inactive.',
             buttonText: "I'm here",
             onConfirm: () => {
-              // User confirmed presence — dismiss prompt and reset
               clearPresence();
               resetIdleTimer();
             },
           });
 
+          // Fallback if modal fails
           if (!presenceHandle) {
-            // Fallback in case modal could not render (e.g., missing styles)
             const confirmed = window.confirm('Are you still there? You will be signed out for security if inactive.');
             if (confirmed) {
               clearPresence();
@@ -781,19 +790,55 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // Start grace period: if no response within GRACE_MS, sign out
+          // Start grace period
           graceTimer = setTimeout(() => {
-            if (!presenceShown) return; // user already dismissed prompt
+            if (!presenceShown) return;
             clearPresence();
             signOutForInactivity();
-          }, GRACE_MS);
-        }, IDLE_MS);
+          }, AUTH_GRACE_MS);
+
+        } else {
+          // Guest user: Redirect to idle loop immediately (no prompt)
+          window.location.href = 'image.html';
+        }
       };
 
-      const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
-      activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
-      // Start monitoring
-      resetIdleTimer();
+      const resetIdleTimer = () => {
+        clearPresence();
+        if (idleTimer) clearTimeout(idleTimer);
+        
+        // Determine timeout based on auth state
+        const timeout = isUserSignedIn ? AUTH_IDLE_MS : GUEST_IDLE_MS;
+        idleTimer = setTimeout(handleIdleTimeout, timeout);
+      };
+
+      const initMonitor = async () => {
+        // Check auth status
+        if (window.sb) {
+          try {
+            const { data } = await window.sb.auth.getSession();
+            isUserSignedIn = !!(data && data.session);
+          } catch (_) {
+            isUserSignedIn = false;
+          }
+        }
+
+        // Force "not signed in" state on auth pages to ensure 3-minute idle loop
+        // prevents race conditions where session tracking might lag during sign-out
+        const isAuthPage = location.pathname.includes('signin.html') || location.pathname.includes('create-account.html');
+        if (isAuthPage) {
+          isUserSignedIn = false;
+        }
+        
+        // Setup listeners
+        const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
+        activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+        
+        // Start monitoring
+        resetIdleTimer();
+      };
+
+      initMonitor();
     }
   } catch (_) { }
 
