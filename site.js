@@ -380,26 +380,29 @@ function renderCart() {
   items.forEach((it, idx) => {
     const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
     subtotal += line;
-    const div = document.createElement('div');
-    div.className = 'cart-item';
-    const key = (it.id != null) ? String(it.id) : `name:${it.name}`;
-    div.setAttribute('data-key', key);
-    const qty = Number(it.qty) || 1;
-    let labelText = (it.name || 'item');
-    if (it.weighted) {
-      const shown = qty % 1 === 0 ? qty.toString() : qty.toFixed(3).replace(/\.0+$/, '');
-      const u = it.unit ? ` ${it.unit}` : '';
-      labelText = `${labelText} ${shown}${u}`;
-    } else if (qty > 1) {
-      labelText = `${labelText} x${qty}`;
+    
+    if (container) {
+      const div = document.createElement('div');
+      div.className = 'cart-item';
+      const key = (it.id != null) ? String(it.id) : `name:${it.name}`;
+      div.setAttribute('data-key', key);
+      const qty = Number(it.qty) || 1;
+      let labelText = (it.name || 'item');
+      if (it.weighted) {
+        const shown = qty % 1 === 0 ? qty.toString() : qty.toFixed(3).replace(/\.0+$/, '');
+        const u = it.unit ? ` ${it.unit}` : '';
+        labelText = `${labelText} ${shown}${u}`;
+      } else if (qty > 1) {
+        labelText = `${labelText} x${qty}`;
+      }
+      div.innerHTML = `
+          <div class="item-number">${idx + 1}</div>
+          <div class="item-label">${labelText}</div>
+          <div class="item-price">${formatMoney(line)}</div>
+          <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
+        `;
+      container.appendChild(div);
     }
-    div.innerHTML = `
-        <div class="item-number">${idx + 1}</div>
-        <div class="item-label">${labelText}</div>
-        <div class="item-price">${formatMoney(line)}</div>
-        <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
-      `;
-    container.appendChild(div);
   });
   if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
   // Push a heartbeat with latest subtotal (debounced)
@@ -846,6 +849,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const checkoutBtn = document.querySelector('.checkout-btn');
   if (checkoutBtn) {
     checkoutBtn.addEventListener('click', async function () {
+      // Redirect to dedicated checkout page for embedded flow
+      if (!location.pathname.includes('checkout.html')) {
+        window.location.href = 'checkout.html';
+        return;
+      }
+      // Fallback for hosted behavior if ever needed
       try {
         await startCheckout();
       } catch (e) {
@@ -1242,7 +1251,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // ---- Stripe Checkout wiring ----
-async function startCheckout() {
+async function startCheckout(options = {}) {
+  const { embedded = false } = options;
   const items = loadCart();
   if (!items || items.length === 0) {
     try { showHintToast('Your cart is empty'); } catch (_) { }
@@ -1302,6 +1312,7 @@ async function startCheckout() {
     subtotal_cents: Math.max(0, subtotalCents),
     success_url,
     cancel_url,
+    ui_mode: embedded ? 'embedded' : 'hosted',
     customer_hint: { user_id, user_email }
   };
 
@@ -1325,6 +1336,10 @@ async function startCheckout() {
     }
   }
 
+  if (embedded) {
+    return resp;
+  }
+
   const url = resp?.url;
   const sessionId = resp?.id || resp?.session_id;
   if (url) {
@@ -1335,6 +1350,67 @@ async function startCheckout() {
   // If no URL, but session returned, we could use Stripe.js redirect (not included). For now, error.
   throw new Error('No checkout URL returned');
 }
+
+// Checkout Page wiring (Embedded)
+document.addEventListener('DOMContentLoaded', async () => {
+  const isCheckout = /(^|\/)checkout\.html(\?|$)/.test(location.pathname) || document.body.classList.contains('checkout');
+  if (!isCheckout) return;
+
+  const mountEl = document.getElementById('checkout-mount');
+  if (!mountEl) return;
+
+  // Fetch Publishable Key from backend
+  let pk = (window.APP_CONFIG && window.APP_CONFIG.STRIPE_PUBLISHABLE_KEY) || '';
+  if (!pk || pk.includes('replace_me')) {
+    try {
+      if (window.sb?.functions?.invoke) {
+        const { data, error } = await window.sb.functions.invoke('stripe-create-session', { method: 'GET' });
+        if (!error && data?.publishableKey) {
+          pk = data.publishableKey;
+        }
+      } else {
+        // Fallback fetch
+        const res = await apiFetch('/stripe/create-session', { method: 'GET' });
+        if (res?.publishableKey) pk = res.publishableKey;
+      }
+    } catch (e) {
+      console.warn('Failed to fetch Stripe config', e);
+    }
+  }
+
+  if (!pk || pk.includes('replace_me')) {
+    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Stripe Configuration Error: Missing Publishable Key</div>';
+    return;
+  }
+
+  if (typeof Stripe === 'undefined') {
+    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Failed to load Stripe.js</div>';
+    return;
+  }
+
+  try {
+    // Initialize Stripe
+    const stripe = Stripe(pk);
+
+    // Create session
+    const sessionData = await startCheckout({ embedded: true });
+    const clientSecret = sessionData?.client_secret;
+
+    if (!clientSecret) {
+      throw new Error('No client_secret returned from backend');
+    }
+
+    // Mount checkout
+    const checkout = await stripe.initEmbeddedCheckout({
+      clientSecret,
+    });
+    checkout.mount('#checkout-mount');
+
+  } catch (e) {
+    console.error('Embedded checkout failed', e);
+    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Failed to initialize checkout. Please try again.</div>';
+  }
+});
 
 // Receipt page: fetch session details and render summary
 document.addEventListener('DOMContentLoaded', () => {

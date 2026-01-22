@@ -2,6 +2,7 @@
 // Expects JSON body: { currency, items: [{ name, quantity, amount_cents, metadata? }], success_url, cancel_url, customer_hint }
 // Returns: { id, url }
 
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 interface LineItemIn {
@@ -16,26 +17,38 @@ interface CreatePayload {
   items: LineItemIn[];
   success_url: string;
   cancel_url: string;
+  ui_mode?: string;
   customer_hint?: { user_id?: string | null; user_email?: string | null };
 }
 
+// @ts-ignore
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
+// @ts-ignore
+const STRIPE_PUBLISHABLE_KEY = Deno.env.get("STRIPE_PUBLISHABLE_KEY");
 const STRIPE_API = "https://api.stripe.com/v1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
 function badRequest(msg: string, status = 400) {
   return new Response(JSON.stringify({ error: msg }), { status, headers: { "content-type": "application/json", ...corsHeaders } });
 }
 
-serve(async (req) => {
+serve(async (req: any) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Handle GET request to retrieve configuration (Publishable Key)
+  if (req.method === "GET") {
+    return new Response(JSON.stringify({ publishableKey: STRIPE_PUBLISHABLE_KEY || "" }), {
+      headers: { "content-type": "application/json", ...corsHeaders },
+    });
+  }
+
   if (req.method !== "POST") return badRequest("Method not allowed", 405);
   if (!STRIPE_SECRET_KEY) return badRequest("Stripe not configured", 500);
 
@@ -50,15 +63,23 @@ serve(async (req) => {
   const items = Array.isArray(payload?.items) ? payload!.items : [];
   const success_url = String(payload?.success_url || "");
   const cancel_url = String(payload?.cancel_url || "");
-  if (!success_url || !cancel_url || items.length === 0) {
+  const ui_mode = String(payload?.ui_mode || "hosted");
+
+  if (!success_url || (!cancel_url && ui_mode !== 'embedded') || items.length === 0) {
     return badRequest("Missing success_url/cancel_url/items");
   }
 
   // Transform items into Stripe line_items with price_data
   const form = new URLSearchParams();
   form.set("mode", "payment");
-  form.set("success_url", success_url);
-  form.set("cancel_url", cancel_url);
+  form.set("ui_mode", ui_mode);
+  
+  if (ui_mode === 'embedded') {
+    form.set("return_url", success_url);
+  } else {
+    form.set("success_url", success_url);
+    form.set("cancel_url", cancel_url);
+  }
 
   const meta: Record<string, string> = {};
   if (payload?.customer_hint?.user_id) meta["user_id"] = String(payload.customer_hint.user_id);
@@ -101,6 +122,6 @@ serve(async (req) => {
     return badRequest(`Stripe error: ${res.status} ${text}`, 502);
   }
   const data = await res.json();
-  const out = { id: data?.id, url: data?.url };
+  const out = { id: data?.id, url: data?.url, client_secret: data?.client_secret };
   return new Response(JSON.stringify(out), { headers: { "content-type": "application/json", ...corsHeaders } });
 });

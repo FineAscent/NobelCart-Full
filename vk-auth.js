@@ -69,13 +69,17 @@
     // Initial render
     renderRows();
 
-    vkEl.addEventListener('mousedown', (e) => {
-      // Prevent focus loss from input when clicking keyboard
-      e.preventDefault();
-    });
+    let repeatDelayTimer = null;
+    let repeatIntervalTimer = null;
 
-    vkEl.addEventListener('click', (e) => {
-      const btn = e.target.closest('.vk-key');
+    function stopRepeat() {
+      if (repeatDelayTimer) clearTimeout(repeatDelayTimer);
+      if (repeatIntervalTimer) clearInterval(repeatIntervalTimer);
+      repeatDelayTimer = null;
+      repeatIntervalTimer = null;
+    }
+
+    function processKey(btn) {
       if (!btn) return;
       const code = btn.dataset.key;
       if (!input) return;
@@ -99,7 +103,36 @@
       if (code === 'SPACE') { insert(' '); return; }
       if (code === '←') { backspace(); return; }
       insert(btn.textContent.length >= 1 ? btn.textContent : '');
-    });
+    }
+
+    function startPress(e) {
+      // Prevent focus loss from input when clicking keyboard
+      if (e.cancelable) e.preventDefault();
+      
+      const btn = e.target.closest('.vk-key');
+      if (!btn) return;
+
+      stopRepeat();
+      processKey(btn);
+
+      const code = btn.dataset.key;
+      // Don't repeat MODE or DONE
+      if (code === 'MODE' || code === 'DONE') return;
+
+      repeatDelayTimer = setTimeout(() => {
+        repeatIntervalTimer = setInterval(() => {
+          processKey(btn);
+        }, 100);
+      }, 500);
+    }
+
+    vkEl.addEventListener('mousedown', startPress);
+    vkEl.addEventListener('touchstart', startPress, { passive: false });
+
+    vkEl.addEventListener('mouseup', stopRepeat);
+    vkEl.addEventListener('mouseleave', stopRepeat);
+    vkEl.addEventListener('touchend', stopRepeat);
+    vkEl.addEventListener('touchcancel', stopRepeat);
 
     return vkEl;
   }

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="checkout.css" />
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body class="checkout">
+  <div class="checkout-wrapper">
+    <div class="checkout-card">
+      <div class="checkout-left">
+        <div class="checkout-header">
+          <button class="back-btn" onclick="window.location.href='index.html'">
+            <span class="back-icon">←</span>
+            <span class="back-text">Back</span>
+          </button>
+        </div>
+
+        <div class="custom-inputs">
+          <div class="input-group name-group">
+            <input type="text" placeholder="First name" class="custom-input first-name" id="checkout-first-name" readonly>
+            <input type="text" placeholder="Last name" class="custom-input last-name" id="checkout-last-name" readonly>
+          </div>
+          
+          <div class="card-info-label">Payment Details</div>
+          
+          <div id="checkout-mount">
+            <!-- Stripe Embedded Checkout will mount here -->
+            <div style="text-align: center; color: #6b7280; margin-top: 40px;">
+              Initializing checkout...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checkout-right">
+        <h2 class="checkout-title">Order Summary</h2>
+        
+        <div class="cart-items-container">
+          <div class="cart-items">
+            <!-- Cart items will be rendered here by site.js -->
+          </div>
+        </div>
+
+        <div class="checkout-footer">
+          <div class="subtotal">
+            <span class="subtotal-label">Total:</span>
+            <span class="subtotal-amount">$0.00</span>
+          </div>
+          <button class="checkout-btn">Checkout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    // Auto-fill user name from signed-in profile
+    (async () => {
+      try {
+        if (!window.sb) return;
+        const { data } = await window.sb.auth.getSession();
+        if (!data?.session) return;
+        
+        const { data: userData } = await window.sb.auth.getUser();
+        const email = userData?.user?.email || '';
+        
+        // Try to get name from user metadata or email
+        const userMeta = userData?.user?.user_metadata || {};
+        let firstName = userMeta.first_name || userMeta.name || '';
+        let lastName = userMeta.last_name || '';
+        
+        // If no metadata, try to extract from email
+        if (!firstName && email) {
+          const emailPart = email.split('@')[0];
+          const parts = emailPart.split(/[._-]/);
+          if (parts.length >= 2) {
+            firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+          } else if (parts.length === 1) {
+            firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+          }
+        }
+        
+        // Fill the input fields
+        const firstNameInput = document.getElementById('checkout-first-name');
+        const lastNameInput = document.getElementById('checkout-last-name');
+        
+        if (firstNameInput && firstName) {
+          firstNameInput.value = firstName;
+          firstNameInput.style.color = '#333';
+        }
+        if (lastNameInput && lastName) {
+          lastNameInput.value = lastName;
+          lastNameInput.style.color = '#333';
+        }
+      } catch (e) {
+        console.error('Failed to auto-fill name:', e);
+      }
+    })();
+  </script>
+  <script src="site.js"></script>
+</body>
+</html>
