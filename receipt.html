@@ -5,34 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Receipt</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="receipt.css" />
 </head>
 <body class="receipt">
   <div class="container">
+    <!-- Receipt Header -->
+    <div class="section-header">
+      <div class="receipt-header-content">
+     
+        <div class="receipt-title">Noble Cart</div>
+        <div class="receipt-subtitle">Thank you for your purchase</div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
     <div class="left-section">
-      <div class="section-header">
-        <div class="tabbar" role="tablist" aria-label="Receipt navigation">
-          <button class="tab" role="tab" aria-selected="false" tabindex="0" onclick="window.location.href='index.html'">
-            <span>Home</span>
-          </button>
-          <button class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="window.location.href='cabinet.html'">
-            <span>Cabinet</span>
-          </button>
-        </div>
-        <div class="search-container" style="visibility:hidden;height:0"></div>
-      </div>
-
-      <h1 class="section-title" style="font-size:28px;margin-bottom:16px;">Your Receipt</h1>
-      <div id="receipt-status" style="margin-bottom:12px;color:#6b7280;">Loading receipt...</div>
-      <div id="receipt-container" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:520px"></div>
+      <div id="receipt-status">Loading receipt details...</div>
+      <div id="receipt-container"></div>
     </div>
 
-    <div class="right-section">
-      <h2 class="total-header">Thank You</h2>
-      <div class="cart-items">
-        <div class="cart-item"><div class="item-number">•</div><div class="item-label">Your purchase was processed by Stripe.</div></div>
-      </div>
-      <button class="checkout-btn" style="display:none;">Hidden</button>
+    <!-- Footer Actions -->
+    <div class="receipt-actions">
+      <button class="receipt-btn btn-primary" onclick="window.location.href='index.html'">Done</button>
     </div>
+    
+    <!-- Hidden elements to maintain script compatibility if needed -->
+    <div class="right-section" style="display:none;"></div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
