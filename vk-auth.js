@@ -176,6 +176,7 @@
     vkEl.style.display = 'block';
     active = true;
     window.__vkActive = true;
+    ensureVisible(targetInput);
   }
 
   function hide() {
@@ -186,24 +187,35 @@
   }
 
   function init() {
-    // Try signin page fields first
+    // Try signin page fields
     let email = document.getElementById('email');
     let password = document.getElementById('password');
     
-    // If not found, try create-account page fields
+    // Try create-account page fields
     if (!email) email = document.getElementById('create-email');
     if (!password) password = document.getElementById('create-password');
+
+    // Try checkout page fields
+    let cfName = document.getElementById('checkout-first-name');
+    let clName = document.getElementById('checkout-last-name');
     
-    if (!email && !password) return;
+    const targets = [email, password, cfName, clName].filter(Boolean);
+    if (targets.length === 0) return;
 
     function bind(el) {
       if (!el) return;
       el.addEventListener('focus', () => { show(el); });
-      el.addEventListener('blur', () => { hide(); });
+      el.addEventListener('blur', () => { 
+        // Small delay to allow click on keyboard to register
+        setTimeout(() => {
+           if (!active) hide(); 
+        }, 150);
+      });
+      // Also prevent native keyboard on mobile
+      el.setAttribute('inputmode', 'none');
     }
 
-    bind(email);
-    bind(password);
+    targets.forEach(bind);
 
     // Hide VK when pressing Escape
     document.addEventListener('keydown', (e) => {
@@ -211,6 +223,36 @@
     });
 
     window.addEventListener('beforeunload', hide);
+  }
+
+  function ensureVisible(el) {
+    if (!el || !vkEl) return;
+    
+    // Wait for VK to render/display
+    setTimeout(() => {
+      const vkRect = vkEl.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const keyboardHeight = vkRect.height || 300; // fallback
+      
+      // Calculate the 'safe zone' limit (top of the keyboard)
+      const limit = viewportHeight - keyboardHeight;
+      
+      // If the bottom of the input is below the limit (covered by keyboard)
+      // or very close to it
+      if (elRect.bottom > limit - 20) {
+        const scrollAmount = elRect.bottom - limit + 40; // +40 for padding
+        
+        // Check if we are in the checkout scrollable container
+        const checkoutLeft = el.closest('.checkout-left');
+        if (checkoutLeft) {
+          checkoutLeft.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+        } else {
+          // Fallback for body/window scrolling (like on signin)
+          window.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+        }
+      }
+    }, 100);
   }
 
   if (document.readyState === 'loading') {
