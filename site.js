@@ -1422,7 +1422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Render QR
-    await QRCode.toCanvas(qrCanvas, url, { width: 260, margin: 1 });
+    await QRCode.toCanvas(qrCanvas, url, { width: 300, margin: 1 });
     setStatus('Ready to scan', 'success');
   }
 
