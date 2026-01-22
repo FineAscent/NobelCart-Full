@@ -1418,6 +1418,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mount checkout
     const checkout = await stripe.initEmbeddedCheckout({
       clientSecret,
+      appearance: {
+        theme: 'stripe',
+        variables: {
+          colorPrimary: '#8b7355',
+          colorBackground: '#ffffff',
+          colorText: '#333333',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          borderRadius: '12px',
+        },
+      }
     });
     // Stripe requires an empty container
     mountEl.innerHTML = '';
