@@ -371,8 +371,9 @@ function formatMoney(n) {
 }
 
 function renderCart() {
-  const container = document.querySelector('.right-section .cart-items');
-  const subtotalEl = document.querySelector('.right-section .subtotal-amount');
+  // Support both Receipt/Cabinet (right-section) and Checkout (checkout-right)
+  const container = document.querySelector('.right-section .cart-items, .checkout-right .cart-items');
+  const subtotalEl = document.querySelector('.right-section .subtotal-amount, .checkout-right .subtotal-amount');
   if (!container) return;
   const items = loadCart();
   container.innerHTML = '';
@@ -1355,6 +1356,9 @@ async function startCheckout(options = {}) {
 document.addEventListener('DOMContentLoaded', async () => {
   const isCheckout = /(^|\/)checkout\.html(\?|$)/.test(location.pathname) || document.body.classList.contains('checkout');
   if (!isCheckout) return;
+
+  // Render the cart summary immediately
+  renderCart();
 
   const mountEl = document.getElementById('checkout-mount');
   if (!mountEl) return;

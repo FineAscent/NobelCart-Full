@@ -47,6 +47,7 @@ body.checkout .container {
     flex-direction: column;
     position: relative;
     border-right: 1px solid rgba(0, 0, 0, 0.04);
+    overflow-y: auto;
 }
 
 .checkout-header {
@@ -180,6 +181,7 @@ body.checkout .container {
     display: flex;
     flex-direction: column;
     position: relative;
+    overflow-y: auto;
 }
 
 .checkout-title {
