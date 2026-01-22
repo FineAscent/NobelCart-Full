@@ -1486,28 +1486,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     pollTimer = setInterval(check, 3500);
   }
 
+  let checkoutChannel = null;
+
   async function runQrCheckout({ refresh = false } = {}) {
     try {
       setStatus(refresh ? 'Refreshing checkout link...' : 'Generating checkout link...', 'info');
       mountEl.classList.add('loading');
+      
+      // Cleanup previous realtime channel if exists
+      if (checkoutChannel) {
+        try { window.sb.removeChannel(checkoutChannel); } catch(_) {}
+        checkoutChannel = null;
+      }
+
       const session = await startCheckout({ returnSession: true });
       lastSessionId = session?.id || session?.session_id || null;
-      const shortCode = session?.short_code;
+      const sessionUrl = session?.url;
       
       if (!lastSessionId) throw new Error('Stripe did not return a session ID');
+      if (!sessionUrl) throw new Error('Stripe did not return a session URL');
 
-      // Use intermediary pay.html for a shorter QR code (better scanability)
-      const origin = window.location.origin;
-      // Ensure we don't double slash if origin ends with / (rare but possible)
-      const cleanOrigin = origin.replace(/\/$/, '');
+      // Generate ephemeral short code for Realtime handshake (no DB required)
+      const shortCode = Math.random().toString(36).substring(2, 10);
       
-      // Use short code "c" if available for minimum QR density, else fallback to session "s"
-      let qrUrl;
-      if (shortCode) {
-        qrUrl = `${cleanOrigin}/p.html?c=${shortCode}`;
-      } else {
-        qrUrl = `${cleanOrigin}/p.html?s=${lastSessionId}`;
+      // Setup Realtime responder
+      if (window.sb) {
+        checkoutChannel = window.sb.channel(`checkout_handshake_${shortCode}`, { config: { broadcast: { ack: true } } });
+        checkoutChannel
+          .on('broadcast', { event: 'request_url' }, () => {
+            // Phone asked for URL, send it back
+            checkoutChannel.send({ type: 'broadcast', event: 'response_url', payload: { url: sessionUrl } });
+          })
+          .subscribe();
       }
+
+      // Use intermediary pay.html with the ephemeral code
+      const origin = window.location.origin;
+      const cleanOrigin = origin.replace(/\/$/, '');
+      const qrUrl = `${cleanOrigin}/p.html?c=${shortCode}`;
       
       await renderQrForUrl(qrUrl, { width: 340 });
       pollStatus(lastSessionId);

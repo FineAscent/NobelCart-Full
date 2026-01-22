@@ -32,31 +32,65 @@
       }
 
       try {
-        // Fetch session details to get the URL
-        let data = null;
-        const payload = code ? { action: 'resolve', code } : { action: 'status', session_id: sid };
+        let url = null;
 
-        if (window.sb && window.sb.functions && window.sb.functions.invoke) {
-           const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
-            body: payload
-          });
-          if (error) throw error;
-          data = d;
-        } else {
-          // Fallback if site.js apiFetch logic is available/preferred, or direct fetch
-           const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-           const res = await fetch(API_BASE + '/stripe/create-session', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify(payload)
-           });
-           if (!res.ok) throw new Error('API error');
-           data = await res.json();
+        // Strategy 1: Realtime Handshake (if code 'c' is present)
+        if (code && window.sb) {
+          statusEl.textContent = 'Connecting...';
+          try {
+            url = await new Promise((resolve, reject) => {
+              const channel = window.sb.channel(`checkout_handshake_${code}`, { config: { broadcast: { ack: true } } });
+              const timeout = setTimeout(() => {
+                window.sb.removeChannel(channel);
+                resolve(null); // Fallback to DB/API lookup if no peer response
+              }, 2500);
+
+              channel
+                .on('broadcast', { event: 'response_url' }, (payload) => {
+                  clearTimeout(timeout);
+                  window.sb.removeChannel(channel);
+                  if (payload.payload && payload.payload.url) resolve(payload.payload.url);
+                  else resolve(null);
+                })
+                .subscribe(async (status) => {
+                  if (status === 'SUBSCRIBED') {
+                    await channel.send({ type: 'broadcast', event: 'request_url', payload: {} });
+                  }
+                });
+            });
+          } catch (e) {
+            console.error('Handshake error', e);
+          }
         }
 
-        if (data && data.url) {
+        // Strategy 2: API Lookup (DB fallback or Session ID)
+        if (!url) {
+          statusEl.textContent = 'Loading payment...';
+          let data = null;
+          const payload = code ? { action: 'resolve', code } : { action: 'status', session_id: sid };
+
+          if (window.sb && window.sb.functions && window.sb.functions.invoke) {
+             const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
+              body: payload
+            });
+            if (error) throw error;
+            data = d;
+          } else {
+             const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+             const res = await fetch(API_BASE + '/stripe/create-session', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify(payload)
+             });
+             if (!res.ok) throw new Error('API error');
+             data = await res.json();
+          }
+          url = data?.url;
+        }
+
+        if (url) {
           statusEl.textContent = 'Redirecting to Stripe...';
-          window.location.href = data.url;
+          window.location.href = url;
         } else {
           throw new Error('No payment URL found');
         }
