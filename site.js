@@ -1419,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   } catch (e) {
     console.error('Embedded checkout failed', e);
-    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Failed to initialize checkout. Please try again.</div>';
+    mountEl.innerHTML = `<div style="color:#b91c1c;text-align:center;">Failed to initialize checkout: ${e.message || 'Unknown error'}<br><span style="font-size:0.8em;color:#666">Check console for details (F12)</span></div>`;
   }
 });
 
