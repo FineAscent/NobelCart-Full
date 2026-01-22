@@ -176,7 +176,6 @@
     vkEl.style.display = 'block';
     active = true;
     window.__vkActive = true;
-    ensureVisible(targetInput);
   }
 
   function hide() {

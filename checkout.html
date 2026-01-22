@@ -21,8 +21,8 @@
 
         <div class="custom-inputs">
           <div class="input-group name-group">
-            <input type="text" placeholder="First name" class="custom-input first-name" id="checkout-first-name">
-            <input type="text" placeholder="Last name" class="custom-input last-name" id="checkout-last-name">
+            <input type="text" placeholder="First name" class="custom-input first-name" id="checkout-first-name" readonly>
+            <input type="text" placeholder="Last name" class="custom-input last-name" id="checkout-last-name" readonly>
           </div>
           
           <div class="card-info-label">Payment Details</div>
@@ -58,7 +58,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
-  <script src="vk-auth.js"></script>
   <script>
     // Auto-fill user name from signed-in profile
     (async () => {
