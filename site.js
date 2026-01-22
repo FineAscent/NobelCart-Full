@@ -1364,13 +1364,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!pk || pk.includes('replace_me')) {
     try {
       if (window.sb?.functions?.invoke) {
+        console.log('[Checkout] Fetching PK from Supabase function...');
         const { data, error } = await window.sb.functions.invoke('stripe-create-session', { method: 'GET' });
-        if (!error && data?.publishableKey) {
-          pk = data.publishableKey;
+        if (error) {
+          console.error('[Checkout] Supabase function error:', error);
+        } else {
+          console.log('[Checkout] Supabase function data:', data);
+          if (data?.publishableKey) {
+            pk = data.publishableKey;
+          }
         }
       } else {
         // Fallback fetch
+        console.log('[Checkout] Fetching PK from API fallback...');
         const res = await apiFetch('/stripe/create-session', { method: 'GET' });
+        console.log('[Checkout] API fallback data:', res);
         if (res?.publishableKey) pk = res.publishableKey;
       }
     } catch (e) {
@@ -1379,9 +1387,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   if (!pk || pk.includes('replace_me')) {
-    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Stripe Configuration Error: Missing Publishable Key</div>';
+    console.error('[Checkout] Missing Publishable Key. Ensure STRIPE_PUBLISHABLE_KEY is set in Supabase Secrets.');
+    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Stripe Configuration Error: Missing Publishable Key<br><span style="font-size:0.8em;color:#666">Check console for details (F12)</span></div>';
     return;
   }
+
+
 
   if (typeof Stripe === 'undefined') {
     mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Failed to load Stripe.js</div>';
