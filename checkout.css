@@ -347,7 +347,7 @@ body.checkout .container {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     .checkout-wrapper {
         padding: 20px;
     }
