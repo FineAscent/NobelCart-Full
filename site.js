@@ -1369,8 +1369,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const statusEl = document.createElement('div');
   statusEl.className = 'qr-status';
-  const qrCanvas = document.createElement('canvas');
-  qrCanvas.className = 'qr-canvas';
   const linkEl = document.createElement('a');
   linkEl.className = 'qr-link';
   linkEl.target = '_blank';
@@ -1401,7 +1399,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const qrHolder = document.createElement('div');
     qrHolder.className = 'qr-holder';
 
-    qrHolder.appendChild(qrCanvas);
+    // Use api.qrserver.com instead of local QRCode library
+    const img = document.createElement('img');
+    img.alt = 'QR code';
+    img.className = 'qr-canvas'; // retain class for CSS sizing
+    const size = opts.width || 340;
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(url);
+    qrHolder.appendChild(img);
+
     linkEl.href = url;
     linkEl.textContent = 'Open checkout in browser';
 
@@ -1416,13 +1421,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     wrapper.appendChild(actions);
     mountEl.appendChild(wrapper);
 
-    if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
-      qrHolder.innerHTML = '<div style="color:#b91c1c; text-align:center;">QR generator missing.</div>';
-      return;
-    }
-
-    // Render QR
-    await QRCode.toCanvas(qrCanvas, url, { width: opts.width || 340, margin: 1 });
     setStatus('Ready to scan', 'success');
   }
 
