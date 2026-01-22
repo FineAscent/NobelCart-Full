@@ -4,6 +4,8 @@
 
 // @ts-ignore
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+// @ts-ignore
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 interface LineItemIn {
   name: string;
@@ -21,12 +23,18 @@ interface CreatePayload {
   customer_hint?: { user_id?: string | null; user_email?: string | null };
   action?: string;
   session_id?: string;
+  code?: string;
 }
 
 // @ts-ignore
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 // @ts-ignore
 const STRIPE_PUBLISHABLE_KEY = Deno.env.get("STRIPE_PUBLISHABLE_KEY");
+// @ts-ignore
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+// @ts-ignore
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
 const STRIPE_API = "https://api.stripe.com/v1";
 
 const corsHeaders = {
@@ -80,9 +88,22 @@ serve(async (req: any) => {
   }
 
   // Status lookup via POST action (avoid exposing secret key client-side)
-  if (payload?.action === 'status') {
-    const sid = String(payload.session_id || '').trim();
-    if (!sid) return badRequest('Missing session_id');
+  if (payload?.action === 'status' || payload?.action === 'resolve') {
+    let sid = String(payload.session_id || '').trim();
+    const code = String(payload.code || '').trim();
+
+    // If code is provided, look it up in Supabase
+    if (!sid && code && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: link } = await supabase.from('checkout_short_links').select('session_id').eq('code', code).single();
+      if (link?.session_id) {
+        sid = link.session_id;
+      } else {
+        return badRequest('Invalid or expired short code', 404);
+      }
+    }
+
+    if (!sid) return badRequest('Missing session_id or code');
     const res = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(sid)}`, {
       method: "GET",
       headers: {
@@ -161,6 +182,21 @@ serve(async (req: any) => {
     return badRequest(`Stripe error: ${res.status} ${text}`, 502);
   }
   const data = await res.json();
-  const out = { id: data?.id, url: data?.url, client_secret: data?.client_secret };
+  
+  // Try to generate a short code
+  let shortCode: string | null = null;
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && data?.id) {
+    try {
+       // Simple 8-char random alphanumeric
+       const code = Math.random().toString(36).substring(2, 10);
+       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+       const { error } = await supabase.from('checkout_short_links').insert({ code, session_id: data.id });
+       if (!error) shortCode = code;
+    } catch (e) {
+      console.error('Failed to create short link', e);
+    }
+  }
+
+  const out = { id: data?.id, url: data?.url, client_secret: data?.client_secret, short_code: shortCode };
   return new Response(JSON.stringify(out), { headers: { "content-type": "application/json", ...corsHeaders } });
 });

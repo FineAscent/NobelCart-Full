@@ -1492,6 +1492,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       mountEl.classList.add('loading');
       const session = await startCheckout({ returnSession: true });
       lastSessionId = session?.id || session?.session_id || null;
+      const shortCode = session?.short_code;
       
       if (!lastSessionId) throw new Error('Stripe did not return a session ID');
 
@@ -1499,8 +1500,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const origin = window.location.origin;
       // Ensure we don't double slash if origin ends with / (rare but possible)
       const cleanOrigin = origin.replace(/\/$/, '');
-      // Use even shorter path "p.html" to minimize QR density
-      const qrUrl = `${cleanOrigin}/p.html?s=${lastSessionId}`;
+      
+      // Use short code "c" if available for minimum QR density, else fallback to session "s"
+      let qrUrl;
+      if (shortCode) {
+        qrUrl = `${cleanOrigin}/p.html?c=${shortCode}`;
+      } else {
+        qrUrl = `${cleanOrigin}/p.html?s=${lastSessionId}`;
+      }
       
       await renderQrForUrl(qrUrl, { width: 340 });
       pollStatus(lastSessionId);

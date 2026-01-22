@@ -24,8 +24,9 @@
       const statusEl = document.getElementById('status');
       const params = new URLSearchParams(window.location.search);
       const sid = params.get('s'); // short param for session id
+      const code = params.get('c'); // even shorter param for lookup code
       
-      if (!sid) {
+      if (!sid && !code) {
         statusEl.textContent = 'Invalid payment link.';
         return;
       }
@@ -33,20 +34,21 @@
       try {
         // Fetch session details to get the URL
         let data = null;
+        const payload = code ? { action: 'resolve', code } : { action: 'status', session_id: sid };
+
         if (window.sb && window.sb.functions && window.sb.functions.invoke) {
            const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
-            body: { action: 'status', session_id: sid }
+            body: payload
           });
           if (error) throw error;
           data = d;
         } else {
           // Fallback if site.js apiFetch logic is available/preferred, or direct fetch
-           // Use the API helper from site.js if possible, or manual fetch
            const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
            const res = await fetch(API_BASE + '/stripe/create-session', {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ action: 'status', session_id: sid })
+             body: JSON.stringify(payload)
            });
            if (!res.ok) throw new Error('API error');
            data = await res.json();
