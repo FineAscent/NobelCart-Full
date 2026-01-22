@@ -1427,23 +1427,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   async function pollStatus(sessionId) {
-    if (!sessionId) return;
+    if (!sessionId) {
+      setStatus('No session id to poll. Regenerate QR.', 'error');
+      return;
+    }
+    if (!window.sb?.functions?.invoke) {
+      // Avoid hammering an API that may not support status lookups
+      setStatus('Awaiting payment. If stuck, refresh QR.', 'info');
+      return;
+    }
     // Clear previous poll if any
     if (pollTimer) clearInterval(pollTimer);
 
+    let consecutiveErrors = 0;
     const check = async () => {
       try {
-        // Prefer Supabase function to hide secret key
         let data = null;
-        if (window.sb?.functions?.invoke) {
-          const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
-            body: { action: 'status', session_id: sessionId }
-          });
-          if (error) throw error;
-          data = d;
-        } else {
-          data = await apiFetch('/stripe/create-session', { method: 'POST', body: { action: 'status', session_id: sessionId } });
-        }
+        const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
+          body: { action: 'status', session_id: sessionId }
+        });
+        if (error) throw error;
+        data = d;
         const status = data?.status || data?.payment_status;
         if (!status) return;
 
@@ -1468,6 +1472,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       } catch (e) {
         console.warn('Status poll failed', e);
+        consecutiveErrors += 1;
+        if (consecutiveErrors >= 3) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          setStatus('Live status unavailable. Please refresh QR or check payment.', 'error');
+        }
       }
     };
 
