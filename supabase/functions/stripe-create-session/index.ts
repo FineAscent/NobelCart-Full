@@ -19,6 +19,8 @@ interface CreatePayload {
   cancel_url: string;
   ui_mode?: string;
   customer_hint?: { user_id?: string | null; user_email?: string | null };
+  action?: string;
+  session_id?: string;
 }
 
 // @ts-ignore
@@ -44,6 +46,24 @@ serve(async (req: any) => {
 
   // Handle GET request to retrieve configuration (Publishable Key)
   if (req.method === "GET") {
+    const { searchParams } = new URL(req.url);
+    const sid = searchParams.get("session_id");
+    // GET without session_id -> publishable key; GET with session_id -> status lookup
+    if (sid && STRIPE_SECRET_KEY) {
+      const res = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(sid)}`, {
+        method: "GET",
+        headers: {
+          "authorization": `Bearer ${STRIPE_SECRET_KEY}`,
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        return badRequest(`Stripe status error: ${res.status} ${text}`, 502);
+      }
+      const data = await res.json();
+      const out = { id: data?.id, status: data?.status, payment_status: data?.payment_status };
+      return new Response(JSON.stringify(out), { headers: { "content-type": "application/json", ...corsHeaders } });
+    }
     return new Response(JSON.stringify({ publishableKey: STRIPE_PUBLISHABLE_KEY || "" }), {
       headers: { "content-type": "application/json", ...corsHeaders },
     });
@@ -57,6 +77,25 @@ serve(async (req: any) => {
     payload = await req.json();
   } catch {
     return badRequest("Invalid JSON body");
+  }
+
+  // Status lookup via POST action (avoid exposing secret key client-side)
+  if (payload?.action === 'status') {
+    const sid = String(payload.session_id || '').trim();
+    if (!sid) return badRequest('Missing session_id');
+    const res = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(sid)}`, {
+      method: "GET",
+      headers: {
+        "authorization": `Bearer ${STRIPE_SECRET_KEY}`,
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return badRequest(`Stripe status error: ${res.status} ${text}`, 502);
+    }
+    const data = await res.json();
+    const out = { id: data?.id, status: data?.status, payment_status: data?.payment_status };
+    return new Response(JSON.stringify(out), { headers: { "content-type": "application/json", ...corsHeaders } });
   }
 
   const currency = (payload?.currency || "usd").toLowerCase();

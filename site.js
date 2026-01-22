@@ -850,14 +850,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const checkoutBtn = document.querySelector('.checkout-btn');
   if (checkoutBtn) {
     checkoutBtn.addEventListener('click', async function () {
-      // Redirect to dedicated checkout page for embedded flow
-      if (!location.pathname.includes('checkout.html')) {
+      const onCheckoutPage = location.pathname.includes('checkout.html');
+      // Redirect into dedicated checkout page if not already there
+      if (!onCheckoutPage) {
         window.location.href = 'checkout.html';
         return;
       }
-      // Fallback for hosted behavior if ever needed
+      // On checkout page: refresh QR flow if available, else fallback to direct hosted redirect
       try {
-        await startCheckout();
+        if (typeof window.__refreshQrCheckout === 'function') {
+          await window.__refreshQrCheckout();
+        } else {
+          await startCheckout();
+        }
       } catch (e) {
         console.error('Checkout failed', e);
         try { showHintToast('Checkout failed'); } catch (_) { }
@@ -1253,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ---- Stripe Checkout wiring ----
 async function startCheckout(options = {}) {
-  const { embedded = false } = options;
+  const { embedded = false, returnSession = false } = options;
   const items = loadCart();
   if (!items || items.length === 0) {
     try { showHintToast('Your cart is empty'); } catch (_) { }
@@ -1337,12 +1342,11 @@ async function startCheckout(options = {}) {
     }
   }
 
-  if (embedded) {
+  if (embedded || returnSession) {
     return resp;
   }
 
   const url = resp?.url;
-  const sessionId = resp?.id || resp?.session_id;
   if (url) {
     // Redirect to Stripe Checkout
     window.location.href = url;
@@ -1352,7 +1356,7 @@ async function startCheckout(options = {}) {
   throw new Error('No checkout URL returned');
 }
 
-// Checkout Page wiring (Embedded)
+// Checkout Page wiring (QR flow)
 document.addEventListener('DOMContentLoaded', async () => {
   const isCheckout = /(^|\/)checkout\.html(\?|$)/.test(location.pathname) || document.body.classList.contains('checkout');
   if (!isCheckout) return;
@@ -1363,70 +1367,145 @@ document.addEventListener('DOMContentLoaded', async () => {
   const mountEl = document.getElementById('checkout-mount');
   if (!mountEl) return;
 
-  // Fetch Publishable Key from backend
-  let pk = (window.APP_CONFIG && window.APP_CONFIG.STRIPE_PUBLISHABLE_KEY) || '';
-  if (!pk || pk.includes('replace_me')) {
-    try {
-      if (window.sb?.functions?.invoke) {
-        console.log('[Checkout] Fetching PK from Supabase function...');
-        const { data, error } = await window.sb.functions.invoke('stripe-create-session', { method: 'GET' });
-        if (error) {
-          console.error('[Checkout] Supabase function error:', error);
-        } else {
-          console.log('[Checkout] Supabase function data:', data);
-          if (data?.publishableKey) {
-            pk = data.publishableKey;
-          }
-        }
-      } else {
-        // Fallback fetch
-        console.log('[Checkout] Fetching PK from API fallback...');
-        const res = await apiFetch('/stripe/create-session', { method: 'GET' });
-        console.log('[Checkout] API fallback data:', res);
-        if (res?.publishableKey) pk = res.publishableKey;
-      }
-    } catch (e) {
-      console.warn('Failed to fetch Stripe config', e);
-    }
+  const statusEl = document.createElement('div');
+  statusEl.className = 'qr-status';
+  const qrCanvas = document.createElement('canvas');
+  qrCanvas.className = 'qr-canvas';
+  const linkEl = document.createElement('a');
+  linkEl.className = 'qr-link';
+  linkEl.target = '_blank';
+  linkEl.rel = 'noreferrer noopener';
+
+  let lastSessionId = null;
+  let pollTimer = null;
+
+  function setStatus(msg, kind = 'info') {
+    statusEl.textContent = msg || '';
+    statusEl.setAttribute('data-kind', kind);
   }
 
-  if (!pk || pk.includes('replace_me')) {
-    console.error('[Checkout] Missing Publishable Key. Ensure STRIPE_PUBLISHABLE_KEY is set in Supabase Secrets.');
-    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Stripe Configuration Error: Missing Publishable Key<br><span style="font-size:0.8em;color:#666">Check console for details (F12)</span></div>';
-    return;
-  }
-
-
-
-  if (typeof Stripe === 'undefined') {
-    mountEl.innerHTML = '<div style="color:#b91c1c;text-align:center;">Failed to load Stripe.js</div>';
-    return;
-  }
-
-  try {
-    // Initialize Stripe
-    const stripe = Stripe(pk);
-
-    // Create session
-    const sessionData = await startCheckout({ embedded: true });
-    const clientSecret = sessionData?.client_secret;
-
-    if (!clientSecret) {
-      throw new Error('No client_secret returned from backend');
-    }
-
-    // Mount checkout
-    const checkout = await stripe.initEmbeddedCheckout({
-      clientSecret,
-    });
-    // Stripe requires an empty container
+  async function renderQrForUrl(url) {
+    if (!url) throw new Error('No checkout URL');
     mountEl.innerHTML = '';
-    checkout.mount('#checkout-mount');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'qr-box';
 
-  } catch (e) {
-    console.error('Embedded checkout failed', e);
-    mountEl.innerHTML = `<div style="color:#b91c1c;text-align:center;">Failed to initialize checkout: ${e.message || 'Unknown error'}<br><span style="font-size:0.8em;color:#666">Check console for details (F12)</span></div>`;
+    const title = document.createElement('div');
+    title.className = 'qr-title';
+    title.textContent = 'Scan to pay with your phone';
+
+    const meta = document.createElement('div');
+    meta.className = 'qr-meta';
+    meta.textContent = 'Your cart is locked into this secure Stripe checkout link.';
+
+    const qrHolder = document.createElement('div');
+    qrHolder.className = 'qr-holder';
+
+    qrHolder.appendChild(qrCanvas);
+    linkEl.href = url;
+    linkEl.textContent = 'Open checkout in browser';
+
+    const actions = document.createElement('div');
+    actions.className = 'qr-actions';
+    actions.appendChild(linkEl);
+    actions.appendChild(statusEl);
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(meta);
+    wrapper.appendChild(qrHolder);
+    wrapper.appendChild(actions);
+    mountEl.appendChild(wrapper);
+
+    if (typeof QRCode === 'undefined' || !QRCode.toCanvas) {
+      qrHolder.innerHTML = '<div style="color:#b91c1c; text-align:center;">QR generator missing.</div>';
+      return;
+    }
+
+    // Render QR
+    await QRCode.toCanvas(qrCanvas, url, { width: 260, margin: 1 });
+    setStatus('Ready to scan', 'success');
   }
+
+  async function pollStatus(sessionId) {
+    if (!sessionId) return;
+    // Clear previous poll if any
+    if (pollTimer) clearInterval(pollTimer);
+
+    const check = async () => {
+      try {
+        // Prefer Supabase function to hide secret key
+        let data = null;
+        if (window.sb?.functions?.invoke) {
+          const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
+            body: { action: 'status', session_id: sessionId }
+          });
+          if (error) throw error;
+          data = d;
+        } else {
+          data = await apiFetch('/stripe/create-session', { method: 'POST', body: { action: 'status', session_id: sessionId } });
+        }
+        const status = data?.status || data?.payment_status;
+        if (!status) return;
+
+        if (status === 'complete' || status === 'paid') {
+          setStatus('Payment complete. Finalizing...', 'success');
+          clearInterval(pollTimer);
+          pollTimer = null;
+          // Clear cart and sign out
+          try { localStorage.removeItem(CART_KEY); } catch (_) { }
+          try { sessionStorage.clear(); } catch (_) { }
+          try { renderCart(); } catch (_) { }
+          try { showHintToast && showHintToast('Payment complete!'); } catch (_) { }
+          try { window.sb?.auth?.signOut?.({ scope: 'local' }); } catch (_) { }
+          setTimeout(() => {
+            mountEl.innerHTML = '<div class="qr-box"><div class="qr-title">Thank you!</div><div class="qr-meta">Payment received. You will be redirected.</div></div>';
+            window.location.href = 'signin.html';
+          }, 800);
+        } else if (status === 'expired' || status === 'canceled') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          setStatus('Session expired. Please generate a new QR.', 'error');
+        }
+      } catch (e) {
+        console.warn('Status poll failed', e);
+      }
+    };
+
+    // Kick off immediately and then interval
+    await check();
+    pollTimer = setInterval(check, 3500);
+  }
+
+  async function runQrCheckout({ refresh = false } = {}) {
+    try {
+      setStatus(refresh ? 'Refreshing checkout link...' : 'Generating checkout link...', 'info');
+      mountEl.classList.add('loading');
+      const session = await startCheckout({ returnSession: true });
+      const url = session?.url;
+      lastSessionId = session?.id || session?.session_id || null;
+      if (!url) throw new Error('Stripe did not return a checkout URL');
+      await renderQrForUrl(url);
+      pollStatus(lastSessionId);
+    } catch (e) {
+      console.error('QR checkout failed', e);
+      mountEl.innerHTML = `<div style="color:#b91c1c; text-align:center;">Failed to create checkout: ${e?.message || e}</div>`;
+    } finally {
+      mountEl.classList.remove('loading');
+    }
+  }
+
+  // Expose refresh for the global checkout button listener
+  window.__refreshQrCheckout = () => runQrCheckout({ refresh: true });
+
+  // Auto-refresh QR if cart changes in another tab
+  window.addEventListener('storage', (e) => {
+    if (e.key === CART_KEY) {
+      runQrCheckout({ refresh: true });
+    }
+  });
+
+  // Initial render
+  runQrCheckout();
 });
 
 // Receipt page: fetch session details and render summary

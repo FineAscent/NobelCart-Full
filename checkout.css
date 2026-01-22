@@ -260,6 +260,84 @@ body.checkout .container {
     gap: 4px;
 }
 
+/* QR checkout block */
+.qr-box {
+    width: 100%;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+}
+
+.qr-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #2f2a24;
+}
+
+.qr-meta {
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.qr-holder {
+    background: #f9fafb;
+    border: 1px dashed rgba(0, 0, 0, 0.1);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+}
+
+.qr-canvas {
+    width: 260px;
+    height: 260px;
+}
+
+.qr-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.qr-link {
+    color: #8b7355;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.qr-link:hover {
+    text-decoration: underline;
+}
+
+.qr-status {
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.qr-status[data-kind="success"] {
+    color: #065f46;
+}
+
+.qr-status[data-kind="error"] {
+    color: #b91c1c;
+}
+
+#checkout-mount.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
 .cart-item {
     display: flex;
     justify-content: space-between;
