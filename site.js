@@ -1491,10 +1491,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       setStatus(refresh ? 'Refreshing checkout link...' : 'Generating checkout link...', 'info');
       mountEl.classList.add('loading');
       const session = await startCheckout({ returnSession: true });
-      const url = session?.url;
       lastSessionId = session?.id || session?.session_id || null;
-      if (!url) throw new Error('Stripe did not return a checkout URL');
-      await renderQrForUrl(url);
+      
+      if (!lastSessionId) throw new Error('Stripe did not return a session ID');
+
+      // Use intermediary pay.html for a shorter QR code (better scanability)
+      const origin = window.location.origin;
+      const cleanOrigin = origin.replace(/\/$/, '');
+      const qrUrl = `${cleanOrigin}/pay.html?s=${lastSessionId}`;
+      
+      await renderQrForUrl(qrUrl);
       pollStatus(lastSessionId);
     } catch (e) {
       console.error('QR checkout failed', e);
