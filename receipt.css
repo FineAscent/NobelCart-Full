@@ -1,111 +1,173 @@
-/* Receipt Page Styles - Mobile First Approach */
+/* Receipt Page Styles - Centered Thank-you View */
+
+:root {
+    --receipt-bg: radial-gradient(circle at top, #f5f7ff 0%, #eef2ff 55%, #e3e9ff 100%);
+    --receipt-card: #ffffff;
+    --receipt-text: #0f172a;
+    --receipt-muted: #6b7280;
+    --accent: #111827;
+    --accent-soft: rgba(15, 23, 42, 0.06);
+}
 
 body.receipt {
-    background-color: #f3f4f6;
-    height: 100vh;
-    width: 100vw;
     margin: 0;
-    padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    font-family: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--receipt-bg);
+    color: var(--receipt-text);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 32px 16px 48px;
+}
+
+.receipt-shell {
+    width: min(640px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.receipt-hero {
+    text-align: center;
+    padding: 32px 24px;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 24px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 25px 65px rgba(15, 23, 42, 0.08);
+}
+
+.hero-icon {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 16px;
+    border-radius: 20px;
+    background: #d1fae5;
+    color: #047857;
+    font-size: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow-y: auto; /* Allow scrolling if needed */
-}
-
-/* Override default container styles */
-body.receipt .container {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    max-width: 480px; /* Phone width approximation */
-    height: auto;
-    min-height: 90vh;
-    margin: 20px auto;
-    background: #fff;
-    border-radius: 20px; /* Rounded corners like a phone screen or modern card */
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    position: relative;
-    overflow: hidden;
-}
-
-/* Hide the default split layout structure */
-body.receipt .left-section,
-body.receipt .right-section {
-    width: 100%;
-    padding: 0;
-    background: transparent;
-    flex: none;
-    overflow: visible;
-}
-
-/* Hide elements not needed for the receipt view */
-body.receipt .right-section {
-    display: none; /* We'll move the "Thank You" or merge it */
-}
-
-body.receipt .section-header {
-    background: #fff;
-    position: relative;
-    padding: 20px;
-    border-bottom: 1px dashed #e5e7eb; /* Receipt tear line look */
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    top: 0;
-    z-index: 10;
-}
-
-body.receipt .tabbar {
-    display: none; /* Hide navigation tabs on receipt */
-}
-
-/* Custom Receipt Header */
-.receipt-header-content {
-    text-align: center;
-    width: 100%;
-}
-
-.receipt-logo {
-    width: 60px;
-    height: 60px;
-    margin: 0 auto 10px;
-    background-image: url('noble.png');
-    background-size: cover;
-    background-position: center;
-    border-radius: 12px;
-}
-
-.receipt-title {
-    font-size: 24px;
     font-weight: 700;
-    color: #111827;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #065f46;
+    background: #d1fae5;
+}
+
+.hero-title {
+    font-size: clamp(24px, 4vw, 32px);
+    line-height: 1.2;
+    margin: 8px 0;
+}
+
+.hero-subtitle {
+    color: var(--receipt-muted);
+    font-size: 15px;
+    line-height: 1.5;
+    margin-bottom: 18px;
+}
+
+.hero-status {
+    color: #0369a1;
+    font-weight: 600;
+}
+
+.receipt-card {
+    background: var(--receipt-card);
+    border-radius: 28px;
+    padding: 28px;
+    box-shadow: 0 30px 75px rgba(15, 23, 42, 0.14);
+}
+
+.receipt-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.receipt-card__label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    color: var(--receipt-muted);
     margin-bottom: 4px;
 }
 
-.receipt-subtitle {
-    font-size: 14px;
-    color: #6b7280;
+.receipt-card__id {
+    font-weight: 600;
+    color: var(--receipt-text);
 }
 
-/* Content Area */
+.receipt-card__body {
+    padding-top: 20px;
+}
+
+.receipt-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 12px 18px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
+}
+
+.receipt-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+}
+
+.btn-secondary {
+    background: rgba(15,23,42,0.08);
+    color: var(--accent);
+}
+
+.btn-tertiary {
+    background: transparent;
+    border: 1px solid rgba(15,23,42,0.2);
+    color: var(--accent);
+}
+
+.receipt-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
 #receipt-container {
-    padding: 24px;
-    background: #fff;
-    border: none !important; /* Override inline styles */
-    border-radius: 0 !important;
-    max-width: none !important;
-    flex: 1;
+    padding: 0;
 }
 
 /* Receipt Items */
-body.receipt .cart-items {
+.receipt-card .cart-items {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-body.receipt .cart-item {
+.receipt-card .cart-item {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -114,15 +176,15 @@ body.receipt .cart-item {
     margin: 0;
 }
 
-body.receipt .cart-item:last-child {
+.receipt-card .cart-item:last-child {
     border-bottom: none;
 }
 
-body.receipt .item-number {
+.receipt-card .item-number {
     display: none; /* Hide number bubbles for cleaner receipt look */
 }
 
-body.receipt .item-label {
+.receipt-card .item-label {
     font-size: 16px;
     color: #374151;
     font-weight: 500;
@@ -131,7 +193,7 @@ body.receipt .item-label {
     padding-right: 12px;
 }
 
-body.receipt .item-price {
+.receipt-card .item-price {
     font-size: 16px;
     font-weight: 600;
     color: #111827;
@@ -139,7 +201,7 @@ body.receipt .item-price {
 }
 
 /* Totals Section */
-body.receipt .subtotal {
+.receipt-card .subtotal {
     margin-top: 20px;
     padding-top: 20px;
     border-top: 2px solid #111827;
@@ -148,65 +210,43 @@ body.receipt .subtotal {
     align-items: center;
 }
 
-body.receipt .subtotal-label {
+.receipt-card .subtotal-label {
     font-size: 18px;
     font-weight: 700;
     color: #111827;
 }
 
-body.receipt .subtotal-amount {
+.receipt-card .subtotal-amount {
     font-size: 24px;
     font-weight: 800;
     color: #111827;
 }
 
-/* Footer Actions */
-.receipt-actions {
-    padding: 24px;
-    background: #f9fafb;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+#receipt-status.hero-status {
+    padding: 0;
 }
 
-.receipt-btn {
-    width: 100%;
-    padding: 16px;
-    border-radius: 12px;
-    font-size: 16px;
-    font-weight: 600;
-    text-align: center;
-    cursor: pointer;
-    border: none;
-    transition: all 0.2s;
-}
+@media (max-width: 600px) {
+    body.receipt {
+        padding: 24px 14px 36px;
+    }
 
-.btn-primary {
-    background: #111827;
-    color: #fff;
-}
+    .receipt-card {
+        padding: 22px;
+    }
 
-.btn-secondary {
-    background: #fff;
-    color: #374151;
-    border: 1px solid #d1d5db;
-}
+    .receipt-card__header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 
-/* Status Message */
-#receipt-status {
-    text-align: center;
-    padding: 20px;
-    font-style: italic;
-    color: #6b7280;
-}
+    .receipt-btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
 
-/* Responsive adjustments */
-@media (max-width: 500px) {
-    body.receipt .container {
-        margin: 0;
-        border-radius: 0;
-        min-height: 100vh;
-        box-shadow: none;
+    .receipt-actions {
+        flex-direction: column;
     }
 }

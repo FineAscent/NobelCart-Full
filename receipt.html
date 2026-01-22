@@ -8,30 +8,31 @@
   <link rel="stylesheet" href="receipt.css" />
 </head>
 <body class="receipt">
-  <div class="container">
-    <!-- Receipt Header -->
-    <div class="section-header">
-      <div class="receipt-header-content">
-     
-        <div class="receipt-title">Noble Cart</div>
-        <div class="receipt-subtitle">Thank you for your purchase</div>
-      </div>
-    </div>
+  <main class="receipt-shell">
+    <section class="receipt-hero">
+      <div class="hero-icon" aria-hidden="true">✓</div>
+      <p class="hero-badge">Payment confirmed</p>
+      <h1 class="hero-title">Thank you for shopping with Noble Cart</h1>
+      <p class="hero-subtitle">We’ll keep this device signed out for security, but your receipt is below anytime you need it.</p>
+      <p id="receipt-status" class="hero-status">Loading receipt details...</p>
+    </section>
 
-    <!-- Main Content -->
-    <div class="left-section">
-      <div id="receipt-status">Loading receipt details...</div>
-      <div id="receipt-container"></div>
-    </div>
+    <section class="receipt-card" aria-live="polite">
+      <header class="receipt-card__header">
+        <div>
+          <p class="receipt-card__label">Receipt</p>
+          <p class="receipt-card__id" id="receipt-reference">Session details</p>
+        </div>
+        <button class="receipt-btn btn-secondary" onclick="window.location.href='cabinet.html'">View cabinet</button>
+      </header>
+      <div id="receipt-container" class="receipt-card__body"></div>
+    </section>
 
-    <!-- Footer Actions -->
     <div class="receipt-actions">
-      <button class="receipt-btn btn-primary" onclick="window.location.href='index.html'">Done</button>
+      <button class="receipt-btn btn-primary" onclick="window.location.href='index.html'">Return home</button>
+      <button class="receipt-btn btn-tertiary" onclick="window.location.href='signin.html'">Sign in again</button>
     </div>
-    
-    <!-- Hidden elements to maintain script compatibility if needed -->
-    <div class="right-section" style="display:none;"></div>
-  </div>
+  </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="site.js"></script>
