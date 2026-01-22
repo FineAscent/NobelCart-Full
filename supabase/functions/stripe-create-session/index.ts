@@ -94,7 +94,7 @@ serve(async (req: any) => {
       return badRequest(`Stripe status error: ${res.status} ${text}`, 502);
     }
     const data = await res.json();
-    const out = { id: data?.id, status: data?.status, payment_status: data?.payment_status };
+    const out = { id: data?.id, status: data?.status, payment_status: data?.payment_status, url: data?.url };
     return new Response(JSON.stringify(out), { headers: { "content-type": "application/json", ...corsHeaders } });
   }
 
