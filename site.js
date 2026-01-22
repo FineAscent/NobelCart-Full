@@ -1384,7 +1384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusEl.setAttribute('data-kind', kind);
   }
 
-  async function renderQrForUrl(url) {
+  async function renderQrForUrl(url, opts = {}) {
     if (!url) throw new Error('No checkout URL');
     mountEl.innerHTML = '';
     const wrapper = document.createElement('div');
@@ -1422,7 +1422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Render QR
-    await QRCode.toCanvas(qrCanvas, url, { width: 300, margin: 1 });
+    await QRCode.toCanvas(qrCanvas, url, { width: opts.width || 340, margin: 1 });
     setStatus('Ready to scan', 'success');
   }
 
@@ -1497,10 +1497,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Use intermediary pay.html for a shorter QR code (better scanability)
       const origin = window.location.origin;
+      // Ensure we don't double slash if origin ends with / (rare but possible)
       const cleanOrigin = origin.replace(/\/$/, '');
-      const qrUrl = `${cleanOrigin}/pay.html?s=${lastSessionId}`;
+      // Use even shorter path "p.html" to minimize QR density
+      const qrUrl = `${cleanOrigin}/p.html?s=${lastSessionId}`;
       
-      await renderQrForUrl(qrUrl);
+      await renderQrForUrl(qrUrl, { width: 340 });
       pollStatus(lastSessionId);
     } catch (e) {
       console.error('QR checkout failed', e);
