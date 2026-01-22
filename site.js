@@ -1415,6 +1415,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const checkout = await stripe.initEmbeddedCheckout({
       clientSecret,
     });
+    // Stripe requires an empty container
+    mountEl.innerHTML = '';
     checkout.mount('#checkout-mount');
 
   } catch (e) {
