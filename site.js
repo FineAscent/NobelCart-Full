@@ -1418,6 +1418,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mount checkout
     const checkout = await stripe.initEmbeddedCheckout({
       clientSecret,
+      layout: {
+        type: 'tabs',
+        defaultCollapsed: false,
+      },
       appearance: {
         theme: 'stripe',
         variables: {
