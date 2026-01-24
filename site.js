@@ -1658,82 +1658,40 @@ document.addEventListener('DOMContentLoaded', () => {
             const amount_total_cents = Number(data.amount_total_cents ?? data.amount_total ?? 0) || 0;
             const items = Array.isArray(data.items) ? data.items : [];
             
-            // Upsert receipt
-            const { data: receiptData, error: receiptError } = await window.sb.from('receipts').upsert({
-              user_id: uid,
-              session_id,
-              currency,
-              amount_total_cents,
-              items
-            });
+            // Upsert receipt with items array into the items jsonb column
+            const { data: receiptData, error: receiptError } = await window.sb.from('receipts').upsert(
+              {
+                user_id: uid,
+                session_id,
+                currency,
+                amount_total_cents,
+                items: items || []
+              },
+              { onConflict: 'session_id' }
+            );
             
             if (receiptError) {
-              console.warn('Upsert error (non-fatal, will try to fetch):', receiptError);
-            }
-            
-            // Get the receipt ID to link checkout items
-            let receiptId = null;
-            if (receiptData && receiptData.length > 0) {
-              receiptId = receiptData[0].id;
+              console.warn('Failed to save receipt (non-fatal):', receiptError);
             } else {
-              // Fetch the receipt if upsert didn't return data
-              const { data: fetchedReceipt } = await window.sb
-                .from('receipts')
-                .select('id')
-                .eq('session_id', session_id)
-                .single();
-              receiptId = fetchedReceipt?.id;
+              console.debug('Receipt saved successfully with', items.length, 'items');
             }
             
-            // Save individual checkout items if we have the receipt ID
-            if (receiptId && items.length > 0) {
-              const checkoutItems = items.map(item => {
-                const metadata = item.metadata || {};
-                const qty = Number(metadata.qty || item.quantity || 1) || 1;
-                const amountCents = Number(item.amount_cents || 0) || 0;
-                const unitPrice = qty > 0 ? Math.round(amountCents / qty) : amountCents;
-                
-                return {
-                  user_id: uid,
-                  receipt_id: receiptId,
-                  product_id: metadata.id || null,
-                  product_name: item.description || item.name || 'Item',
-                  quantity: qty,
-                  unit_price_cents: unitPrice,
-                  total_price_cents: amountCents,
-                  is_weighted: metadata.weighted === '1',
-                  unit: metadata.unit || null
-                };
-              });
-              
-              const { error: itemsError } = await window.sb
-                .from('checkout_items')
-                .insert(checkoutItems);
-              
-              if (itemsError) {
-                console.warn('Failed to store checkout items (non-fatal)', itemsError);
-              } else {
-                console.debug('Checkout items saved successfully', checkoutItems.length);
+            // Send receipt email with checkout details
+            try {
+              if (window.sb?.functions?.invoke && userEmail && items.length > 0) {
+                await window.sb.functions.invoke('send-checkout-email', {
+                  body: {
+                    user_id: uid,
+                    user_email: userEmail,
+                    items: items,
+                    total_cents: amount_total_cents,
+                    currency: currency
+                  }
+                });
+                console.debug('Receipt email sent successfully');
               }
-              
-              // Send receipt email with checkout details
-              try {
-                if (window.sb?.functions?.invoke && userEmail) {
-                  await window.sb.functions.invoke('send-checkout-email', {
-                    body: {
-                      user_id: uid,
-                      receipt_id: receiptId,
-                      user_email: userEmail,
-                      items: checkoutItems,
-                      total_cents: amount_total_cents,
-                      currency: currency
-                    }
-                  });
-                  console.debug('Receipt email sent successfully');
-                }
-              } catch (emailErr) {
-                console.warn('Failed to send receipt email (non-fatal)', emailErr);
-              }
+            } catch (emailErr) {
+              console.warn('Failed to send receipt email (non-fatal)', emailErr);
             }
           }
         }
