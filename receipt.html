@@ -13,23 +13,24 @@
       <div class="hero-icon" aria-hidden="true">✓</div>
       <p class="hero-badge">Payment confirmed</p>
       <h1 class="hero-title">Thank you for shopping with Noble Cart</h1>
-      <p class="hero-subtitle">We’ll keep this device signed out for security, but your receipt is below anytime you need it.</p>
-      <p id="receipt-status" class="hero-status">Loading receipt details...</p>
+      <p class="hero-subtitle">We’ve sent your receipt to <span id="receipt-email" aria-live="polite">your email</span>. You can also find it anytime in the Noble Cart app.</p>
+      <p id="receipt-status" class="hero-status">Preparing your receipt confirmation...</p>
     </section>
 
     <section class="receipt-card" aria-live="polite">
       <header class="receipt-card__header">
         <div>
-          <p class="receipt-card__label">Receipt</p>
-          <p class="receipt-card__id" id="receipt-reference">Session details</p>
+          <p class="receipt-card__label">Receipt status</p>
+          <p class="receipt-card__id" id="receipt-reference">Emailed copy</p>
         </div>
-        <button class="receipt-btn btn-secondary" onclick="window.location.href='cabinet.html'">View cabinet</button>
       </header>
-      <div id="receipt-container" class="receipt-card__body"></div>
+      <div id="receipt-container" class="receipt-card__body">
+        <div style="color:#4b5563;">Your detailed receipt lives in your inbox and inside the Noble Cart app.</div>
+      </div>
     </section>
 
     <div class="receipt-actions">
-      <button class="receipt-btn btn-primary" onclick="window.location.href='index.html'">Return home</button>
+      <button class="receipt-btn btn-primary" onclick="window.location.href='signin.html'">Done</button>
       <button class="receipt-btn btn-tertiary" onclick="window.location.href='signin.html'">Sign in again</button>
     </div>
   </main>

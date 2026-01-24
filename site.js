@@ -1149,111 +1149,110 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let current = null; // { transcript_no, currency, total_cents, items: [{name, qty, amount_cents}] }
 
-      const fmt = (cents, cur = 'USD') => {
-        const n = Number(cents || 0) / 100;
-        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: String(cur).toUpperCase() }).format(n); } catch { return `$${n.toFixed(2)}`; }
-      };
-      const setStatus = (msg, kind = 'info') => {
-        if (!statusEl) return;
-        statusEl.textContent = msg || '';
-        statusEl.style.color = kind === 'error' ? '#b91c1c' : kind === 'success' ? '#065f46' : '#6b7280';
-      };
+    const fmt = (cents, cur = 'USD') => {
+      const n = Number(cents || 0) / 100;
+      try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: String(cur).toUpperCase() }).format(n); } catch { return `$${n.toFixed(2)}`; }
+    };
+    const setStatus = (msg, kind = 'info') => {
+      if (!statusEl) return;
+      statusEl.textContent = msg || '';
+      statusEl.style.color = kind === 'error' ? '#b91c1c' : kind === 'success' ? '#065f46' : '#6b7280';
+    };
 
-      function renderItems() {
-        if (!tbody) return;
-        if (!current || !Array.isArray(current.items) || current.items.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:#6b7280;">No items found for this transcript.</td></tr>';
-          return;
-        }
-        tbody.innerHTML = '';
-        current.items.forEach((it, idx) => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${(it.name || 'Item')}</td>
-            <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${it.qty ?? 1}</td>
-            <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${fmt(it.amount_cents, current.currency)}</td>
-            <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">
-              <button class="btn btn-secondary" data-refund-idx="${idx}">Refund</button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        tbody.querySelectorAll('[data-refund-idx]').forEach((btn) => {
-          btn.addEventListener('click', async () => {
-            const idx = Number(btn.getAttribute('data-refund-idx')) || 0;
-            const item = current.items[idx];
-            if (!item) return;
-            setStatus('Processing refund...', 'info');
-            try {
-              let ok = false; let message = '';
-              if (window.sb?.functions?.invoke) {
-                const { data, error } = await window.sb.functions.invoke('refunds-create', {
-                  body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents }
-                });
-                if (error) throw error;
-                ok = !!data?.ok; message = data?.message || '';
-              } else {
-                const data = await apiFetch('/refunds/create', { method: 'POST', body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents } });
-                ok = !!data?.ok; message = data?.message || '';
-              }
-              if (ok) setStatus(message || 'Refund created.', 'success');
-              else setStatus(message || 'Refund failed.', 'error');
-            } catch (e) {
-              console.error('Refund failed', e);
-              setStatus('Refund failed: ' + (e?.message || e), 'error');
-            }
-          });
-        });
+    function renderItems() {
+      if (!tbody) return;
+      if (!current || !Array.isArray(current.items) || current.items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:#6b7280;">No items found for this transcript.</td></tr>';
+        return;
       }
+      tbody.innerHTML = '';
+      current.items.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${(it.name || 'Item')}</td>
+          <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${it.qty ?? 1}</td>
+          <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${fmt(it.amount_cents, current.currency)}</td>
+          <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">
+            <button class="btn btn-secondary" data-refund-idx="${idx}">Refund</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
 
-      async function searchTranscript(noRaw) {
-        const no = String(noRaw || '').trim().replace(/^#?/, '');
-        if (!no) return;
-        setStatus('Searching...', 'info');
-        try {
-          let result = null;
-          if (window.sb?.functions?.invoke) {
-            const { data, error } = await window.sb.functions.invoke('refunds-search', { body: { transcript_no: no } });
-            if (error) throw error;
-            result = data;
-          } else {
-            result = await apiFetch(`/refunds/search?transcript_no=${encodeURIComponent(no)}`);
+      tbody.querySelectorAll('[data-refund-idx]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const idx = Number(btn.getAttribute('data-refund-idx')) || 0;
+          const item = current.items[idx];
+          if (!item) return;
+          setStatus('Processing refund...', 'info');
+          try {
+            let ok = false; let message = '';
+            if (window.sb?.functions?.invoke) {
+              const { data, error } = await window.sb.functions.invoke('refunds-create', {
+                body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents }
+              });
+              if (error) throw error;
+              ok = !!data?.ok; message = data?.message || '';
+            } else {
+              const data = await apiFetch('/refunds/create', { method: 'POST', body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents } });
+              ok = !!data?.ok; message = data?.message || '';
+            }
+            if (ok) setStatus(message || 'Refund created.', 'success');
+            else setStatus(message || 'Refund failed.', 'error');
+          } catch (e) {
+            console.error('Refund failed', e);
+            setStatus('Refund failed: ' + (e?.message || e), 'error');
           }
-          if (!result || !result.transcript_no) {
-            current = null;
-            if (summary) summary.textContent = 'No transcript found';
-            if (subsummary) subsummary.textContent = '';
-            renderItems();
-            setStatus('Not found', 'error');
-            return;
-          }
-          current = result;
-          if (summary) summary.textContent = `Transcript ${result.transcript_no}`;
-          if (subsummary) subsummary.textContent = `${(result.items?.length || 0)} items • Total ${fmt(result.total_cents || 0, result.currency || 'USD')}`;
-          setStatus('Loaded', 'success');
-          renderItems();
-        } catch (e) {
-          console.error('Search failed', e);
+        });
+      });
+    }
+
+    async function searchTranscript(noRaw) {
+      const no = String(noRaw || '').trim().replace(/^#?/, '');
+      if (!no) return;
+      setStatus('Searching...', 'info');
+      try {
+        let result = null;
+        if (window.sb?.functions?.invoke) {
+          const { data, error } = await window.sb.functions.invoke('refunds-search', { body: { transcript_no: no } });
+          if (error) throw error;
+          result = data;
+        } else {
+          result = await apiFetch(`/refunds/search?transcript_no=${encodeURIComponent(no)}`);
+        }
+        if (!result || !result.transcript_no) {
           current = null;
-          if (summary) summary.textContent = 'Search failed';
+          if (summary) summary.textContent = 'No transcript found';
           if (subsummary) subsummary.textContent = '';
           renderItems();
-          setStatus('Error: ' + (e?.message || e), 'error');
+          setStatus('Not found', 'error');
+          return;
         }
-      }
-
-      if (form && input) {
-        form.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const value = input.value;
-          if (value) searchTranscript(value);
-        });
+        current = result;
+        if (summary) summary.textContent = `Transcript ${result.transcript_no}`;
+        if (subsummary) subsummary.textContent = `${(result.items?.length || 0)} items • Total ${fmt(result.total_cents || 0, result.currency || 'USD')}`;
+        setStatus('Loaded', 'success');
+        renderItems();
+      } catch (e) {
+        console.error('Search failed', e);
+        current = null;
+        if (summary) summary.textContent = 'Search failed';
+        if (subsummary) subsummary.textContent = '';
+        renderItems();
+        setStatus('Error: ' + (e?.message || e), 'error');
       }
     }
-  } catch { }
-});
 
+    if (form && input) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const value = input.value;
+        if (value) searchTranscript(value);
+      });
+    }
+  }
+} catch { }
+});
 
 
 // ---- Stripe Checkout wiring ----
@@ -1556,11 +1555,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const sid = params.get('session_id');
   const receiptContainer = document.getElementById('receipt-container');
   const statusEl = document.getElementById('receipt-status');
+  const emailEl = document.getElementById('receipt-email');
 
+  const fmt = (cents, cur = 'USD') => {
+    const n = Number(cents || 0) / 100;
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: String(cur).toUpperCase() }).format(n); } catch { return `$${n.toFixed(2)}`; }
+  };
   const setStatus = (msg, kind = 'info') => {
     if (!statusEl) return;
     statusEl.textContent = msg || '';
     statusEl.style.color = kind === 'error' ? '#b91c1c' : kind === 'success' ? '#065f46' : '#6b7280';
+  };
+
+  const setEmail = (email) => {
+    if (!emailEl || !email) return;
+    emailEl.textContent = email;
   };
 
   async function fetchDetails(sessionId) {
@@ -1580,35 +1589,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (!data) throw new Error('No details');
 
-      // Render a basic summary
-      if (receiptContainer) {
-        const currency = (data.currency || 'USD').toUpperCase();
-        const fmt = (cents) => {
-          const n = Number(cents || 0) / 100;
-          try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(n); } catch { return `$${n.toFixed(2)}`; }
-        };
-        const lines = Array.isArray(data.items) ? data.items : [];
-        const total = data.amount_total_cents ?? data.amount_total ?? 0;
-        const sub = data.amount_subtotal_cents ?? data.amount_subtotal ?? null;
-
-        const itemsHtml = lines.map((it, idx) => {
-          const name = it.name || `Item ${idx + 1}`;
-          const qty = it.quantity ?? 1;
-          const amt = it.amount_cents ?? it.unit_amount_cents ?? 0;
-          return `<div class="cart-item"><div class="item-number">${idx + 1}</div><div class="item-label">${name}${qty > 1 ? ' x' + qty : ''}</div><div class="item-price">${fmt(amt * (qty || 1))}</div></div>`;
-        }).join('');
-
-        receiptContainer.innerHTML = `
-          <div class="cart-items">${itemsHtml || '<div style=\"color:#6b7280;\">No items</div>'}</div>
-          <div class="subtotal"><span class="subtotal-label">Total:</span><span class="subtotal-amount">${fmt(total)}</span></div>
-        `;
-      }
+      // Prefer showing the user's email rather than rendering the full receipt details
+      const sessionEmail = data.customer_email || data.customer_details?.email || data.receipt_email;
+      if (sessionEmail) setEmail(sessionEmail);
 
       // Store receipt under user's account in Supabase (best-effort)
       try {
         if (window.sb) {
           const { data: u } = await window.sb.auth.getUser();
           const uid = u?.user?.id || null;
+          const userEmail = u?.user?.email || null;
+          if (userEmail) setEmail(userEmail);
           if (uid) {
             const currency = (data.currency || 'USD').toUpperCase();
             const session_id = data.id || sessionId;
@@ -1626,7 +1617,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Clear cart after a successful checkout
       try { saveCart([]); renderCart(); } catch { }
-      setStatus('Payment complete', 'success');
+      setStatus('Payment complete. Check your email for the receipt.', 'success');
     } catch (e) {
       console.error('Failed to load receipt', e);
       setStatus('Failed to load receipt', 'error');
