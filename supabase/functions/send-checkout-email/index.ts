@@ -3,10 +3,13 @@
 // Sends a receipt email with checkout details to user
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const RESEND_API = "https://api.resend.com/emails";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@nobelcart.com";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,6 +55,25 @@ serve(async (req) => {
   if (!user_email) return badRequest("Missing user_email");
   if (!items || !Array.isArray(items)) return badRequest("Missing or invalid items array");
   if (total_cents === undefined || total_cents === null) return badRequest("Missing total_cents");
+
+  // Idempotency Check
+  if (receipt_id && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: receipt } = await supabase
+        .from('receipts')
+        .select('email_sent')
+        .eq('id', receipt_id)
+        .single();
+      
+      if (receipt && receipt.email_sent) {
+        console.log(`Email already sent for receipt ${receipt_id}. Skipping.`);
+        return successResponse({ ok: true, message: "Email already sent", skipped: true });
+      }
+    } catch (e) {
+      console.warn("Idempotency check failed (proceeding anyway):", e);
+    }
+  }
 
   // Build email HTML
   const itemsHtml = items
@@ -172,6 +194,14 @@ serve(async (req) => {
           message: "Receipt saved (email sending failed, but order was processed)",
           email_sent: false,
         });
+      }
+
+      // Mark as sent in DB
+      if (receipt_id && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+          await supabase.from('receipts').update({ email_sent: true }).eq('id', receipt_id);
+        } catch (_) {}
       }
 
       const emailData = await emailRes.json();
