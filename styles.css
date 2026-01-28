@@ -343,95 +343,234 @@ body.page-exit-right .container {
     font-weight: 700;
     border-radius: 50%;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-    pointer-events: none;
-    /* purely informational */
 }
 
 .right-section {
-    width: 200px;
+    width: 280px;
+    min-width: 280px; /* Ensure it doesn't collapse */
+    flex: 0 0 280px;
     background-color: #efefef;
-    padding: 42px 18px 18px 18px;
+    padding: 32px 20px;
     display: flex;
     flex-direction: column;
+    /* Transition specific properties for smoother animation */
+    transition: width 1.3s cubic-bezier(0.25, 1, 0.5, 1), 
+                min-width 1.3s cubic-bezier(0.25, 1, 0.5, 1), 
+                flex-basis 1.3s cubic-bezier(0.25, 1, 0.5, 1), 
+                padding 1.3s ease, 
+                background-color 0.3s ease;
+    will-change: width, flex-basis, padding;
+    overflow: hidden;
+    overflow-x: hidden;
+    border-left: 1px solid #e5e5e5;
+    z-index: 20;
+}
+
+/* Slow fade out for the OpenSearch view */
+.slow-fade-out {
+    transition: opacity 2.3s ease, color 2.3s ease, filter 2.3s ease !important;
+    opacity: 0 !important;
+    filter: grayscale(100%) brightness(120%);
+    pointer-events: none;
+}
+
+.slow-fade-out * {
+    color: #e0e0e0 !important; /* Fade text to light gray/white */
+    border-color: #f0f0f0 !important;
+}
+
+/* Hide small thumbs in expanded mode since we show the big image on left */
+body.index.opensearch-active .item-image {
+    display: none !important;
+}
+
+/* Expanded state for Right Section (Default Scan Mode) */
+/* This block is kept for structure but overridden at bottom for specificity if needed */
+body.index.opensearch-active .right-section {
+    /* Base styles, width overridden at bottom */
+    background-color: #F2EFE9; 
+    padding: 40px 30px;
 }
 
 .total-header {
     font-size: 20px;
     font-weight: 600;
     color: #333;
-    margin: 16px 0 22px;
+    margin: 16px auto 22px;
     text-align: center;
+    max-width: 550px;
+    width: 92%;
 }
 
 .cart-items {
     flex: 1;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
+    overflow-y: auto;
+    padding-top: 4px;
 }
 
 .cart-item {
+    position: relative;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
-    padding: 6px 0;
+    justify-content: space-between;
+    padding: 16px 0;
+    margin: 0 auto;
+    width: 92%;
+    max-width: 550px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    background: transparent;
 }
 
-.item-number {
-    width: 25px;
-    height: 25px;
-    border-radius: 50%;
-    background-color: #efeded;
+.cart-item:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.cart-item.selected,
+.cart-item:active {
+    background-color: #f0f0f0;
+    border-radius: 8px;
+}
+
+.item-left {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 500;
-    color: #666;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-start;
+}
+
+.item-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
 }
 
 .item-label {
-    color: #666;
-    font-size: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #222;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
 }
 
 .item-price {
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 500;
-    color: #333;
+    color: #444;
+    text-align: right;
 }
 
-/* Remove button (circular) */
 .remove-item {
-    appearance: none;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #fff;
-    color: #444;
-    font-size: 14px;
-    line-height: 1;
-    display: inline-flex;
+    background: transparent;
+    border: none;
+    color: #999;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    margin-left: 8px;
-    transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: color 0.2s;
 }
 
 .remove-item:hover {
-    background: #f7f5f5;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    color: #d93025;
+    background: rgba(217, 48, 37, 0.1);
+    border-radius: 4px;
 }
 
-.remove-item:active {
-    transform: scale(0.94);
+/* Hide clutter in the list view */
+.item-number,
+.item-image,
+.item-details {
+    display: none;
 }
+
+.left-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: flex 0.5s ease;
+    background-color: #fff;
+    position: relative;
+}
+
+/* OpenSearch Top Bar */
+.opensearch-top {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fff;
+    z-index: 10;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background-color: #8B8682; /* Match the mock button color */
+    color: white;
+    border: none;
+    padding: 16px 48px;
+    border-radius: 30px;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    transition: all 0.2s ease;
+    text-transform: capitalize;
+}
+
+.action-btn .btn-icon {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2.5;
+}
+
+.action-btn:hover {
+    background-color: #75706c;
+    transform: translateY(-1px);
+}
+
+/* Selected Item Display (Left Panel) */
+.selected-item-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #F8F8F8; /* Lighter background */
+    margin: 20px;
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.selected-item-image {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+    mix-blend-mode: multiply; /* Helps integrate white-bg images */
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+}
+
+.placeholder-message {
+    color: #bdbdbd;
+    font-size: 24px;
+    font-weight: 600;
+    text-align: center;
+    max-width: 300px;
+    line-height: 1.4;
+}
+
 
 /* Cart item animations */
 @keyframes cartIn {
@@ -486,7 +625,9 @@ body.page-exit-right .container {
     align-items: center;
     padding: 20px 0;
     border-top: 1px solid #e5e7eb;
-    margin-bottom: 20px;
+    margin: 0 auto 20px;
+    max-width: 550px;
+    width: 92%;
 }
 
 .subtotal-label {
@@ -511,6 +652,9 @@ body.page-exit-right .container {
     font-weight: 500;
     cursor: pointer;
     transition: background-color 0.2s ease;
+    max-width: 550px;
+    width: 92%;
+    margin: 0 auto;
 }
 
 .checkout-btn:hover {
@@ -1360,7 +1504,55 @@ body.signin.keyboard-visible .auth-wrapper {
     margin: 6px 0 8px;
 }
 
-/* --- Adjustments for 16:9 aspect ratio devices (e.g., 10.1 inch tablets) --- */
+/* --- Embedded Views (Left Section) --- */
+#left-views {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.embedded-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.embedded-view.hidden {
+    display: none !important;
+}
+
+/* OpenSearch View */
+.opensearch-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.action-btn {
+    background-color: #8b7355;
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 30px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.action-btn:hover {
+    background-color: #7a6449;
+    transform: translateY(-2px);
+}
+
+.action-btn:active {
+    transform: translateY(1px);
+}
+
 @media screen and (min-aspect-ratio: 1.5),
 screen and (max-height: 800px) {
 
@@ -1383,6 +1575,7 @@ screen and (max-height: 800px) {
     .right-section {
         flex: 0 0 240px !important;
         width: 240px !important;
+        min-width: 240px !important;
         padding: 25px 15px 15px 15px !important;
     }
 
@@ -1395,26 +1588,15 @@ screen and (max-height: 800px) {
         margin-bottom: 12px !important;
     }
 
-    .cart-item {
-        margin-bottom: 4px !important;
-        padding: 4px 0 !important;
-    }
-
-    .item-number {
-        width: 18px !important;
-        height: 18px !important;
-        font-size: 10px !important;
-    }
+    /* item-number is hidden globally, removing rule */
 
     .item-label,
     .item-price {
-        font-size: 12px !important;
+        font-size: 13px !important;
     }
 
     .remove-item {
-        width: 18px !important;
-        height: 18px !important;
-        font-size: 10px !important;
+        font-size: 14px !important;
     }
 
     .subtotal {
@@ -1563,4 +1745,91 @@ screen and (max-height: 800px) {
         height: 100vh !important;
         border-radius: 0 !important;
     }
+}
+
+/* --- FORCE OVERRIDES FOR EXPANDED MODE --- */
+
+/* 1. Hide cart images in the right panel when expanded (OpenSearch mode) */
+body.index.opensearch-active .right-section .item-image {
+    display: none !important;
+}
+
+/* 2. Force Right Panel to be wide (55vw) in expanded mode */
+/* We use high specificity and !important to override any media queries */
+body.index.opensearch-active .right-section {
+    width: 55vw !important;
+    min-width: 55vw !important;
+    flex: 0 0 55vw !important;
+    padding: 40px 30px !important;
+    max-width: none !important;
+    /* Maintain the transition in the active state to ensure it animates back when class is removed */
+    transition: width 1.7s cubic-bezier(0.25, 1, 0.5, 1), 
+                min-width 1.7s cubic-bezier(0.25, 1, 0.5, 1), 
+                flex-basis 1.7s cubic-bezier(0.25, 1, 0.5, 1), 
+                padding 1.7s ease !important;
+}
+
+/* Expanded View Footer Styling */
+body.index.opensearch-active .checkout-btn {
+    width: 92%;
+    max-width: 550px; /* Match content width */
+    margin: 20px auto 0; /* Center it */
+    display: block;
+    padding: 16px 24px;
+    font-size: 18px;
+    font-weight: 600;
+    border-radius: 30px; /* Pill shape */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    background-color: #8b7355;
+    color: white;
+}
+
+body.index.opensearch-active .checkout-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+    background-color: #7a6449;
+}
+
+body.index.opensearch-active .checkout-btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+body.index.opensearch-active .subtotal {
+    margin-bottom: 0;
+    padding: 20px 24px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+    max-width: 550px; /* Constrain width */
+    margin-left: auto;
+    margin-right: auto;
+    width: 92%;
+}
+
+body.index.opensearch-active .subtotal-label {
+    font-size: 18px;
+    color: #666;
+    font-weight: 500;
+}
+
+body.index.opensearch-active .subtotal-amount {
+    font-size: 22px;
+    color: #111;
+    font-weight: 700;
+}
+
+/* Constrain list width to bring content closer */
+body.index.opensearch-active .cart-items {
+    max-width: 100%;
+}
+
+/* Center header too */
+body.index.opensearch-active .total-header {
+    max-width: 550px;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 24px;
+    margin-bottom: 25px;
+    font-weight: 700;
+    color: #111;
 }

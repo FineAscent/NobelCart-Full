@@ -342,19 +342,19 @@ body.checkout .container {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 0;
-    background: transparent;
-    border-radius: 0;
-    transition: none;
-    border: none;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 16px 18px;
+    background: #fff;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    margin-bottom: 10px;
 }
 
 .cart-item:hover {
-    background-color: transparent;
-    box-shadow: none;
-    border-color: rgba(0, 0, 0, 0.05);
-    transform: none;
+    background-color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
 }
 
 

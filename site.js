@@ -214,6 +214,8 @@ function productCardHTML(p) {
   const areaAttr = area ? ` data-area="${area}"` : '';
   const unitAttr = p.priceUnit ? ` data-unit="${String(p.priceUnit)}"` : '';
   const scaleAttr = p.scaleNeed ? ` data-scale="1"` : ' data-scale="0"';
+  // We'll set data-image dynamically after resolving, but if p.image_url is a direct link we could set it here.
+  // For now rely on renderProductsToGrid to set it.
   return `
       <div class="product-card"${idAttr}${nameAttr}${priceAttr}${areaAttr}${unitAttr}${scaleAttr}>
         <div class="product-info">
@@ -230,21 +232,30 @@ async function renderProductsToGrid(gridEl, items) {
   gridEl.innerHTML = items.map(productCardHTML).join('');
   // Bind add-to-cart interactions for this grid
   try { bindGridForCart(gridEl); } catch (_) { }
+  
   // Resolve images asynchronously
   const cards = Array.from(gridEl.querySelectorAll('.product-card'));
+  const resolvedImages = new Map(); // key (id/name) -> url
+  const resolvedKeys = new Map();   // key (id/name) -> imageKey (backend path)
+
   await Promise.all(cards.map(async (card, idx) => {
     const p = items[idx];
     const key = Array.isArray(p.imageKeys) && p.imageKeys.length ? p.imageKeys[0] : null;
     let url = null;
+    let finalImageKey = null;
+
     // Prefer existing API image resolver when key is provided
     if (key) {
       url = await getImageUrlForKey(key);
+      finalImageKey = key;
     } else if (p.image_url) {
       // image_url may be a full URL OR an external key that the API can sign
       if (/^https?:\/\//i.test(p.image_url)) {
         url = p.image_url;
+        // Don't treat public URLs as refreshable keys unless needed, but we can store them
       } else {
         try { url = await getImageUrlForKey(p.image_url); } catch { }
+        finalImageKey = p.image_url;
       }
     }
     const imgDiv = card.querySelector('.product-image');
@@ -261,6 +272,7 @@ async function renderProductsToGrid(gridEl, items) {
               .from('cabinet-uploads')
               .createSignedUrl(path, 3600);
             if (!error && data && data.signedUrl) url = data.signedUrl;
+            finalImageKey = p.image_url;
           }
         } catch { }
       }
@@ -268,6 +280,22 @@ async function renderProductsToGrid(gridEl, items) {
         imgDiv.style.backgroundImage = `url('${url}')`;
         imgDiv.style.backgroundSize = 'cover';
         imgDiv.style.backgroundPosition = 'center';
+        // Save url to card for add-to-cart
+        card.setAttribute('data-image', url);
+        // Save the key/path for refreshing later
+        if (finalImageKey) {
+            card.setAttribute('data-image-key', finalImageKey);
+        }
+        
+        // Track for cart update
+        if (p.id) {
+            resolvedImages.set(String(p.id), url);
+            if (finalImageKey) resolvedKeys.set(String(p.id), finalImageKey);
+        }
+        if (p.name) {
+            resolvedImages.set(`name:${p.name}`, url);
+            if (finalImageKey) resolvedKeys.set(`name:${p.name}`, finalImageKey);
+        }
       }
     }
     // add/override location-tag with areaLocation if present
@@ -282,6 +310,44 @@ async function renderProductsToGrid(gridEl, items) {
       tag.textContent = area;
     }
   }));
+
+  // Self-heal: Update cart items if we found images OR keys for them
+  if (resolvedImages.size > 0 || resolvedKeys.size > 0) {
+    const cartItems = loadCart();
+    let dirty = false;
+    cartItems.forEach(it => {
+        const idKey = it.id != null ? String(it.id) : null;
+        const nameKey = it.name ? `name:${it.name}` : null;
+
+        // 1. Backfill Image URL if missing
+        if (!it.image) {
+            let foundUrl = null;
+            if (idKey && resolvedImages.has(idKey)) foundUrl = resolvedImages.get(idKey);
+            else if (nameKey && resolvedImages.has(nameKey)) foundUrl = resolvedImages.get(nameKey);
+            
+            if (foundUrl) {
+                it.image = foundUrl;
+                dirty = true;
+            }
+        }
+
+        // 2. Backfill Image Key if missing (crucial for refreshing expired URLs)
+        if (!it.imageKey) {
+            let foundKey = null;
+            if (idKey && resolvedKeys.has(idKey)) foundKey = resolvedKeys.get(idKey);
+            else if (nameKey && resolvedKeys.has(nameKey)) foundKey = resolvedKeys.get(nameKey);
+
+            if (foundKey) {
+                it.imageKey = foundKey;
+                dirty = true;
+            }
+        }
+    });
+    if (dirty) {
+        saveCart(cartItems);
+        renderCart();
+    }
+  }
 }
 
 // --- Cart (Total sidebar) ---
@@ -422,6 +488,39 @@ function formatMoney(n) {
   return `$${v.toFixed(2)}`;
 }
 
+// --- Cart Selection Logic ---
+let selectedItemKey = null;
+
+function selectCartItem(key) {
+  selectedItemKey = key;
+  const items = loadCart();
+  const item = items.find(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) === key);
+  
+  // 1. Update Cart UI Selection State
+  const container = document.querySelector('.cart-items');
+  if (container) {
+    const allItems = container.querySelectorAll('.cart-item');
+    allItems.forEach(el => {
+      if (el.dataset.key === key) el.classList.add('selected');
+      else el.classList.remove('selected');
+    });
+  }
+
+  // 2. Update Left Panel Display (if in OpenSearch mode)
+  const displayEl = document.getElementById('selected-item-display');
+  if (displayEl) {
+    if (item && item.image) {
+      displayEl.innerHTML = `<img src="${item.image}" class="selected-item-image" alt="${item.name}">`;
+    } else if (item) {
+      // Item selected but no image
+      displayEl.innerHTML = `<div class="placeholder-message">${item.name}</div>`;
+    } else {
+      // Nothing selected
+      displayEl.innerHTML = `<div class="placeholder-message">"Selected" item Image "shown here"</div>`;
+    }
+  }
+}
+
 function renderCart() {
   // Support both Receipt/Cabinet (right-section) and Checkout (checkout-right)
   const container = document.querySelector('.right-section .cart-items, .checkout-right .cart-items');
@@ -430,6 +529,24 @@ function renderCart() {
   const items = loadCart();
   container.innerHTML = '';
   let subtotal = 0;
+  
+  // If previously selected item is gone, clear selection
+  if (selectedItemKey) {
+    const exists = items.some(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) === selectedItemKey);
+    if (!exists) selectedItemKey = null;
+  }
+  
+  // If nothing selected and we have items, select the last one (most recently added)
+  if (!selectedItemKey && items.length > 0) {
+    const last = items[items.length - 1];
+    selectedItemKey = (last.id != null) ? String(last.id) : `name:${last.name}`;
+    // Defer the UI update slightly to ensure DOM is ready if called from init
+    setTimeout(() => selectCartItem(selectedItemKey), 0);
+  } else if (items.length === 0) {
+     // Empty cart, reset display
+     selectCartItem(null);
+  }
+
   items.forEach((it, idx) => {
     const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
     subtotal += line;
@@ -439,6 +556,10 @@ function renderCart() {
       div.className = 'cart-item';
       const key = (it.id != null) ? String(it.id) : `name:${it.name}`;
       div.setAttribute('data-key', key);
+      
+      // Apply selection class
+      if (key === selectedItemKey) div.classList.add('selected');
+
       const qty = Number(it.qty) || 1;
       let labelText = (it.name || 'item');
       if (it.weighted) {
@@ -448,18 +569,40 @@ function renderCart() {
       } else if (qty > 1) {
         labelText = `${labelText} x${qty}`;
       }
+      
+      let imgHtml = '';
+      if (it.image) {
+        imgHtml = `<div class="item-image" style="background-image: url('${it.image}');"></div>`;
+      }
+      
       div.innerHTML = `
-          <div class="item-number">${idx + 1}</div>
-          <div class="item-label">${labelText}</div>
-          <div class="item-price">${formatMoney(line)}</div>
-          <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
+          <div class="item-left">
+            <div class="item-number">${idx + 1}</div>
+            ${imgHtml}
+            <div class="item-label">${labelText}</div>
+          </div>
+          <div class="item-right">
+            <div class="item-price">${formatMoney(line)}</div>
+            <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
+          </div>
         `;
+        
+      // Click to select
+      div.addEventListener('click', (e) => {
+        // Don't select if clicking remove button
+        if (e.target.closest('.remove-item')) return;
+        selectCartItem(key);
+      });
+      
       container.appendChild(div);
     }
   });
   if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
   // Push a heartbeat with latest subtotal (debounced)
   try { scheduleHeartbeat(subtotal); } catch (_) { }
+  
+  // Ensure the display is in sync after render
+  if (selectedItemKey) selectCartItem(selectedItemKey);
 }
 
 function removeFromCartByKey(key) {
@@ -467,6 +610,8 @@ function removeFromCartByKey(key) {
   const items = loadCart();
   const next = items.filter(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) !== key);
   saveCart(next);
+  
+  // If we removed the selected item, renderCart will handle clearing/reselecting
   renderCart();
 }
 
@@ -501,12 +646,14 @@ function decrementCartItemByKey(key) {
   if (changed) {
     saveCart(items);
     renderCart();
+    // Keep selection on this item
+    selectCartItem(key);
     return 'decremented';
   }
   return null;
 }
 
-function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, unitPrice = null }) {
+function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, unitPrice = null, image = null, imageKey = null }) {
   const items = loadCart();
   const key = (id != null) ? String(id) : `name:${name}`;
   const existing = items.find(it => (it.id != null ? String(it.id) : `name:${it.name}`) === key);
@@ -522,15 +669,22 @@ function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, un
     } else {
       existing.qty = (existing.qty || 1) + 1;
     }
+    // Update image if available
+    if (image) existing.image = image;
+    if (imageKey) existing.imageKey = imageKey;
   } else {
     if (weighted) {
-      items.push({ id, name, price: Number(unitPrice != null ? unitPrice : price) || 0, qty: Number(qty) || 0, weighted: true, unit: unit || null });
+      items.push({ id, name, price: Number(unitPrice != null ? unitPrice : price) || 0, qty: Number(qty) || 0, weighted: true, unit: unit || null, image, imageKey });
     } else {
-      items.push({ id, name, price: Number(price) || 0, qty: 1 });
+      items.push({ id, name, price: Number(price) || 0, qty: 1, image, imageKey });
     }
   }
   saveCart(items);
+  
+  // Auto-select the newly added/updated item
+  selectedItemKey = key;
   renderCart();
+  
   // Animate the added item
   try {
     const container = document.querySelector('.right-section .cart-items');
@@ -559,6 +713,9 @@ function bindGridForCart(gridEl) {
     const id = card.getAttribute('data-id');
     const name = card.getAttribute('data-name') || (card.querySelector('.product-name')?.textContent || '').trim();
     const priceAttr = card.getAttribute('data-price');
+    const image = card.getAttribute('data-image'); // Get image URL
+    const imageKey = card.getAttribute('data-image-key'); // Get image Key for refreshing
+    
     let price = priceAttr != null ? Number(priceAttr) : null;
     if (price == null || Number.isNaN(price)) {
       // Parse from visible price text like "$2.00"
@@ -572,11 +729,11 @@ function bindGridForCart(gridEl) {
         name, unit, onConfirm: (weightVal) => {
           const w = Number(weightVal);
           if (!w || w <= 0) return; // ignore invalid
-          addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price });
+          addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price, image, imageKey });
         }
       });
     } else {
-      addToCart({ id, name, price });
+      addToCart({ id, name, price, image, imageKey });
     }
   });
 }
