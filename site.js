@@ -1086,9 +1086,9 @@ document.addEventListener('DOMContentLoaded', () => {
           isUserSignedIn = false;
         }
 
-        // Setup listeners
+        // Setup listeners (use capture to catch non-bubbling events like scroll)
         const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
-        activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+        activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true, capture: true }));
 
         // Start monitoring
         resetIdleTimer();
