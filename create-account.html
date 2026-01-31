@@ -16,16 +16,32 @@
         <p class="auth-subtitle">Use your email and a password to get started.</p>
 
         <form id="create-form" class="auth-form" novalidate>
+          <div class="auth-field text-field">
+            <label class="auth-label" for="create-name">Full Name</label>
+            <input id="create-name" class="auth-input" type="text" name="full_name" placeholder="Abraham Ali"
+              autocomplete="name" required data-field="name" inputmode="text" autocapitalize="words"
+              autocorrect="off" />
+          </div>
+
           <div class="auth-field email-field">
             <label class="auth-label" for="create-email">Email</label>
-            <input id="create-email" class="auth-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required
-              inputmode="email" data-field="email" />
+            <input id="create-email" class="auth-input" type="email" name="email" placeholder="you@example.com"
+              autocomplete="email" required inputmode="email" data-field="email" />
           </div>
+
+          <!-- Phone Auth Temporarily Disabled
+          <div class="auth-field phone-field">
+            <label class="auth-label" for="create-phone">Phone Number</label>
+            <input id="create-phone" class="auth-input" type="tel" name="phone" placeholder="+1234567890" 
+              autocomplete="tel" inputmode="tel" data-field="phone" />
+          </div>
+          -->
 
           <div class="auth-field password-field">
             <label class="auth-label" for="create-password">Password</label>
-            <input id="create-password" class="auth-input" type="password" name="password" placeholder="Choose a password" autocomplete="new-password"
-              required minlength="6" data-field="password" />
+            <input id="create-password" class="auth-input" type="password" name="password"
+              placeholder="Choose a password" autocomplete="new-password" required minlength="6"
+              data-field="password" />
           </div>
 
           <button type="submit" class="auth-button">Create account</button>
@@ -34,9 +50,64 @@
             <a href="signin.html">Already have an account? Sign in</a>
           </div>
         </form>
+
+        <!-- OTP Verification Overlay (Temporarily Disabled)
+        <div id="otp-overlay" class="otp-overlay" style="display: none;">
+          <div class="otp-card">
+            <h2>Verify Phone Number</h2>
+            <p>We sent a 6-digit code to your phone.</p>
+            <input type="text" id="otp-input" placeholder="000000" maxlength="6" inputmode="numeric" />
+            <button id="otp-verify-btn" class="auth-button">Verify Code</button>
+            <button id="otp-cancel-btn" class="text-button">Skip / Later</button>
+            <div id="otp-error" class="auth-error" style="display:none;"></div>
+          </div>
+        </div>
+        -->
       </div>
     </div>
   </div>
+
+  <style>
+    /*
+    .otp-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .otp-card {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .otp-card h2 { margin-top: 0; color: #333; }
+    .otp-card p { color: #666; margin-bottom: 20px; }
+    #otp-input {
+      font-size: 24px;
+      letter-spacing: 4px;
+      text-align: center;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+    }
+    .text-button {
+      background: none;
+      border: none;
+      color: #666;
+      margin-top: 10px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    */
+  </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
@@ -49,10 +120,10 @@
       const inputs = Array.from(document.querySelectorAll('.auth-input'));
       if (!inputs.length) return;
 
-      const focusClasses = ['focus-email', 'focus-password'];
+      const focusClasses = ['focus-email', 'focus-password', 'focus-name'];
       const setFocusState = (field) => {
         body.classList.remove(...focusClasses);
-        if (field === 'email' || field === 'password') {
+        if (field) {
           body.classList.add(`focus-${field}`);
         }
       };
@@ -77,21 +148,24 @@
         });
         input.addEventListener('blur', handleBlur);
       });
-
-      // If page loads with a field already focused (password manager), adjust immediately
-      const active = document.activeElement;
-      if (inputs.includes(active)) {
-        body.classList.add('keyboard-visible');
-        setFocusState(active.dataset.field);
-      }
     })();
   </script>
   <script>
     (function () {
       const form = document.getElementById('create-form');
+      const nameEl = document.getElementById('create-name');
       const emailEl = document.getElementById('create-email');
+      // const phoneEl = document.getElementById('create-phone');
       const pwEl = document.getElementById('create-password');
       const errEl = document.getElementById('create-error');
+
+      // const otpOverlay = document.getElementById('otp-overlay');
+      // const otpInput = document.getElementById('otp-input');
+      // const otpVerifyBtn = document.getElementById('otp-verify-btn');
+      // const otpCancelBtn = document.getElementById('otp-cancel-btn');
+      // const otpError = document.getElementById('otp-error');
+
+      // let currentPhone = '';
 
       const showError = (msg) => {
         if (errEl) {
@@ -103,27 +177,103 @@
       form?.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (errEl) errEl.style.display = 'none';
+        const fullName = (nameEl?.value || '').trim();
         const email = (emailEl?.value || '').trim();
         const password = (pwEl?.value || '').trim();
+        // currentPhone = (phoneEl?.value || '').trim();
+
+        if (!fullName) {
+          showError('Please enter your name.');
+          return;
+        }
         if (!email || !password) {
           showError('Please enter email and password.');
           return;
         }
+
         try {
           if (!window.sb) throw new Error('Auth not ready');
-          const { data, error } = await window.sb.auth.signUp({ email, password });
+
+          // 1. Create User with Email/Password + Metadata
+          const { data, error } = await window.sb.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                full_name: fullName,
+                // phone: currentPhone // Store phone in metadata as backup
+              }
+            }
+          });
+
           if (error) throw error;
-          // If email confirmation is enabled, session may be null
-          if (!data.session) {
-            alert('Account created. Please check your email to confirm before signing in.');
-            window.location.href = 'signin.html';
-            return;
+
+          /* PHONE VERIFICATION DISABLED
+          // 2. If phone number provided, trigger SMS Verification
+          if (currentPhone) {
+             // Basic formatting check (ensure + prefix if needed, or leave to Supabase)
+             if (!currentPhone.startsWith('+') && /^\d{10,}$/.test(currentPhone)) {
+                 // Assume US default if no prefix, or let backend fail? 
+                 // Best practice: Prepend +1 if strictly 10 digits and US-centric, 
+                 // but safer to ask user for country code. We'll pass as-is.
+             }
+             
+             // Trigger OTP
+             const { error: otpError } = await window.sb.auth.signInWithOtp({
+               phone: currentPhone
+             });
+             
+             if (otpError) {
+               console.warn("SMS send failed:", otpError);
+               // If SMS fails (e.g. unconfigured), just proceed to index but warn
+               alert("Account created, but could not send SMS verification (Check Supabase Config). Redirecting...");
+               window.location.href = 'index.html';
+             } else {
+               // Show OTP Modal
+               otpOverlay.style.display = 'flex';
+               otpInput.focus();
+             }
+             return;
           }
+          */
+
+          // If no phone, standard redirect
           window.location.href = 'index.html';
         } catch (ex) {
           showError(ex?.message || 'Failed to create account.');
         }
       });
+
+      /* OTP LOGIC DISABLED
+      // OTP Verify Logic
+      otpVerifyBtn?.addEventListener('click', async () => {
+         const token = otpInput.value.trim();
+         if (!token) return;
+         otpError.style.display = 'none';
+
+         try {
+           const { data, error } = await window.sb.auth.verifyOtp({
+             phone: currentPhone,
+             token: token,
+             type: 'sms'
+           });
+           
+           if (error) throw error;
+           
+           // Verification success!
+           window.location.href = 'index.html';
+           
+         } catch (e) {
+           otpError.textContent = e.message || 'Invalid code';
+           otpError.style.display = 'block';
+         }
+      });
+
+      otpCancelBtn?.addEventListener('click', () => {
+         window.location.href = 'index.html';
+      });
+      */
+
     })();
   </script>
 </body>

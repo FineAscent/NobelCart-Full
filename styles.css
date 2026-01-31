@@ -23,7 +23,7 @@ body.signin.focus-password .email-field {
     min-height: 40px;
     border-radius: 24px;
     border: 1px solid rgba(0, 0, 0, 0.08);
-    background: #fff;
+    background: #F5F2F2;
     color: #333;
     font-size: 14px;
     cursor: pointer;
@@ -141,15 +141,20 @@ body.index .header {
     background: #f9fafb;
 }
 
-/* Page transition: slide content slightly to the right and fade out */
-body.page-exit-right {
+/* Page transition: Fade out */
+.page-fade-out {
+    opacity: 0;
+    transition: opacity 0.3s ease;
     pointer-events: none;
-    /* prevent double navigations during transition */
 }
 
-body.page-exit-right .container {
-    transform: translateX(60px);
-    opacity: 0.02;
+.page-opacity-0 {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.page-fade-in {
+    opacity: 1 !important;
 }
 
 .left-section {
@@ -249,7 +254,7 @@ body.page-exit-right .container {
 }
 
 .tabbar .tab.active {
-    background: #fff;
+    background: #F5F2F2;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
@@ -277,7 +282,7 @@ body.page-exit-right .container {
 }
 
 .product-card {
-    background-color: #EFEAEA;
+    background-color: #F5F2F2;
     border-radius: 15px;
     padding: 0;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -337,7 +342,7 @@ body.page-exit-right .container {
     right: 8px;
     width: 24px;
     height: 24px;
-    background: #ffffff;
+    background: #F5F2F2;
     color: #333;
     font-size: 11px;
     font-weight: 700;
@@ -345,20 +350,107 @@ body.page-exit-right .container {
     display: flex;
 }
 
+/* Animations for Category Page */
+/* Container animation removed to focus on grid fade-in */
+/*
+@keyframes fadeInPage {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.category-page .container {
+    animation: fadeInPage 1.5s ease-out;
+}
+*/
+
+.category-page .product-card {
+    opacity: 0;
+    transform: translateY(30px);
+    /* Start slightly lower for better effect */
+    transition: opacity 1.5s cubic-bezier(0.2, 0.8, 0.2, 1), transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: opacity, transform;
+}
+
+.category-page .product-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Ensure hover effect works on category page */
+.category-page .product-card:hover {
+    transform: translateY(-4px);
+    transition-duration: 0.3s;
+    /* Faster response on hover */
+}
+
+/* Staggered delays for grid items */
+.category-page .product-card:nth-child(1) {
+    transition-delay: 0.05s;
+}
+
+.category-page .product-card:nth-child(2) {
+    transition-delay: 0.1s;
+}
+
+.category-page .product-card:nth-child(3) {
+    transition-delay: 0.15s;
+}
+
+.category-page .product-card:nth-child(4) {
+    transition-delay: 0.2s;
+}
+
+.category-page .product-card:nth-child(5) {
+    transition-delay: 0.25s;
+}
+
+.category-page .product-card:nth-child(6) {
+    transition-delay: 0.3s;
+}
+
+.category-page .product-card:nth-child(7) {
+    transition-delay: 0.35s;
+}
+
+.category-page .product-card:nth-child(8) {
+    transition-delay: 0.4s;
+}
+
+.category-page .product-card:nth-child(9) {
+    transition-delay: 0.45s;
+}
+
+.category-page .product-card:nth-child(10) {
+    transition-delay: 0.5s;
+}
+
+.category-page .product-card:nth-child(11) {
+    transition-delay: 0.55s;
+}
+
+.category-page .product-card:nth-child(12) {
+    transition-delay: 0.6s;
+}
+
+.category-page .product-card:nth-child(n+13) {
+    transition-delay: 0.65s;
+}
+
 .right-section {
     width: 280px;
-    min-width: 280px; /* Ensure it doesn't collapse */
+    min-width: 280px;
+    /* Ensure it doesn't collapse */
     flex: 0 0 280px;
     background-color: #efefef;
     padding: 32px 20px;
     display: flex;
     flex-direction: column;
     /* Transition specific properties for smoother animation */
-    transition: width 1.3s cubic-bezier(0.25, 1, 0.5, 1), 
-                min-width 1.3s cubic-bezier(0.25, 1, 0.5, 1), 
-                flex-basis 1.3s cubic-bezier(0.25, 1, 0.5, 1), 
-                padding 1.3s ease, 
-                background-color 0.3s ease;
+    transition: width 1.3s cubic-bezier(0.25, 1, 0.5, 1),
+        min-width 1.3s cubic-bezier(0.25, 1, 0.5, 1),
+        flex-basis 1.3s cubic-bezier(0.25, 1, 0.5, 1),
+        padding 1.3s ease,
+        background-color 0.3s ease;
     will-change: width, flex-basis, padding;
     overflow: hidden;
     overflow-x: hidden;
@@ -375,7 +467,8 @@ body.page-exit-right .container {
 }
 
 .slow-fade-out * {
-    color: #e0e0e0 !important; /* Fade text to light gray/white */
+    color: #e0e0e0 !important;
+    /* Fade text to light gray/white */
     border-color: #f0f0f0 !important;
 }
 
@@ -388,8 +481,8 @@ body.index.opensearch-active .item-image {
 /* This block is kept for structure but overridden at bottom for specificity if needed */
 body.index.opensearch-active .right-section {
     /* Base styles, width overridden at bottom */
-    background-color: #F2EFE9; 
-    padding: 40px 30px;
+    background-color: #F2EFE9;
+    padding: 20px 30px;
 }
 
 .total-header {
@@ -498,17 +591,17 @@ body.index.opensearch-active .right-section {
     flex-direction: column;
     overflow: hidden;
     transition: flex 0.5s ease;
-    background-color: #fff;
+    background-color: #F5F2F2;
     position: relative;
 }
 
 /* OpenSearch Top Bar */
 .opensearch-top {
-    padding: 20px;
+    padding: 39px;
     display: flex;
     justify-content: center;
     border-bottom: 1px solid #f0f0f0;
-    background: #fff;
+    background: #F5F2F2;
     z-index: 10;
 }
 
@@ -517,7 +610,8 @@ body.index.opensearch-active .right-section {
     align-items: center;
     justify-content: center;
     gap: 12px;
-    background-color: #8B8682; /* Match the mock button color */
+    background-color: #8B8682;
+    /* Match the mock button color */
     color: white;
     border: none;
     padding: 16px 48px;
@@ -525,7 +619,7 @@ body.index.opensearch-active .right-section {
     font-size: 20px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     transition: all 0.2s ease;
     text-transform: capitalize;
 }
@@ -547,7 +641,8 @@ body.index.opensearch-active .right-section {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #F8F8F8; /* Lighter background */
+    background-color: #F5F2F2;
+    /* Lighter background */
     margin: 20px;
     border-radius: 20px;
     position: relative;
@@ -558,8 +653,9 @@ body.index.opensearch-active .right-section {
     max-width: 80%;
     max-height: 80%;
     object-fit: contain;
-    mix-blend-mode: multiply; /* Helps integrate white-bg images */
-    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));
+    mix-blend-mode: multiply;
+    /* Helps integrate white-bg images */
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
 }
 
 .placeholder-message {
@@ -749,7 +845,7 @@ body.index.opensearch-active .right-section {
 }
 
 .category-card {
-    background: #EFEAEA;
+    background: #F5F2F2;
     border-radius: 15px;
     height: 160px;
     padding: 14px;
@@ -1030,37 +1126,35 @@ body.signin {
     position: relative;
     display: flex;
     align-items: center;
+    margin-top: 8px;
 }
 
 /* Password field with toggle button needs extra padding */
 .auth-input-wrap .auth-input {
     padding-right: 70px;
+    margin-top: 0;
 }
 
 /* Password toggle button styling */
 .password-toggle {
     position: absolute;
-    right: 8px;
+    right: 10px;
     top: 50%;
     transform: translateY(-50%);
-    height: 32px;
-    padding: 0 12px;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-    border-radius: 8px;
-    background: #fff;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
     color: #6b7280;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 160ms ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: color 160ms ease;
+    border-radius: 6px;
 }
 
 .password-toggle:hover {
-    background: #f9fafb;
-    border-color: rgba(0, 0, 0, 0.18);
-    color: #374151;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    color: #111827;
+    background: rgba(0, 0, 0, 0.04);
 }
 
 .password-toggle:active {
@@ -1532,21 +1626,21 @@ body.signin.keyboard-visible .auth-wrapper {
 }
 
 .action-btn {
-    background-color: #8b7355;
-    color: white;
+    background-color: #dcdbdb;
+    color: rgb(33, 37, 33);
     border: none;
     padding: 12px 16px;
     border-radius: 30px;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 470;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s ease, background-color 0.2s ease;
 }
 
 .action-btn:hover {
-    background-color: #7a6449;
-    transform: translateY(-2px);
+    background-color: #d3d1d1;
+
 }
 
 .action-btn:active {
@@ -1670,7 +1764,7 @@ screen and (max-height: 800px) {
     }
 
     .tabbar .tab.active {
-        background: #FFFFFF !important;
+        background: #F5F2F2 !important;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
     }
 
@@ -1693,7 +1787,7 @@ screen and (max-height: 800px) {
     }
 
     .category-card {
-        background: #EFEAEA !important;
+        background: #F5F2F2 !important;
         padding: 10px !important;
         gap: 30px !important;
         min-height: 155px !important;
@@ -1702,8 +1796,8 @@ screen and (max-height: 800px) {
 
     .category-title {
         font-size: 16px !important;
-       font-family:  'Arial Narrow', sans-serif;
-        
+        font-family: 'Arial Narrow', sans-serif;
+
         /* Slightly smaller */
         margin-top: 4px !important;
     }
@@ -1763,22 +1857,25 @@ body.index.opensearch-active .right-section {
     padding: 40px 30px !important;
     max-width: none !important;
     /* Maintain the transition in the active state to ensure it animates back when class is removed */
-    transition: width 1.7s cubic-bezier(0.25, 1, 0.5, 1), 
-                min-width 1.7s cubic-bezier(0.25, 1, 0.5, 1), 
-                flex-basis 1.7s cubic-bezier(0.25, 1, 0.5, 1), 
-                padding 1.7s ease !important;
+    transition: width 1.7s cubic-bezier(0.25, 1, 0.5, 1),
+        min-width 1.7s cubic-bezier(0.25, 1, 0.5, 1),
+        flex-basis 1.7s cubic-bezier(0.25, 1, 0.5, 1),
+        padding 1.7s ease !important;
 }
 
 /* Expanded View Footer Styling */
 body.index.opensearch-active .checkout-btn {
     width: 92%;
-    max-width: 550px; /* Match content width */
-    margin: 20px auto 0; /* Center it */
+    max-width: 550px;
+    /* Match content width */
+    margin: 20px auto 0;
+    /* Center it */
     display: block;
     padding: 16px 24px;
     font-size: 18px;
     font-weight: 600;
-    border-radius: 30px; /* Pill shape */
+    border-radius: 30px;
+    /* Pill shape */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
     background-color: #8b7355;
@@ -1799,8 +1896,9 @@ body.index.opensearch-active .checkout-btn:active {
 body.index.opensearch-active .subtotal {
     margin-bottom: 0;
     padding: 20px 24px;
-    border-top: 1px solid rgba(0,0,0,0.06);
-    max-width: 550px; /* Constrain width */
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    max-width: 550px;
+    /* Constrain width */
     margin-left: auto;
     margin-right: auto;
     width: 92%;
@@ -1832,4 +1930,55 @@ body.index.opensearch-active .total-header {
     margin-bottom: 25px;
     font-weight: 700;
     color: #111;
+}
+
+/* Grid Fade Transitions */
+@keyframes fadeOutGrid {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+}
+
+@keyframes fadeInGrid {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.fade-out-active {
+    animation: fadeOutGrid 0.3s ease-out forwards;
+}
+
+.fade-in-active {
+    opacity: 0;
+    /* Start hidden */
+    animation: fadeInGrid 0.4s ease-out forwards;
+}
+
+/* Checkout Page Transitions */
+.page-transition-fade-out {
+    opacity: 0 !important;
+    transition: opacity 0.5s ease-in-out;
+    pointer-events: none;
+}
+
+.page-opacity-0 {
+    opacity: 0;
+}
+
+.page-fade-in {
+    opacity: 1 !important;
+    transition: opacity 0.6s ease-out;
 }

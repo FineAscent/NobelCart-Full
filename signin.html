@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign In</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body class="signin">
   <div class="container">
     <!-- Fullscreen centered auth layout (no left/right sections) -->
@@ -13,10 +15,11 @@
       <div class="auth-card" aria-labelledby="signin-title">
         <h1 id="signin-title" class="auth-title">Welcome back</h1>
         <p class="auth-subtitle">Sign in to continue</p>
-        
+
         <!-- Phone sign-in option at top -->
         <div style="text-align: center; margin-bottom: 12px;">
-          <button type="button" id="qr-signin-btn-top" class="auth-button shine-button" style="background: #1b7991; color: #f2f2f2; font-size: 14px; padding: 12px 16px;">
+          <button type="button" id="qr-signin-btn-top" class="auth-button shine-button"
+            style="background: #1b7991; color: #f2f2f2; font-size: 14px; padding: 12px 16px;">
             Sign in with phone
           </button>
         </div>
@@ -24,33 +27,18 @@
         <form id="signin-form" class="auth-form" novalidate>
           <div class="auth-field email-field">
             <label class="auth-label" for="email">Email</label>
-            <input
-              id="email"
-              class="auth-input"
-              type="email"
-              name="email"
-              placeholder="you@example.com"
-              autocomplete="email"
-              required
-              inputmode="email"
-              data-field="email"
-            />
+            <!-- Phone Auth Placeholder Changed: placeholder="you@example.com or +1234567890" -->
+            <input id="email" class="auth-input" type="email" name="email" placeholder="you@example.com"
+              autocomplete="email" required data-field="email" inputmode="email" />
           </div>
 
-          <div class="auth-field password-field">
+          <div class="auth-field password-field" id="password-section">
             <label class="auth-label" for="password">Password</label>
             <div class="auth-input-wrap">
-              <input
-                id="password"
-                class="auth-input"
-                type="password"
-                name="password"
-                placeholder="••••••••"
-                autocomplete="current-password"
-                required
-                data-field="password"
-              />
-              <button type="button" id="toggle-password" class="password-toggle" aria-label="Show password">Show</button>
+              <input id="password" class="auth-input" type="password" name="password" placeholder="••••••••"
+                autocomplete="current-password" required data-field="password" />
+              <button type="button" id="toggle-password" class="password-toggle"
+                aria-label="Show password">Show</button>
             </div>
           </div>
 
@@ -61,29 +49,45 @@
             <a href="create-account.html" id="create-link">Create account</a>
           </div>
         </form>
+
+        <!-- OTP Verification Overlay (Temporarily Disabled)
+        <div id="otp-overlay" class="otp-overlay" style="display: none;">
+          <div class="otp-card">
+            <h2>Verify Phone Number</h2>
+            <p>We sent a 6-digit code to your phone.</p>
+            <input type="text" id="otp-input" placeholder="000000" maxlength="6" inputmode="numeric" />
+            <button id="otp-verify-btn" class="auth-button">Verify Code</button>
+            <button id="otp-cancel-btn" class="text-button">Cancel</button>
+            <div id="otp-error" class="auth-error" style="display:none;"></div>
+          </div>
+        </div>
+        -->
       </div>
     </div>
   </div>
 
   <style>
     @keyframes shine {
-      0% { background-position: -200% center; }
-      100% { background-position: 200% center; }
+      0% {
+        background-position: -200% center;
+      }
+
+      100% {
+        background-position: 200% center;
+      }
     }
-    
+
     .shine-button {
-      background-image: linear-gradient(
-        90deg,
-        #1f648d 0%,
-        rgba(243, 243, 243, 0.791) 50%,
-        #268aab 100%
-      );
+      background-image: linear-gradient(90deg,
+          #1f648d 0%,
+          rgba(243, 243, 243, 0.791) 50%,
+          #268aab 100%);
       background-size: 200% 100%;
       animation: shine 3s ease-in-out infinite;
       position: relative;
       overflow: hidden;
     }
-    
+
     .shine-button::before {
       content: '';
       position: absolute;
@@ -91,14 +95,66 @@
       left: -100%;
       width: 100%;
       height: 100%;
-      background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(97, 203, 244, 0.4),
-        transparent
-      );
+      background: linear-gradient(90deg,
+          transparent,
+          rgba(97, 203, 244, 0.4),
+          transparent);
       animation: shine 3s ease-in-out infinite;
     }
+
+    /* OTP Overlay Styles
+    .otp-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+    }
+
+    .otp-card {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .otp-card h2 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .otp-card p {
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    #otp-input {
+      font-size: 24px;
+      letter-spacing: 4px;
+      text-align: center;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+    }
+
+    .text-button {
+      background: none;
+      border: none;
+      color: #666;
+      margin-top: 10px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    */
   </style>
 
   <style>
@@ -117,6 +173,7 @@
       opacity: 1;
       transition: opacity 1.5s ease-out;
     }
+
     #splash-logo {
       position: absolute;
       inset: 0;
@@ -126,11 +183,27 @@
       opacity: 0;
       animation: splashFade 9s ease-in-out forwards;
     }
+
     @keyframes splashFade {
-      0% { opacity: 0; transform: scale(0.95); }
-      15% { opacity: 1; transform: scale(1); }
-      85% { opacity: 1; transform: scale(1); }
-      100% { opacity: 0; transform: scale(1.05); }
+      0% {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+
+      15% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      85% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(1.05);
+      }
     }
   </style>
 
@@ -141,7 +214,7 @@
 
   <!-- Splash Logic -->
   <script>
-    (function() {
+    (function () {
       // Skip splash if this is an admin redirect
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('admin')) return;
@@ -154,7 +227,7 @@
           splash.style.display = 'flex';
           // Mark as shown immediately so reload/navigation skips it
           sessionStorage.setItem('nc_splash_shown', 'true');
-          
+
           // Remove splash after animation completes (9s + slight buffer)
           setTimeout(() => {
             splash.style.opacity = '0';
@@ -179,14 +252,14 @@
         // Always force sign-out on the sign-in page to ensure no sticky sessions
         // This prevents the site.js watcher from triggering a "force_sign_out" loop
         await window.sb.auth.signOut({ scope: 'local' });
-        
+
         // Clear storage but preserve splash screen flag
         const splash = sessionStorage.getItem('nc_splash_shown');
-        try { localStorage.removeItem('nc_cart_v1'); } catch {}
-        try { sessionStorage.clear(); } catch {}
+        try { localStorage.removeItem('nc_cart_v1'); } catch { }
+        try { sessionStorage.clear(); } catch { }
         if (splash) sessionStorage.setItem('nc_splash_shown', splash);
-        
-      } catch {}
+
+      } catch { }
     })();
   </script>
   <script>
@@ -235,18 +308,18 @@
   </script>
   <script>
     // Minimal full-screen loading overlay (supports centered logo)
-    function showLoadingOverlay(message, opts){
+    function showLoadingOverlay(message, opts) {
       const options = opts || {};
       try {
         let ov = document.getElementById('nc-loading-overlay');
-        if (!ov){
+        if (!ov) {
           ov = document.createElement('div');
           ov.id = 'nc-loading-overlay';
-          ov.setAttribute('aria-live','polite');
+          ov.setAttribute('aria-live', 'polite');
           ov.style.cssText = 'position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:99999;';
           const inner = document.createElement('div');
           inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#fff;';
-          if (options.logo){
+          if (options.logo) {
             const img = document.createElement('img');
             img.src = 'Images/logo.gif';
             img.alt = 'Loading';
@@ -277,16 +350,78 @@
       } catch (_) { }
     }
 
-    // Supabase email/password sign-in
-    document.getElementById('signin-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const err = document.getElementById('auth-error');
-      err.style.display = 'none';
-      let email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value.trim();
+    // --- Sign-in Logic (Email OR Phone) ---
+    const form = document.getElementById('signin-form');
+    const inputEl = document.getElementById('email');
+    const passwordEl = document.getElementById('password');
+    const passwordSection = document.getElementById('password-section');
+    const err = document.getElementById('auth-error');
 
-      if (!email || !password) {
-        err.textContent = 'Please enter your email and password.';
+    /* OTP Elements Temporarily Disabled
+    const otpOverlay = document.getElementById('otp-overlay');
+    const otpInput = document.getElementById('otp-input');
+    const otpVerifyBtn = document.getElementById('otp-verify-btn');
+    const otpCancelBtn = document.getElementById('otp-cancel-btn');
+    const otpError = document.getElementById('otp-error');
+    let currentPhone = '';
+    */
+
+    /* Smart input detection Temporarily Disabled
+    // For now, if it looks like a phone (digits/plus), hide password.
+    if (inputEl) {
+      inputEl.addEventListener('input', () => {
+        const val = inputEl.value.trim();
+        // Simple heuristic: if it has @ it's email. If it starts with + or is all digits, it's phone.
+        const isEmail = val.includes('@');
+        if (!isEmail && val.length > 2 && /^[+\d\s\-\(\)]+$/.test(val)) {
+          passwordSection.style.display = 'none';
+          passwordEl.removeAttribute('required');
+        } else {
+          passwordSection.style.display = 'block';
+          passwordEl.setAttribute('required', 'true');
+        }
+      });
+    }
+    */
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.style.display = 'none';
+      const userVal = inputEl.value.trim();
+
+      if (!userVal) {
+        err.textContent = 'Please enter your email.';
+        err.style.display = 'block';
+        return;
+      }
+
+      /* Phone Auth Checks temporarily disabled
+      const isEmail = userVal.includes('@');
+      const isPhone = !isEmail && /^[+\d\s\-\(\)]+$/.test(userVal);
+
+      if (isPhone) {
+        // --- Phone Flow ---
+        currentPhone = userVal;
+        try {
+          if (!window.sb) throw new Error('Auth not initialized.');
+          const { error } = await window.sb.auth.signInWithOtp({ phone: currentPhone });
+          if (error) throw error;
+
+          // Show OTP UI
+          otpOverlay.style.display = 'flex';
+          otpInput.focus();
+        } catch (ex) {
+          err.textContent = ex.message || 'Failed to send SMS code.';
+          err.style.display = 'block';
+        }
+        return; // Stop here, wait for OTP
+      }
+      */
+
+      // --- Email Flow (Standard) ---
+      const password = passwordEl.value.trim();
+      if (!password) {
+        err.textContent = 'Please enter your password.';
         err.style.display = 'block';
         return;
       }
@@ -294,10 +429,13 @@
       try {
         if (!window.sb) throw new Error('Auth not initialized.');
         // Normalize simple admin handle to an email for login
+        let email = userVal;
         if (email && !email.includes('@') && email.toLowerCase() === 'admin') {
           email = 'admin@example.com';
         }
+
         let { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+
         if (error) {
           // If logging in as admin and user doesn't exist, try to create it on the fly
           const isAdminHandle = (email.toLowerCase() === 'admin@example.com');
@@ -325,7 +463,7 @@
             if (isAdmin) payload.is_admin = true;
             await window.sb.from('profiles').upsert(payload);
           }
-        } catch (_) {}
+        } catch (_) { }
         // On success, show logo overlay for 4 seconds, then go to cabinet
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin')) {
@@ -333,7 +471,7 @@
           return;
         }
 
-        try { showLoadingOverlay('', { logo: true }); } catch(_){ }
+        try { showLoadingOverlay('', { logo: true }); } catch (_) { }
         setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
       } catch (e) {
         err.textContent = e.message || 'Sign-in failed.';
@@ -341,35 +479,57 @@
       }
     });
 
-    // Toggle password visibility
-    (function () {
-      const btn = document.getElementById('toggle-password');
-      const input = document.getElementById('password');
-      if (!btn || !input) return;
-      btn.addEventListener('click', () => {
-        const isPw = input.type === 'password';
-        input.type = isPw ? 'text' : 'password';
-        btn.textContent = isPw ? 'Hide' : 'Show';
-        btn.setAttribute('aria-label', isPw ? 'Hide password' : 'Show password');
+    /* OTP Verify Button Logic Disabled
+    if (otpVerifyBtn) {
+      otpVerifyBtn.addEventListener('click', async () => {
+        const token = otpInput.value.trim();
+        if (!token) return;
+        otpError.style.display = 'none';
+        try {
+          const { data, error } = await window.sb.auth.verifyOtp({
+            phone: currentPhone,
+            token: token,
+            type: 'sms'
+          });
+          if (error) throw error;
+
+          // Login Success
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.get('admin')) {
+            window.location.href = 'admin/index.html';
+            return;
+          }
+          try { showLoadingOverlay('', { logo: true }); } catch (_) { }
+          setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
+        } catch (e) {
+          otpError.textContent = e.message || 'Invalid Code';
+          otpError.style.display = 'block';
+        }
       });
-    })();
+    }
+    if (otpCancelBtn) {
+      otpCancelBtn.addEventListener('click', () => {
+        otpOverlay.style.display = 'none';
+      });
+    }
+    */
   </script>
   <script>
     // QR Sign-in flow using Supabase Realtime broadcast and WebCrypto (AES-GCM)
-    (function(){
+    (function () {
       const btn = document.getElementById('qr-signin-btn');
       const btnTop = document.getElementById('qr-signin-btn-top');
       if (!btn && !btnTop) return;
 
       // Minimal modal for QR display
-      function ensureModalRoot(){
-        if (!document.querySelector('#modal-root')){
+      function ensureModalRoot() {
+        if (!document.querySelector('#modal-root')) {
           const root = document.createElement('div');
           root.id = 'modal-root';
           document.body.appendChild(root);
         }
       }
-      function showQRModal(html){
+      function showQRModal(html) {
         ensureModalRoot();
         const root = document.querySelector('#modal-root');
         const overlay = document.createElement('div');
@@ -379,39 +539,39 @@
         modal.innerHTML = html;
         overlay.appendChild(modal);
         root.appendChild(overlay);
-        overlay.addEventListener('click', (e)=>{ if(e.target===overlay){ try{ root.removeChild(overlay);}catch(_){} } });
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) { try { root.removeChild(overlay); } catch (_) { } } });
         const closeBtn = modal.querySelector('.qr-close');
-        if (closeBtn) closeBtn.addEventListener('click', ()=>{ try{ root.removeChild(overlay);}catch(_){} });
-        return { overlay, modal, close: ()=>{ try{ root.removeChild(overlay);}catch(_){} } };
+        if (closeBtn) closeBtn.addEventListener('click', () => { try { root.removeChild(overlay); } catch (_) { } });
+        return { overlay, modal, close: () => { try { root.removeChild(overlay); } catch (_) { } } };
       }
 
-      function randString(len){
+      function randString(len) {
         const arr = new Uint8Array(len);
         crypto.getRandomValues(arr);
-        return btoa(String.fromCharCode(...arr)).replace(/[^a-zA-Z0-9]/g,'').slice(0,len);
+        return btoa(String.fromCharCode(...arr)).replace(/[^a-zA-Z0-9]/g, '').slice(0, len);
       }
 
-      async function sha256Hex(str){
+      async function sha256Hex(str) {
         const enc = new TextEncoder();
         const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
-        return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
       }
-      async function deriveKey(secret){
+      async function deriveKey(secret) {
         const enc = new TextEncoder();
         const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveKey']);
-        return crypto.subtle.deriveKey({ name:'PBKDF2', salt: enc.encode('nc-qr-salt'), iterations: 100000, hash:'SHA-256' }, keyMaterial, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+        return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: enc.encode('nc-qr-salt'), iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
       }
-      async function encryptJson(secret, obj){
+      async function encryptJson(secret, obj) {
         const key = await deriveKey(secret);
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const enc = new TextEncoder();
         const data = enc.encode(JSON.stringify(obj));
-        const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, data));
+        const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data));
         return { iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...ct)) };
       }
 
-      async function startQrSignin(){
-        try{
+      async function startQrSignin() {
+        try {
           if (!window.sb) throw new Error('Auth not initialized');
           // Create a short code (channel name) and a longer secret for encryption
           const code = randString(10);
@@ -440,7 +600,7 @@
             </div>`;
 
           const modal = showQRModal(html);
-          function renderQR(targetEl, url){
+          function renderQR(targetEl, url) {
             const img = new Image();
             img.alt = 'QR code';
             img.width = 224;
@@ -450,9 +610,9 @@
             targetEl.appendChild(img);
             const link = document.createElement('div');
             link.style.cssText = 'margin-top:8px; font-size:12px; color:#4b5563; word-break:break-all; text-align:center;';
-            link.innerHTML = '<a href="'+url+'" target="_blank" rel="noopener">'+url+'</a>';
+            link.innerHTML = '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
             targetEl.appendChild(link);
-            if (baseOrigin.startsWith('file:')){
+            if (baseOrigin.startsWith('file:')) {
               const warn = document.createElement('div');
               warn.style.cssText = 'margin-top:6px; color:#b91c1c; font-size:12px; text-align:center;';
               warn.textContent = 'Warning: You are opening this page from a local file. Your phone cannot access file:// links. Please serve the site over http(s).';
@@ -461,14 +621,14 @@
           }
 
           // Initial render
-          (function(){
+          (function () {
             const target = document.getElementById('qr-canvas');
             if (!target) return;
             renderQR(target, approveUrl);
           })();
 
           // Allow overriding host for mobile accessibility
-          (function(){
+          (function () {
             const updateBtn = document.getElementById('qr-update');
             const hostInput = document.getElementById('qr-host');
             const target = document.getElementById('qr-canvas');
@@ -476,56 +636,56 @@
             updateBtn.addEventListener('click', () => {
               const host = (hostInput.value || '').trim();
               if (!host) return;
-              try{
+              try {
                 const u = new URL(baseOrigin);
                 u.hostname = host;
                 approveUrl = u.origin + '/qr-approve.html?code=' + encodeURIComponent(code) + '&secret=' + encodeURIComponent(secret);
                 renderQR(target, approveUrl);
-              } catch (_) {}
+              } catch (_) { }
             });
           })();
 
           // Subscribe to realtime channel waiting for encrypted session payload
           const channel = window.sb.channel(channelName, { config: { broadcast: { ack: true } } });
-          channel.on('broadcast', { event: 'login_session' }, async (payload)=>{
-            try{
+          channel.on('broadcast', { event: 'login_session' }, async (payload) => {
+            try {
               const { iv, ct } = payload?.payload || {};
               if (!iv || !ct) return;
               // Decrypt
               const decKey = await deriveKey(secret);
-              const ivBytes = Uint8Array.from(atob(iv), c=>c.charCodeAt(0));
-              const ctBytes = Uint8Array.from(atob(ct), c=>c.charCodeAt(0));
-              const plainBuf = await crypto.subtle.decrypt({ name:'AES-GCM', iv: ivBytes }, decKey, ctBytes);
+              const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
+              const ctBytes = Uint8Array.from(atob(ct), c => c.charCodeAt(0));
+              const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, decKey, ctBytes);
               const txt = new TextDecoder().decode(plainBuf);
               const obj = JSON.parse(txt);
               const { access_token, refresh_token } = obj || {};
-              if (access_token && refresh_token){
+              if (access_token && refresh_token) {
                 // Set session locally
                 const { error } = await window.sb.auth.setSession({ access_token, refresh_token });
                 if (error) throw error;
                 // Close modal, show logo overlay for 4 seconds, then go to cabinet
-                try { modal.close(); } catch(_){ }
-                
+                try { modal.close(); } catch (_) { }
+
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('admin')) {
                   window.location.href = 'admin/index.html';
                   return;
                 }
 
-                try { showLoadingOverlay('', { logo: true }); } catch(_){ }
-                setTimeout(()=>{ window.location.href = 'cabinet.html'; }, 4000);
+                try { showLoadingOverlay('', { logo: true }); } catch (_) { }
+                setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
               }
             } catch (e) {
               console.error('QR decrypt/setSession failed', e);
             }
           });
-          await channel.subscribe(async (status)=>{
+          await channel.subscribe(async (status) => {
             // no-op; waiting for broadcast
           });
 
-        }catch(e){
+        } catch (e) {
           const err = document.getElementById('auth-error');
-          if (err){ err.textContent = e.message || 'QR sign-in failed.'; err.style.display = 'block'; }
+          if (err) { err.textContent = e.message || 'QR sign-in failed.'; err.style.display = 'block'; }
         }
       }
 
@@ -535,4 +695,5 @@
   </script>
   <script src="site.js"></script>
 </body>
+
 </html>

@@ -1,5 +1,7 @@
+<!-- checkout.html this is for the checkout but loads only on the phone through the scan qr -->
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,12 +10,13 @@
   <link rel="stylesheet" href="checkout.css" />
   <script src="https://js.stripe.com/v3/"></script>
 </head>
-<body class="checkout">
+
+<body class="checkout page-opacity-0">
   <div class="checkout-wrapper">
     <div class="checkout-card">
       <div class="checkout-left">
         <div class="checkout-header">
-          <button class="back-btn" onclick="window.location.href='index.html'">
+          <button class="back-btn" id="checkout-back-btn">
             <span class="back-icon">←</span>
             <span class="back-text">Back</span>
           </button>
@@ -21,12 +24,11 @@
 
         <div class="custom-inputs">
           <div class="input-group name-group">
-            <input type="text" placeholder="First name" class="custom-input first-name" id="checkout-first-name" readonly>
-            <input type="text" placeholder="Last name" class="custom-input last-name" id="checkout-last-name" readonly>
+            <input type="text" placeholder="Name" class="custom-input full-name" id="checkout-full-name" readonly>
           </div>
-          
+
           <div class="card-info-label">Payment Details</div>
-          
+
           <div id="checkout-mount">
             <!-- Stripe Embedded Checkout will mount here -->
             <div style="text-align: center; color: #6b7280; margin-top: 40px;">
@@ -38,7 +40,7 @@
 
       <div class="checkout-right">
         <h2 class="checkout-title">Order Summary</h2>
-        
+
         <div class="cart-items-container">
           <div class="cart-items">
             <!-- Cart items will be rendered here by site.js -->
@@ -65,38 +67,36 @@
         if (!window.sb) return;
         const { data } = await window.sb.auth.getSession();
         if (!data?.session) return;
-        
+
         const { data: userData } = await window.sb.auth.getUser();
         const email = userData?.user?.email || '';
-        
+
         // Try to get name from user metadata or email
         const userMeta = userData?.user?.user_metadata || {};
-        let firstName = userMeta.first_name || userMeta.name || '';
-        let lastName = userMeta.last_name || '';
-        
-        // If no metadata, try to extract from email
-        if (!firstName && email) {
-          const emailPart = email.split('@')[0];
-          const parts = emailPart.split(/[._-]/);
-          if (parts.length >= 2) {
-            firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-            lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
-          } else if (parts.length === 1) {
-            firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        // Prioritize full_name, fallback to first+last, or email part
+        let fullName = userMeta.full_name || '';
+
+        if (!fullName) {
+          const first = userMeta.first_name || userMeta.name || '';
+          const last = userMeta.last_name || '';
+          if (first || last) {
+            fullName = `${first} ${last}`.trim();
           }
         }
-        
-        // Fill the input fields
-        const firstNameInput = document.getElementById('checkout-first-name');
-        const lastNameInput = document.getElementById('checkout-last-name');
-        
-        if (firstNameInput && firstName) {
-          firstNameInput.value = firstName;
-          firstNameInput.style.color = '#333';
+
+        // If still no name, try to extract from email
+        if (!fullName && email) {
+          const emailPart = email.split('@')[0];
+          // Simple heuristic to capitalize email part
+          fullName = emailPart.charAt(0).toUpperCase() + emailPart.slice(1);
         }
-        if (lastNameInput && lastName) {
-          lastNameInput.value = lastName;
-          lastNameInput.style.color = '#333';
+
+        // Fill the input field
+        const nameInput = document.getElementById('checkout-full-name');
+
+        if (nameInput && fullName) {
+          nameInput.value = fullName;
+          nameInput.style.color = '#333';
         }
       } catch (e) {
         console.error('Failed to auto-fill name:', e);
@@ -104,5 +104,20 @@
     })();
   </script>
   <script src="site.js?v=8"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const backBtn = document.getElementById('checkout-back-btn');
+      if (backBtn) {
+        backBtn.addEventListener('click', () => {
+          document.body.classList.add('page-transition-fade-out');
+          setTimeout(() => {
+            // Force navigation to index.html (defaults to OpenSearch/Main view)
+            window.location.href = 'index.html';
+          }, 500);
+        });
+      }
+    });
+  </script>
 </body>
+
 </html>

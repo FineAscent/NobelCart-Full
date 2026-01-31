@@ -1,5 +1,5 @@
 // Virtual keyboard for Sign-in inputs (email & password)
-(function(){
+(function () {
   const VK_ID = 'vk-auth';
   let vkEl = null;
   let input = null;
@@ -30,7 +30,7 @@
 
     let isNumbersMode = false;
 
-    function key(label, opts={}) {
+    function key(label, opts = {}) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'vk-key' + (opts.special ? ' vk-key--special' : '') + (opts.space ? ' vk-key--space' : '') + (opts.done ? ' vk-key--done' : '');
@@ -41,21 +41,21 @@
 
     function renderRows() {
       // Clear all rows
-      [row1,row2,row3,row4].forEach(r => { if (r) r.innerHTML = ''; });
+      [row1, row2, row3, row4].forEach(r => { if (r) r.innerHTML = ''; });
 
       if (!isNumbersMode) {
-        const r1 = ['q','w','e','r','t','y','u','i','o','p'];
-        const r2 = ['a','s','d','f','g','h','j','k','l','←'];
-        const r3 = ['z','x','c','v','b','n','m','@','.'];
+        const r1 = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+        const r2 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '←'];
+        const r3 = ['z', 'x', 'c', 'v', 'b', 'n', 'm', '@', '.'];
         r1.forEach(k => row1.appendChild(key(k)));
-        r2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
+        r2.forEach(k => row2.appendChild(key(k, { special: k === '←' })));
         r3.forEach(k => row3.appendChild(key(k)));
       } else {
-        const n1 = ['1','2','3','4','5','6','7','8','9','0'];
-        const n2 = ['-','_','/','\\',':',';','(',' )','$','&','←'];
-        const n3 = ['@','.','!','?','#','%','+','=','*',','];
+        const n1 = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+        const n2 = ['-', '_', '/', '\\', ':', ';', '(', ' )', '$', '&', '←'];
+        const n3 = ['@', '.', '!', '?', '#', '%', '+', '=', '*', ','];
         n1.forEach(k => row1.appendChild(key(k)));
-        n2.forEach(k => row2.appendChild(key(k, { special: k==='←' })));
+        n2.forEach(k => row2.appendChild(key(k, { special: k === '←' })));
         n3.forEach(k => row3.appendChild(key(k)));
       }
 
@@ -87,17 +87,17 @@
       if (code === 'MODE') {
         isNumbersMode = !isNumbersMode;
         renderRows();
-        if (input) { try { input.focus(); } catch(_){} }
+        if (input) { try { input.focus(); } catch (_) { } }
         return;
       }
       if (code === 'DONE') {
         try {
           const ev = new CustomEvent('vk:done', { bubbles: true });
           (input || document).dispatchEvent(ev);
-        } catch(_) {}
+        } catch (_) { }
         hide();
         // blur the input to finalize
-        try { input.blur(); } catch(_){}
+        try { input.blur(); } catch (_) { }
         return;
       }
       if (code === 'SPACE') { insert(' '); return; }
@@ -108,7 +108,7 @@
     function startPress(e) {
       // Prevent focus loss from input when clicking keyboard
       if (e.cancelable) e.preventDefault();
-      
+
       const btn = e.target.closest('.vk-key');
       if (!btn) return;
 
@@ -144,7 +144,7 @@
     const val = input.value || '';
     input.value = val.slice(0, start) + text + val.slice(end);
     const pos = start + text.length;
-    try { input.setSelectionRange(pos, pos); } catch(_) {}
+    try { input.setSelectionRange(pos, pos); } catch (_) { }
     input.focus();
     // Trigger input event for any listeners
     const ev = new Event('input', { bubbles: true });
@@ -159,10 +159,10 @@
     if (start === end && start > 0) {
       input.value = val.slice(0, start - 1) + val.slice(end);
       const pos = start - 1;
-      try { input.setSelectionRange(pos, pos); } catch(_) {}
+      try { input.setSelectionRange(pos, pos); } catch (_) { }
     } else if (start !== end) {
       input.value = val.slice(0, start) + val.slice(end);
-      try { input.setSelectionRange(start, start); } catch(_) {}
+      try { input.setSelectionRange(start, start); } catch (_) { }
     }
     input.focus();
     const ev = new Event('input', { bubbles: true });
@@ -189,25 +189,33 @@
     // Try signin page fields
     let email = document.getElementById('email');
     let password = document.getElementById('password');
-    
+
     // Try create-account page fields
     if (!email) email = document.getElementById('create-email');
     if (!password) password = document.getElementById('create-password');
+    let createName = document.getElementById('create-name');
 
     // Try checkout page fields
     let cfName = document.getElementById('checkout-first-name');
     let clName = document.getElementById('checkout-last-name');
-    
-    const targets = [email, password, cfName, clName].filter(Boolean);
+
+    // Also support checkout-full-name if present
+    let cFullName = document.getElementById('checkout-full-name');
+
+    const targets = [email, password, createName, cfName, clName, cFullName].filter(Boolean);
     if (targets.length === 0) return;
 
     function bind(el) {
       if (!el) return;
       el.addEventListener('focus', () => { show(el); });
-      el.addEventListener('blur', () => { 
-        // Small delay to allow click on keyboard to register
+      el.addEventListener('blur', () => {
+        // Small delay to allow focus to move to another input or for click to register
         setTimeout(() => {
-           if (!active) hide(); 
+          const newFocus = document.activeElement;
+          // If the new focused element is not in our list of targets, close the VK
+          if (!targets.includes(newFocus)) {
+            hide();
+          }
         }, 150);
       });
       // Also prevent native keyboard on mobile
@@ -226,22 +234,22 @@
 
   function ensureVisible(el) {
     if (!el || !vkEl) return;
-    
+
     // Wait for VK to render/display
     setTimeout(() => {
       const vkRect = vkEl.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
       const keyboardHeight = vkRect.height || 300; // fallback
-      
+
       // Calculate the 'safe zone' limit (top of the keyboard)
       const limit = viewportHeight - keyboardHeight;
-      
+
       // If the bottom of the input is below the limit (covered by keyboard)
       // or very close to it
       if (elRect.bottom > limit - 20) {
         const scrollAmount = elRect.bottom - limit + 40; // +40 for padding
-        
+
         // Check if we are in the checkout scrollable container
         const checkoutLeft = el.closest('.checkout-left');
         if (checkoutLeft) {

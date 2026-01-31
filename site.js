@@ -230,9 +230,19 @@ function productCardHTML(p) {
 async function renderProductsToGrid(gridEl, items) {
   if (!gridEl) return;
   gridEl.innerHTML = items.map(productCardHTML).join('');
+
+  // Trigger fade-in for category page
+  if (document.body.classList.contains('category-page')) {
+    // Small delay to ensure DOM paint happens with opacity:0 first
+    setTimeout(() => {
+      const cards = gridEl.querySelectorAll('.product-card');
+      cards.forEach(card => card.classList.add('visible'));
+    }, 100);
+  }
+
   // Bind add-to-cart interactions for this grid
   try { bindGridForCart(gridEl); } catch (_) { }
-  
+
   // Resolve images asynchronously
   const cards = Array.from(gridEl.querySelectorAll('.product-card'));
   const resolvedImages = new Map(); // key (id/name) -> url
@@ -284,17 +294,17 @@ async function renderProductsToGrid(gridEl, items) {
         card.setAttribute('data-image', url);
         // Save the key/path for refreshing later
         if (finalImageKey) {
-            card.setAttribute('data-image-key', finalImageKey);
+          card.setAttribute('data-image-key', finalImageKey);
         }
-        
+
         // Track for cart update
         if (p.id) {
-            resolvedImages.set(String(p.id), url);
-            if (finalImageKey) resolvedKeys.set(String(p.id), finalImageKey);
+          resolvedImages.set(String(p.id), url);
+          if (finalImageKey) resolvedKeys.set(String(p.id), finalImageKey);
         }
         if (p.name) {
-            resolvedImages.set(`name:${p.name}`, url);
-            if (finalImageKey) resolvedKeys.set(`name:${p.name}`, finalImageKey);
+          resolvedImages.set(`name:${p.name}`, url);
+          if (finalImageKey) resolvedKeys.set(`name:${p.name}`, finalImageKey);
         }
       }
     }
@@ -316,36 +326,36 @@ async function renderProductsToGrid(gridEl, items) {
     const cartItems = loadCart();
     let dirty = false;
     cartItems.forEach(it => {
-        const idKey = it.id != null ? String(it.id) : null;
-        const nameKey = it.name ? `name:${it.name}` : null;
+      const idKey = it.id != null ? String(it.id) : null;
+      const nameKey = it.name ? `name:${it.name}` : null;
 
-        // 1. Backfill Image URL if missing
-        if (!it.image) {
-            let foundUrl = null;
-            if (idKey && resolvedImages.has(idKey)) foundUrl = resolvedImages.get(idKey);
-            else if (nameKey && resolvedImages.has(nameKey)) foundUrl = resolvedImages.get(nameKey);
-            
-            if (foundUrl) {
-                it.image = foundUrl;
-                dirty = true;
-            }
+      // 1. Backfill Image URL if missing
+      if (!it.image) {
+        let foundUrl = null;
+        if (idKey && resolvedImages.has(idKey)) foundUrl = resolvedImages.get(idKey);
+        else if (nameKey && resolvedImages.has(nameKey)) foundUrl = resolvedImages.get(nameKey);
+
+        if (foundUrl) {
+          it.image = foundUrl;
+          dirty = true;
         }
+      }
 
-        // 2. Backfill Image Key if missing (crucial for refreshing expired URLs)
-        if (!it.imageKey) {
-            let foundKey = null;
-            if (idKey && resolvedKeys.has(idKey)) foundKey = resolvedKeys.get(idKey);
-            else if (nameKey && resolvedKeys.has(nameKey)) foundKey = resolvedKeys.get(nameKey);
+      // 2. Backfill Image Key if missing (crucial for refreshing expired URLs)
+      if (!it.imageKey) {
+        let foundKey = null;
+        if (idKey && resolvedKeys.has(idKey)) foundKey = resolvedKeys.get(idKey);
+        else if (nameKey && resolvedKeys.has(nameKey)) foundKey = resolvedKeys.get(nameKey);
 
-            if (foundKey) {
-                it.imageKey = foundKey;
-                dirty = true;
-            }
+        if (foundKey) {
+          it.imageKey = foundKey;
+          dirty = true;
         }
+      }
     });
     if (dirty) {
-        saveCart(cartItems);
-        renderCart();
+      saveCart(cartItems);
+      renderCart();
     }
   }
 }
@@ -495,7 +505,7 @@ function selectCartItem(key) {
   selectedItemKey = key;
   const items = loadCart();
   const item = items.find(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) === key);
-  
+
   // 1. Update Cart UI Selection State
   const container = document.querySelector('.cart-items');
   if (container) {
@@ -529,13 +539,13 @@ function renderCart() {
   const items = loadCart();
   container.innerHTML = '';
   let subtotal = 0;
-  
+
   // If previously selected item is gone, clear selection
   if (selectedItemKey) {
     const exists = items.some(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) === selectedItemKey);
     if (!exists) selectedItemKey = null;
   }
-  
+
   // If nothing selected and we have items, select the last one (most recently added)
   if (!selectedItemKey && items.length > 0) {
     const last = items[items.length - 1];
@@ -543,20 +553,20 @@ function renderCart() {
     // Defer the UI update slightly to ensure DOM is ready if called from init
     setTimeout(() => selectCartItem(selectedItemKey), 0);
   } else if (items.length === 0) {
-     // Empty cart, reset display
-     selectCartItem(null);
+    // Empty cart, reset display
+    selectCartItem(null);
   }
 
   items.forEach((it, idx) => {
     const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
     subtotal += line;
-    
+
     if (container) {
       const div = document.createElement('div');
       div.className = 'cart-item';
       const key = (it.id != null) ? String(it.id) : `name:${it.name}`;
       div.setAttribute('data-key', key);
-      
+
       // Apply selection class
       if (key === selectedItemKey) div.classList.add('selected');
 
@@ -569,12 +579,12 @@ function renderCart() {
       } else if (qty > 1) {
         labelText = `${labelText} x${qty}`;
       }
-      
+
       let imgHtml = '';
       if (it.image) {
         imgHtml = `<div class="item-image" style="background-image: url('${it.image}');"></div>`;
       }
-      
+
       div.innerHTML = `
           <div class="item-left">
             <div class="item-number">${idx + 1}</div>
@@ -586,23 +596,38 @@ function renderCart() {
             <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
           </div>
         `;
-        
+
       // Click to select
       div.addEventListener('click', (e) => {
         // Don't select if clicking remove button
         if (e.target.closest('.remove-item')) return;
         selectCartItem(key);
       });
-      
+
       container.appendChild(div);
     }
   });
   if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
   // Push a heartbeat with latest subtotal (debounced)
   try { scheduleHeartbeat(subtotal); } catch (_) { }
-  
-  // Ensure the display is in sync after render
+
   if (selectedItemKey) selectCartItem(selectedItemKey);
+
+  // Disable checkout button if cart is empty
+  const checkoutBtn = document.querySelector('.checkout-btn');
+  if (checkoutBtn) {
+    if (items.length === 0) {
+      checkoutBtn.setAttribute('disabled', 'true');
+      checkoutBtn.style.opacity = '0.5';
+      checkoutBtn.style.pointerEvents = 'none';
+      checkoutBtn.style.cursor = 'not-allowed';
+    } else {
+      checkoutBtn.removeAttribute('disabled');
+      checkoutBtn.style.opacity = '1';
+      checkoutBtn.style.pointerEvents = 'auto';
+      checkoutBtn.style.cursor = 'pointer';
+    }
+  }
 }
 
 function removeFromCartByKey(key) {
@@ -610,7 +635,7 @@ function removeFromCartByKey(key) {
   const items = loadCart();
   const next = items.filter(it => ((it.id != null) ? String(it.id) : `name:${it.name}`) !== key);
   saveCart(next);
-  
+
   // If we removed the selected item, renderCart will handle clearing/reselecting
   renderCart();
 }
@@ -680,11 +705,11 @@ function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, un
     }
   }
   saveCart(items);
-  
+
   // Auto-select the newly added/updated item
   selectedItemKey = key;
   renderCart();
-  
+
   // Animate the added item
   try {
     const container = document.querySelector('.right-section .cart-items');
@@ -715,7 +740,7 @@ function bindGridForCart(gridEl) {
     const priceAttr = card.getAttribute('data-price');
     const image = card.getAttribute('data-image'); // Get image URL
     const imageKey = card.getAttribute('data-image-key'); // Get image Key for refreshing
-    
+
     let price = priceAttr != null ? Number(priceAttr) : null;
     if (price == null || Number.isNaN(price)) {
       // Parse from visible price text like "$2.00"
@@ -737,6 +762,24 @@ function bindGridForCart(gridEl) {
     }
   });
 }
+
+// Page Transition Fade-In Logic
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.body.classList.contains('page-opacity-0')) {
+    // slight delay to ensure CSS transition can catch the change
+    setTimeout(() => {
+      document.body.classList.add('page-fade-in');
+    }, 50);
+  }
+});
+
+// Smooth navigation helper
+window.smoothNavigate = function (url) {
+  document.body.classList.add('page-fade-out');
+  setTimeout(() => {
+    window.location.href = url;
+  }, 300);
+};
 
 // Supabase-backed Cabinet fetch (IDs from Supabase, details from AWS) into sections A1..A10
 async function loadCabinetFromSupabase() {
@@ -948,7 +991,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     const isAdminPath = /(^|\/)admin\//.test(location.pathname);
     const isAdminMode = new URLSearchParams(window.location.search).has('admin');
-    
+
     if (!isAdminPath && !isAdminMode) {
       let idleTimer = null;
       let graceTimer = null;
@@ -1019,7 +1062,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const resetIdleTimer = () => {
         clearPresence();
         if (idleTimer) clearTimeout(idleTimer);
-        
+
         // Determine timeout based on auth state
         const timeout = isUserSignedIn ? AUTH_IDLE_MS : GUEST_IDLE_MS;
         idleTimer = setTimeout(handleIdleTimeout, timeout);
@@ -1042,11 +1085,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isAuthPage) {
           isUserSignedIn = false;
         }
-        
+
         // Setup listeners
         const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
         activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
-        
+
         // Start monitoring
         resetIdleTimer();
       };
@@ -1058,11 +1101,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add click functionality to checkout button
   const checkoutBtn = document.querySelector('.checkout-btn');
   if (checkoutBtn) {
-    checkoutBtn.addEventListener('click', async function () {
+    checkoutBtn.addEventListener('click', async function (e) {
+      const items = loadCart();
+      if (items.length === 0) {
+        e.preventDefault();
+        try { showHintToast('Your cart is empty'); } catch (_) { }
+        return;
+      }
+
       const onCheckoutPage = location.pathname.includes('checkout.html');
       // Redirect into dedicated checkout page if not already there
       if (!onCheckoutPage) {
-        window.location.href = 'checkout.html';
+        // Transition animation: Fade out
+        document.body.classList.add('page-transition-fade-out');
+        setTimeout(() => {
+          window.location.href = 'checkout.html';
+        }, 500);
         return;
       }
       // On checkout page: refresh QR flow if available, else fallback to direct hosted redirect
@@ -1133,11 +1187,21 @@ document.addEventListener('DOMContentLoaded', () => {
       card.addEventListener('dblclick', () => {
         if (navigating) return;
         navigating = true;
+
+        // Trigger fade out on the grid container
+        const gridView = document.getElementById('view-category-grid');
+        if (gridView) {
+          gridView.classList.add('fade-out-active');
+        }
+
         const q = title ? ('?name=' + encodeURIComponent(title)) : '';
         if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch { } }
         try { sessionStorage.setItem('lastView', 'category'); } catch { }
-        document.body.classList.add('page-exit-right');
-        setTimeout(() => { window.location.href = 'category.html' + q; }, 280);
+
+        // Wait for animation
+        setTimeout(() => {
+          window.location.href = 'category.html' + q;
+        }, 300);
       });
     });
   } else {
@@ -1171,12 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (backBtn) {
         backBtn.addEventListener('click', (e) => {
           e.preventDefault();
-          document.body.classList.add('page-exit-right');
-          setTimeout(() => {
-            const currentPath = window.location.pathname;
-            const newPath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1) + 'index.html';
-            window.location.href = newPath;
-          }, 280);
+          window.smoothNavigate('index.html');
         });
       }
     };
@@ -1233,7 +1292,8 @@ document.addEventListener('DOMContentLoaded', () => {
       let allCatItems = [];
       (async () => {
         if (!grid) return;
-        grid.innerHTML = '<div class="product-card"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div></div></div>';
+        // Make sure Loading placeholder is visible immediately
+        grid.innerHTML = '<div class="product-card visible"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div></div></div>';
         try {
           const items = await fetchProducts({ availability: 'In Stock', limit: 200 });
           allCatItems = items.filter(p => (p.category || '').trim() === (cat || '').trim());
@@ -1333,8 +1393,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (dest) {
           tabNavigating = true;
-          document.body.classList.add('page-exit-right');
-          setTimeout(() => { window.location.href = dest; }, 280);
+          document.body.classList.add('page-transition-fade-out');
+          setTimeout(() => { window.location.href = dest; }, 500);
           return;
         }
 
@@ -1358,26 +1418,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let current = null; // { transcript_no, currency, total_cents, items: [{name, qty, amount_cents}] }
 
-    const fmt = (cents, cur = 'USD') => {
-      const n = Number(cents || 0) / 100;
-      try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: String(cur).toUpperCase() }).format(n); } catch { return `$${n.toFixed(2)}`; }
-    };
-    const setStatus = (msg, kind = 'info') => {
-      if (!statusEl) return;
-      statusEl.textContent = msg || '';
-      statusEl.style.color = kind === 'error' ? '#b91c1c' : kind === 'success' ? '#065f46' : '#6b7280';
-    };
+      const fmt = (cents, cur = 'USD') => {
+        const n = Number(cents || 0) / 100;
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: String(cur).toUpperCase() }).format(n); } catch { return `$${n.toFixed(2)}`; }
+      };
+      const setStatus = (msg, kind = 'info') => {
+        if (!statusEl) return;
+        statusEl.textContent = msg || '';
+        statusEl.style.color = kind === 'error' ? '#b91c1c' : kind === 'success' ? '#065f46' : '#6b7280';
+      };
 
-    function renderItems() {
-      if (!tbody) return;
-      if (!current || !Array.isArray(current.items) || current.items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:#6b7280;">No items found for this transcript.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = '';
-      current.items.forEach((it, idx) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
+      function renderItems() {
+        if (!tbody) return;
+        if (!current || !Array.isArray(current.items) || current.items.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:#6b7280;">No items found for this transcript.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        current.items.forEach((it, idx) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
           <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${(it.name || 'Item')}</td>
           <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${it.qty ?? 1}</td>
           <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${fmt(it.amount_cents, current.currency)}</td>
@@ -1385,82 +1445,82 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="btn btn-secondary" data-refund-idx="${idx}">Refund</button>
           </td>
         `;
-        tbody.appendChild(tr);
-      });
-
-      tbody.querySelectorAll('[data-refund-idx]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const idx = Number(btn.getAttribute('data-refund-idx')) || 0;
-          const item = current.items[idx];
-          if (!item) return;
-          setStatus('Processing refund...', 'info');
-          try {
-            let ok = false; let message = '';
-            if (window.sb?.functions?.invoke) {
-              const { data, error } = await window.sb.functions.invoke('refunds-create', {
-                body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents }
-              });
-              if (error) throw error;
-              ok = !!data?.ok; message = data?.message || '';
-            } else {
-              const data = await apiFetch('/refunds/create', { method: 'POST', body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents } });
-              ok = !!data?.ok; message = data?.message || '';
-            }
-            if (ok) setStatus(message || 'Refund created.', 'success');
-            else setStatus(message || 'Refund failed.', 'error');
-          } catch (e) {
-            console.error('Refund failed', e);
-            setStatus('Refund failed: ' + (e?.message || e), 'error');
-          }
+          tbody.appendChild(tr);
         });
-      });
-    }
 
-    async function searchTranscript(noRaw) {
-      const no = String(noRaw || '').trim().replace(/^#?/, '');
-      if (!no) return;
-      setStatus('Searching...', 'info');
-      try {
-        let result = null;
-        if (window.sb?.functions?.invoke) {
-          const { data, error } = await window.sb.functions.invoke('refunds-search', { body: { transcript_no: no } });
-          if (error) throw error;
-          result = data;
-        } else {
-          result = await apiFetch(`/refunds/search?transcript_no=${encodeURIComponent(no)}`);
-        }
-        if (!result || !result.transcript_no) {
+        tbody.querySelectorAll('[data-refund-idx]').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const idx = Number(btn.getAttribute('data-refund-idx')) || 0;
+            const item = current.items[idx];
+            if (!item) return;
+            setStatus('Processing refund...', 'info');
+            try {
+              let ok = false; let message = '';
+              if (window.sb?.functions?.invoke) {
+                const { data, error } = await window.sb.functions.invoke('refunds-create', {
+                  body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents }
+                });
+                if (error) throw error;
+                ok = !!data?.ok; message = data?.message || '';
+              } else {
+                const data = await apiFetch('/refunds/create', { method: 'POST', body: { transcript_no: current.transcript_no, item_index: idx, amount_cents: item.amount_cents } });
+                ok = !!data?.ok; message = data?.message || '';
+              }
+              if (ok) setStatus(message || 'Refund created.', 'success');
+              else setStatus(message || 'Refund failed.', 'error');
+            } catch (e) {
+              console.error('Refund failed', e);
+              setStatus('Refund failed: ' + (e?.message || e), 'error');
+            }
+          });
+        });
+      }
+
+      async function searchTranscript(noRaw) {
+        const no = String(noRaw || '').trim().replace(/^#?/, '');
+        if (!no) return;
+        setStatus('Searching...', 'info');
+        try {
+          let result = null;
+          if (window.sb?.functions?.invoke) {
+            const { data, error } = await window.sb.functions.invoke('refunds-search', { body: { transcript_no: no } });
+            if (error) throw error;
+            result = data;
+          } else {
+            result = await apiFetch(`/refunds/search?transcript_no=${encodeURIComponent(no)}`);
+          }
+          if (!result || !result.transcript_no) {
+            current = null;
+            if (summary) summary.textContent = 'No transcript found';
+            if (subsummary) subsummary.textContent = '';
+            renderItems();
+            setStatus('Not found', 'error');
+            return;
+          }
+          current = result;
+          if (summary) summary.textContent = `Transcript ${result.transcript_no}`;
+          if (subsummary) subsummary.textContent = `${(result.items?.length || 0)} items • Total ${fmt(result.total_cents || 0, result.currency || 'USD')}`;
+          setStatus('Loaded', 'success');
+          renderItems();
+        } catch (e) {
+          console.error('Search failed', e);
           current = null;
-          if (summary) summary.textContent = 'No transcript found';
+          if (summary) summary.textContent = 'Search failed';
           if (subsummary) subsummary.textContent = '';
           renderItems();
-          setStatus('Not found', 'error');
-          return;
+          setStatus('Error: ' + (e?.message || e), 'error');
         }
-        current = result;
-        if (summary) summary.textContent = `Transcript ${result.transcript_no}`;
-        if (subsummary) subsummary.textContent = `${(result.items?.length || 0)} items • Total ${fmt(result.total_cents || 0, result.currency || 'USD')}`;
-        setStatus('Loaded', 'success');
-        renderItems();
-      } catch (e) {
-        console.error('Search failed', e);
-        current = null;
-        if (summary) summary.textContent = 'Search failed';
-        if (subsummary) subsummary.textContent = '';
-        renderItems();
-        setStatus('Error: ' + (e?.message || e), 'error');
+      }
+
+      if (form && input) {
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const value = input.value;
+          if (value) searchTranscript(value);
+        });
       }
     }
-
-    if (form && input) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const value = input.value;
-        if (value) searchTranscript(value);
-      });
-    }
-  }
-} catch { }
+  } catch { }
 });
 
 
@@ -1698,23 +1758,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       setStatus(refresh ? 'Refreshing checkout link...' : 'Generating checkout link...', 'info');
       mountEl.classList.add('loading');
-      
+
       // Cleanup previous realtime channel if exists
       if (checkoutChannel) {
-        try { window.sb.removeChannel(checkoutChannel); } catch(_) {}
+        try { window.sb.removeChannel(checkoutChannel); } catch (_) { }
         checkoutChannel = null;
       }
 
       const session = await startCheckout({ returnSession: true });
       lastSessionId = session?.id || session?.session_id || null;
       const sessionUrl = session?.url;
-      
+
       if (!lastSessionId) throw new Error('Stripe did not return a session ID');
       if (!sessionUrl) throw new Error('Stripe did not return a session URL');
 
       // Generate ephemeral short code for Realtime handshake (no DB required)
       const shortCode = Math.random().toString(36).substring(2, 10);
-      
+
       // Setup Realtime responder
       if (window.sb) {
         checkoutChannel = window.sb.channel(`checkout_handshake_${shortCode}`, { config: { broadcast: { ack: true } } });
@@ -1730,7 +1790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const origin = window.location.origin;
       const cleanOrigin = origin.replace(/\/$/, '');
       const qrUrl = `${cleanOrigin}/p.html?c=${shortCode}`;
-      
+
       await renderQrForUrl(qrUrl, { width: 340 });
       pollStatus(lastSessionId);
     } catch (e) {
@@ -1814,7 +1874,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const session_id = data.id || sessionId;
             const amount_total_cents = Number(data.amount_total_cents ?? data.amount_total ?? 0) || 0;
             const items = Array.isArray(data.items) ? data.items : [];
-            
+
             // Upsert receipt with items array into the items jsonb column
             const { data: receiptData, error: receiptError } = await window.sb.from('receipts').upsert(
               {
@@ -1826,13 +1886,13 @@ document.addEventListener('DOMContentLoaded', () => {
               },
               { onConflict: 'session_id' }
             );
-            
+
             if (receiptError) {
               console.warn('Failed to save receipt (non-fatal):', receiptError);
             } else {
               console.debug('Receipt saved successfully with', items.length, 'items');
             }
-            
+
             // Send receipt email with checkout details
             try {
               if (window.sb?.functions?.invoke && userEmail && items.length > 0) {
@@ -1866,4 +1926,92 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   fetchDetails(sid);
+});
+
+// --- Inactivity Timer for Grid/Category Views ---
+document.addEventListener('DOMContentLoaded', () => {
+  const INACTIVITY_LIMIT_MS = 15000;
+  let inactivityTimer = null;
+  const leftSection = document.querySelector('.left-section');
+
+  // Elements for index.html view switching
+  const viewOpenSearch = document.getElementById('view-opensearch');
+  const viewCategoryGrid = document.getElementById('view-category-grid');
+
+  function isGridOrCategoryActive() {
+    // 1. Are we on category.html?
+    if (document.body.classList.contains('category-page')) return true;
+
+    // 2. Are we on index.html with Grid View visible?
+    if (viewCategoryGrid && !viewCategoryGrid.classList.contains('hidden')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function revertView() {
+    console.debug('[Inactivity] Time limit reached, reverting view...');
+
+    if (document.body.classList.contains('category-page')) {
+      // If on category page, go back to index
+      window.location.href = 'index.html';
+    } else if (viewOpenSearch && viewCategoryGrid) {
+      // If on index.html grid view, revert to OpenSearch
+
+      // 1. Hide Grid
+      viewCategoryGrid.style.opacity = '0';
+      viewCategoryGrid.classList.add('hidden');
+
+      // 2. Show OpenSearch
+      viewOpenSearch.classList.remove('hidden');
+      viewOpenSearch.classList.remove('slow-fade-out');
+      document.body.classList.add('opensearch-active');
+
+      // 3. Clear ?view=grid param if present so reload doesn't bring us back
+      const url = new URL(window.location);
+      if (url.searchParams.get('view') === 'grid') {
+        url.searchParams.delete('view');
+        window.history.replaceState({}, '', url);
+      }
+    }
+  }
+
+  function resetTimer() {
+    if (inactivityTimer) clearTimeout(inactivityTimer);
+
+    // Only start timer if we are in the target state
+    if (isGridOrCategoryActive()) {
+      inactivityTimer = setTimeout(revertView, INACTIVITY_LIMIT_MS);
+    }
+  }
+
+  // Monitor interactions on the Left Section only
+  if (leftSection) {
+    const events = ['mousedown', 'mousemove', 'touchstart', 'click', 'scroll', 'keydown'];
+    events.forEach(evt => {
+      leftSection.addEventListener(evt, resetTimer, { passive: true });
+    });
+  }
+
+  // For index.html, we need to detect when the view changes to Grid
+  if (viewCategoryGrid) {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          // If grid just became visible, start/reset the timer
+          if (!viewCategoryGrid.classList.contains('hidden')) {
+            resetTimer();
+          } else {
+            // If grid became hidden, clear timer
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+          }
+        }
+      });
+    });
+    observer.observe(viewCategoryGrid, { attributes: true });
+  }
+
+  // Initial check on load
+  resetTimer();
 });

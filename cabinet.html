@@ -1,3 +1,4 @@
+<!-- cabinet.html -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,7 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body>
+<body class="page-opacity-0">
   <div class="container">
     <div class="left-section">
 
@@ -18,7 +19,7 @@
           <span class="back-text">Back</span>
         </button>
         <div class="tabbar" role="tablist" aria-label="Cabinet navigation">
-          <button class="tab" role="tab" aria-selected="false" tabindex="-1">
+          <button class="tab" role="tab" aria-selected="false" tabindex="-1" onclick="smoothNavigate('index.html')">
             <span>Category</span>
           </button>
           <button class="tab active" role="tab" aria-selected="true" tabindex="0">

@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+
+<body class="page-opacity-0">
   <div class="container">
     <div class="left-section">
       <div class="section-header">
         <div class="tabbar" role="tablist" aria-label="Account navigation">
-          <button class="tab" role="tab" aria-selected="false" tabindex="0" onclick="window.location.href='index.html'">
+          <button class="tab" role="tab" aria-selected="false" tabindex="0" onclick="smoothNavigate('index.html')">
             <span>Home</span>
           </button>
           <button id="account-tab" class="tab active" role="tab" aria-selected="true" tabindex="-1">
@@ -23,7 +25,8 @@
 
       <h1 class="section-title" style="font-size: 28px; margin-bottom: 16px;">Your Account</h1>
 
-      <div class="account-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:520px">
+      <div class="account-card"
+        style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;max-width:520px">
         <div style="margin-bottom:12px; color:#6b7280">Signed in as</div>
         <div id="acct-email" style="font-size:18px;font-weight:600; color:#111827">—</div>
         <div id="acct-id" style="font-size:12px;color:#6b7280; margin-top:6px; word-break:break-all">—</div>
@@ -38,13 +41,16 @@
       <div id="admin-tools" style="display:none; margin-top: 14px;">
         <div style="font-size: 14px; color:#6b7280; margin-bottom:6px;">Admin Tools</div>
         <div style="display:flex; gap:8px;">
-          <a href="admin/index.html" class="btn" style="height:32px; padding:6px 10px; display:inline-flex; align-items:center;">Admin</a>
+          <a href="admin/index.html" class="btn"
+            style="height:32px; padding:6px 10px; display:inline-flex; align-items:center;">Admin</a>
         </div>
       </div>
 
       <h2 class="section-title" style="font-size: 22px; margin: 18px 0 10px;">Previous Purchases</h2>
       <div id="purchases-status" style="color:#6b7280; margin-bottom:8px;">Loading...</div>
-      <div id="purchases-list" style="display:flex;flex-direction:column;gap:10px;width:100%;max-height:60vh;overflow-y:auto;padding-right:6px"></div>
+      <div id="purchases-list"
+        style="display:flex;flex-direction:column;gap:10px;width:100%;max-height:60vh;overflow-y:auto;padding-right:6px">
+      </div>
     </div>
 
   </div>
@@ -58,7 +64,7 @@
         if (!window.sb) return (window.location.href = 'signin.html');
         const { data, error } = await window.sb.auth.getSession();
         if (error || !data?.session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
           return (window.location.href = 'signin.html');
         }
         const { data: u } = await window.sb.auth.getUser();
@@ -74,9 +80,9 @@
             const adminBox = document.getElementById('admin-tools');
             if (adminBox) adminBox.style.display = 'block';
           }
-        } catch (_) {}
+        } catch (_) { }
       } catch (e) {
-        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
         return (window.location.href = 'signin.html');
       }
     })();
@@ -116,7 +122,7 @@
             const products = await (window.fetchProductsByIds ? window.fetchProductsByIds(idList) : []);
             for (const p of (products || [])) productMap.set(String(p.id), p);
           }
-        } catch (_) {}
+        } catch (_) { }
 
         // Helpers
         const fmtMoney = (cents, currency = 'USD') => {
@@ -144,7 +150,7 @@
               }
             }
           }
-        } catch (_) {}
+        } catch (_) { }
 
         // Render grouped by receipt
         if (!rows || rows.length === 0) {
@@ -173,7 +179,7 @@
           // Render any refunds for this session
           try {
             const list = refundsBySession.get(r.session_id) || [];
-            list.sort((a,b)=> (a.created||0) - (b.created||0));
+            list.sort((a, b) => (a.created || 0) - (b.created || 0));
             for (const rf of list) {
               const tile = document.createElement('div');
               tile.className = 'refund-tile';
@@ -183,7 +189,7 @@
               tile.textContent = `Purchase from ${fmtDate(r.created_at)} was refunded ${amtTxt}${whenTxt ? ' on ' + whenTxt : ''}.`;
               receiptBox.appendChild(tile);
             }
-          } catch (_) {}
+          } catch (_) { }
 
           const items = Array.isArray(r.items) ? r.items : [];
           for (const it of items) {
@@ -207,14 +213,14 @@
                 if (!url) {
                   const key = Array.isArray(p.imageKeys) && p.imageKeys.length ? p.imageKeys[0] : (p.image_url || null);
                   if (key && window.getImageUrlForKey) {
-                    try { url = await window.getImageUrlForKey(key); } catch {}
+                    try { url = await window.getImageUrlForKey(key); } catch { }
                   }
                 }
                 if (url) {
                   img.style.backgroundImage = `url('${url}')`;
                 }
               }
-            } catch (_) {}
+            } catch (_) { }
 
             const name = document.createElement('div');
             name.className = 'purchase-name';
@@ -259,7 +265,7 @@
 
     // Kick off purchases load when page is ready
     document.addEventListener('DOMContentLoaded', () => {
-      try { loadPreviousPurchases(); } catch (_) {}
+      try { loadPreviousPurchases(); } catch (_) { }
     });
   </script>
   <script src="site.js"></script>
@@ -288,4 +294,5 @@
     })();
   </script>
 </body>
+
 </html>
