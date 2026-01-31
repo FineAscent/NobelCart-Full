@@ -999,7 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let presenceHandle = null;
       let isUserSignedIn = false;
 
-      const AUTH_IDLE_MS = 8 * 60 * 1000;    // 8 mins for signed-in users
+      const AUTH_IDLE_MS = 6 * 60 * 1000;    // 6 mins for signed-in users
       const AUTH_GRACE_MS = 60 * 1000;       // 1 min grace to respond
       const GUEST_IDLE_MS = 3 * 60 * 1000;   // 3 mins for non-signed-in users
 
@@ -1070,6 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const initMonitor = async () => {
         // Check auth status
+        // Check auth status & subscribe to changes
         if (window.sb) {
           try {
             const { data } = await window.sb.auth.getSession();
@@ -1077,6 +1078,28 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (_) {
             isUserSignedIn = false;
           }
+
+          // Listen for dynamic auth changes (e.g. late hydration)
+          window.sb.auth.onAuthStateChange((event, session) => {
+            const wasSignedIn = isUserSignedIn;
+
+            // Check if we are on an auth page
+            const isAuthPage = location.pathname.includes('signin.html') || location.pathname.includes('create-account.html');
+
+            if (isAuthPage) {
+              // Always treat as guest on signin pages to ensure idle loop works (3 mins)
+              isUserSignedIn = false;
+            } else {
+              // Normal behavior
+              isUserSignedIn = !!session;
+            }
+
+            // If state actually changed, reset timer immediately to apply new policy
+            if (wasSignedIn !== isUserSignedIn) {
+              console.debug('Inactivity monitor: Auth state changed to', isUserSignedIn ? 'signed-in' : 'guest');
+              resetIdleTimer();
+            }
+          });
         }
 
         // Force "not signed in" state on auth pages to ensure 3-minute idle loop
@@ -1235,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (backBtn) {
         backBtn.addEventListener('click', (e) => {
           e.preventDefault();
-          window.smoothNavigate('index.html');
+          window.smoothNavigate('index.html?view=grid');
         });
       }
     };

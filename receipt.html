@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,13 +8,15 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="receipt.css" />
 </head>
+
 <body class="receipt">
   <main class="receipt-shell">
     <section class="receipt-hero">
       <div class="hero-icon" aria-hidden="true">✓</div>
       <p class="hero-badge">Payment confirmed</p>
       <h1 class="hero-title">Thank you for shopping with Noble Cart</h1>
-      <p class="hero-subtitle">We’ve sent your receipt to <span id="receipt-email" aria-live="polite">your email</span>. You can also find it anytime in the Noble Cart app.</p>
+      <p class="hero-subtitle">We’ve sent your receipt to <span id="receipt-email" aria-live="polite">your email</span>.
+        You can also find it anytime in the Noble Cart app.</p>
       <p id="receipt-status" class="hero-status">Preparing your receipt confirmation...</p>
     </section>
 
@@ -30,12 +33,13 @@
     </section>
 
     <div class="receipt-actions">
-      <button class="receipt-btn btn-primary" onclick="window.location.href='signin.html'">Done</button>
-      <button class="receipt-btn btn-tertiary" onclick="window.location.href='signin.html'">Sign in again</button>
+      <button class="receipt-btn btn-primary" onclick="window.close()">Close</button>
+      <div style="text-align:center; font-size:13px; color:#6b7280; margin-top:8px;">You can close this page</div>
     </div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="site.js"></script>
 </body>
+
 </html>

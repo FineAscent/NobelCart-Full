@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+
+    <link href='fonts.googleapis.com' rel='stylesheet'>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="index opensearch-active page-opacity-0">
+    <div class="container">
+        <div class="left-section">
+            <!-- View Container -->
+            <div id="left-views">
+                <!-- View: OpenSearch (Default) -->
+                <div id="view-opensearch" class="embedded-view">
+                    <div class="opensearch-top">
+                        <button id="btn-start-search" class="action-btn">
+                            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                            find item
+                        </button>
+                    </div>
+                    <div id="selected-item-display" class="selected-item-display">
+                        <!-- Image will be injected here via JS -->
+                        <div class="placeholder-message">
+                            "Selected" item Image "shown here"
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View: Category Grid (Removed: moved to grid.html) -->
+            </div>
+        </div>
+
+        <div class="right-section">
+            <h2 class="total-header">Total</h2>
+
+            <div class="cart-items">
+                <div class="cart-item">
+                    <div class="item-left">
+                        <div class="item-label">item</div>
+                    </div>
+                    <div class="item-right">
+                        <div class="item-price">$1.00</div>
+                        <button class="remove-item">✕</button>
+                    </div>
+                </div>
+
+                <div class="cart-item">
+                    <div class="item-left">
+                        <div class="item-label">item</div>
+                    </div>
+                    <div class="item-right">
+                        <div class="item-price">$2.00</div>
+                        <button class="remove-item">✕</button>
+                    </div>
+                </div>
+
+                <div class="cart-item">
+                    <div class="item-left">
+                        <div class="item-label">item</div>
+                    </div>
+                    <div class="item-right">
+                        <div class="item-price">$3.00</div>
+                        <button class="remove-item">✕</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="subtotal">
+                <span class="subtotal-label">SubTotal:</span>
+                <span class="subtotal-amount">$25.00</span>
+            </div>
+
+            <button class="checkout-btn">Checkout</button>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="site.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnStartSearch = document.getElementById('btn-start-search');
+            // Logic for switching views locally is removed as views are now separated.
+            // btnStartSearch will likely trigger OpenSearch which is handled by site.js or a separate openSearch() function.
+            // Currently site.js lines 1350+ handle 'btn-start-search' by calling openSearch().
+            if (btnStartSearch) {
+                btnStartSearch.addEventListener('click', () => {
+                    // Check if openSearch exists globally or needs to be imported
+                    if (window.openSearch) window.openSearch();
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>
