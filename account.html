@@ -296,21 +296,60 @@
     });
 
     // Setting: Allergy Caution
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       const toggle = document.getElementById('setting-allergy');
       const knob = toggle ? toggle.parentElement.querySelector('.slider-knob') : null;
-      if (toggle) {
-        // Init
+
+      if (toggle && window.sb) {
+        // 1. Initial Load: Try to fetch from Supabase, fallback to localStorage
+        try {
+          const { data: { user } } = await window.sb.auth.getUser();
+          if (user) {
+            const { data: profile } = await window.sb
+              .from('profiles')
+              .select('show_allergy_caution')
+              .eq('id', user.id)
+              .single();
+
+            if (profile) {
+              // Sync DB value to localStorage
+              const val = profile.show_allergy_caution !== false; // default true
+              localStorage.setItem('nc_show_allergy_info', val ? 'true' : 'false');
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to sync settings from Supabase', e);
+        }
+
+        // Apply state from localStorage (now synced)
         const current = localStorage.getItem('nc_show_allergy_info') !== 'false';
         toggle.checked = current;
         if (knob) knob.style.transform = current ? 'translateX(24px)' : 'translateX(0)';
 
-        // Change
-        toggle.addEventListener('change', () => {
+        // 2. Change Handler: Update Supabase + localStorage
+        toggle.addEventListener('change', async () => {
           const val = toggle.checked;
-          localStorage.setItem('nc_show_allergy_info', val ? 'true' : 'false');
-          // Update transform manually since CSS sibling selector might fail depending on precise structure
+          const strVal = val ? 'true' : 'false';
+
+          // Immediate UI feedback
+          localStorage.setItem('nc_show_allergy_info', strVal);
           if (knob) knob.style.transform = val ? 'translateX(24px)' : 'translateX(0)';
+
+          // Persist to Supabase
+          try {
+            const { data: { user } } = await window.sb.auth.getUser();
+            if (user) {
+              const { error } = await window.sb
+                .from('profiles')
+                .update({ show_allergy_caution: val })
+                .eq('id', user.id);
+              if (error) throw error;
+            }
+          } catch (e) {
+            console.error('Failed to save setting to Supabase', e);
+            // Optional: Revert UI if save fails? 
+            // For now, keep UI responsive and assume mostly transient errors or offline.
+          }
         });
       }
     });

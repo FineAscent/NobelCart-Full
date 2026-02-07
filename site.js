@@ -1200,6 +1200,21 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
               // Normal behavior
               isUserSignedIn = !!session;
+
+              // Sync user preferences if signed in
+              if (isUserSignedIn && window.sb) {
+                window.sb.from('profiles')
+                  .select('show_allergy_caution')
+                  .eq('id', session.user.id)
+                  .single()
+                  .then(({ data }) => {
+                    if (data) {
+                      const val = data.show_allergy_caution !== false;
+                      localStorage.setItem('nc_show_allergy_info', val ? 'true' : 'false');
+                    }
+                  })
+                  .catch(() => { }); // silent fail
+              }
             }
 
             // If state actually changed, reset timer immediately to apply new policy
@@ -1215,6 +1230,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const isAuthPage = location.pathname.includes('signin.html') || location.pathname.includes('create-account.html');
         if (isAuthPage) {
           isUserSignedIn = false;
+        } else if (window.sb) {
+          // Initial sync on load (if not auth page)
+          window.sb.auth.getSession().then(({ data }) => {
+            if (data?.session?.user) {
+              window.sb.from('profiles')
+                .select('show_allergy_caution')
+                .eq('id', data.session.user.id)
+                .single()
+                .then(({ data: prof }) => {
+                  if (prof) {
+                    const val = prof.show_allergy_caution !== false;
+                    localStorage.setItem('nc_show_allergy_info', val ? 'true' : 'false');
+                  }
+                })
+                .catch(() => { });
+            }
+          });
         }
 
         // Setup listeners (use capture to catch non-bubbling events like scroll)
