@@ -437,22 +437,9 @@
         let { data, error } = await window.sb.auth.signInWithPassword({ email, password });
 
         if (error) {
-          // If logging in as admin and user doesn't exist, try to create it on the fly
-          const isAdminHandle = (email.toLowerCase() === 'admin@example.com');
-          if (isAdminHandle && /Invalid login credentials/i.test(error.message || '')) {
-            const signup = await window.sb.auth.signUp({ email, password });
-            if (signup.error) throw signup.error;
-            data = signup.data;
-            // If email confirmation is required, session may be null
-            if (!data.session) {
-              err.textContent = 'Admin user created. Please verify the email sent to ' + email + ' to proceed.';
-              err.style.display = 'block';
-              return;
-            }
-          } else {
-            throw error;
-          }
+          throw error;
         }
+
         // Mark profile active on sign-in (idempotent upsert)
         try {
           const uid = data?.user?.id;
