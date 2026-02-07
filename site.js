@@ -55,6 +55,46 @@ function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm
   return { close, overlay, modal };
 }
 
+function showAllergyModal({ name, allergyText, onConfirm }) {
+  ensureModalRoot();
+  const root = document.querySelector('#modal-root');
+  if (!root) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+
+  modal.innerHTML = `
+    <div class="modal-header">Allergy Caution</div>
+    <div class="modal-body" style="padding: 24px 16px;">
+      <div class="modal-product" style="font-weight:600; font-size:1.1rem; margin-bottom:12px; color:#111827;">
+        ${(name || '').replace(/</g, '&lt;')}
+      </div>
+      <div style="font-size:1rem; color:#374151; line-height:1.5;">
+        Please note this item contains:
+        <div style="font-weight:600; color:#000; margin-top:4px; font-size:1.05rem;">
+          ${String(allergyText).replace(/</g, '&lt;')}
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions" style="justify-content:center; padding-bottom:20px;">
+      <button class="btn btn-primary" style="min-width: 100px;">OK</button>
+    </div>
+  `;
+  overlay.appendChild(modal);
+  root.appendChild(overlay);
+
+  const btnOk = modal.querySelector('.btn-primary');
+  const close = () => { try { root.removeChild(overlay); } catch (_) { } };
+
+  btnOk.addEventListener('click', () => {
+    try { onConfirm && onConfirm(); } finally { close(); }
+  });
+
+  // Focus OK
+  setTimeout(() => btnOk.focus(), 50);
+}
+
 function showWeightModal({ name, unit, onConfirm }) {
   ensureModalRoot();
   const root = document.querySelector('#modal-root');
@@ -106,22 +146,9 @@ async function fetchProductsByIds(ids = []) {
   const unique = Array.from(new Set(ids)).filter(Boolean).map(String);
   if (unique.length === 0) return [];
 
-  // 1) Preferred: GET /products?ids=ID1,ID2,...
-  try {
-    const params = new URLSearchParams();
-    params.set('ids', unique.join(','));
-    const data = await apiFetch(`/products?${params.toString()}`);
-    if (data && Array.isArray(data.items)) return data.items;
-  } catch (_) { }
+  // Update: User specified explicit URL GET /products/{id}
+  // We fetch these in parallel with limited concurrency to respect the new structure.
 
-  // 2) Alternative: POST /products/by-ids { ids: [...] }
-  try {
-    const data = await apiFetch(`/products/by-ids`, { method: 'POST', body: { ids: unique } });
-    if (data && Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data)) return data; // some backends may return array directly
-  } catch (_) { }
-
-  // 3) Fallback: GET each /products/{id} with limited concurrency
   const results = [];
   const concurrency = 8;
   let i = 0;
@@ -149,6 +176,68 @@ async function getImageUrlForKey(key) {
     return null;
   }
 }
+
+// 2. Function to get a single product by ID (User provided snippet adapted)
+async function getProduct(id) {
+  try {
+    // Use existing API_BASE which is already set to the correct AWS URL
+    const url = `${API_BASE}/products/${id}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error('Product not found or error:', response.status);
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Network error:', error);
+    return null;
+  }
+}
+
+// 3. Example: How to use it to update your page (User provided snippet)
+async function showProductOnPage(productId) {
+  const product = await getProduct(productId);
+
+  if (product) {
+    const nameEl = document.getElementById('product-name');
+    if (nameEl) nameEl.innerText = product.name || '';
+
+    const priceEl = document.getElementById('product-price');
+    // Format price if numeric
+    const p = product.price;
+    if (priceEl) priceEl.innerText = (typeof p === 'number') ? `$${p.toFixed(2)}` : (p || '');
+
+    const descEl = document.getElementById('product-desc');
+    if (descEl) descEl.innerText = product.description || '';
+
+    // Show allergy info if it exists
+    const allergyEl = document.getElementById('allergy-info');
+    if (allergyEl) {
+      if (product.allergySummary && product.allergySummary !== 'none') {
+        allergyEl.innerText = `⚠️ Allergy Warning: ${product.allergySummary}`;
+        allergyEl.style.display = 'block';
+      } else {
+        allergyEl.style.display = 'none';
+      }
+    }
+
+    // Show Image (using the first image key if available)
+    const imgEl = document.getElementById('product-img');
+    if (imgEl && product.imageKeys && product.imageKeys.length > 0) {
+      // Use existing helper to get signed URL if possible
+      try {
+        // getImageUrlForKey is defined right above in site.js
+        const url = await getImageUrlForKey(product.imageKeys[0]);
+        if (url) imgEl.src = url;
+      } catch (e) {
+        console.warn('Failed to load image url', e);
+      }
+    }
+  }
+}
+// Expose for debugging/console use
+window.showProductOnPage = showProductOnPage;
 
 // ---- Supabase Receipt & Checkout History ----
 // Fetch all receipts for the current user
@@ -214,10 +303,14 @@ function productCardHTML(p) {
   const areaAttr = area ? ` data-area="${area}"` : '';
   const unitAttr = p.priceUnit ? ` data-unit="${String(p.priceUnit)}"` : '';
   const scaleAttr = p.scaleNeed ? ` data-scale="1"` : ' data-scale="0"';
+  // Allergy info
+  const allergyVal = (p.allergySummary && p.allergySummary !== 'none') ? p.allergySummary : 'none';
+  const allergyAttr = ` data-allergy="${String(allergyVal).replace(/"/g, '&quot;')}"`;
+
   // We'll set data-image dynamically after resolving, but if p.image_url is a direct link we could set it here.
   // For now rely on renderProductsToGrid to set it.
   return `
-      <div class="product-card"${idAttr}${nameAttr}${priceAttr}${areaAttr}${unitAttr}${scaleAttr}>
+      <div class="product-card"${idAttr}${nameAttr}${priceAttr}${areaAttr}${unitAttr}${scaleAttr}${allergyAttr}>
         <div class="product-info">
           <div class="product-image"></div>
           <div class="product-name">${name}</div>
@@ -749,16 +842,31 @@ function bindGridForCart(gridEl) {
     }
     const needsScale = card.getAttribute('data-scale') === '1';
     const unit = card.getAttribute('data-unit');
-    if (needsScale) {
-      showWeightModal({
-        name, unit, onConfirm: (weightVal) => {
-          const w = Number(weightVal);
-          if (!w || w <= 0) return; // ignore invalid
-          addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price, image, imageKey });
-        }
+    const allergy = card.getAttribute('data-allergy');
+
+    const proceed = () => {
+      if (needsScale) {
+        showWeightModal({
+          name, unit, onConfirm: (weightVal) => {
+            const w = Number(weightVal);
+            if (!w || w <= 0) return; // ignore invalid
+            addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price, image, imageKey });
+          }
+        });
+      } else {
+        addToCart({ id, name, price, image, imageKey });
+      }
+    };
+
+    const showAllergy = localStorage.getItem('nc_show_allergy_info') !== 'false';
+    if (showAllergy && allergy && allergy.toLowerCase() !== 'none') {
+      showAllergyModal({
+        name,
+        allergyText: allergy,
+        onConfirm: proceed
       });
     } else {
-      addToCart({ id, name, price, image, imageKey });
+      proceed();
     }
   });
 }

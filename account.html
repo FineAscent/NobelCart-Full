@@ -47,6 +47,37 @@
         </div>
       </div>
 
+      <!-- Settings -->
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+        <h2 class="section-title" style="font-size: 22px; margin-bottom: 12px;">Settings</h2>
+        <div class="setting-row"
+          style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div style="font-size:16px; color:#111827;">Show Allergy Caution</div>
+          <label class="switch" style="position:relative; display:inline-block; width:48px; height:24px;">
+            <input type="checkbox" id="setting-allergy" style="opacity:0; width:0; height:0;">
+            <span class="slider"
+              style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:24px;">
+            </span>
+            <span class="slider-knob"
+              style="position:absolute; content:''; height:18px; width:18px; left:3px; bottom:3px; background-color:white; transition:.4s; border-radius:50%;">
+            </span>
+          </label>
+        </div>
+        <style>
+          input:checked+.slider {
+            background-color: #f59e0b;
+          }
+
+          input:focus+.slider {
+            box-shadow: 0 0 1px #f59e0b;
+          }
+
+          input:checked+.slider .slider-knob {
+            transform: translateX(24px);
+          }
+        </style>
+      </div>
+
       <h2 class="section-title" style="font-size: 22px; margin: 18px 0 10px;">Previous Purchases</h2>
       <div id="purchases-status" style="color:#6b7280; margin-bottom:8px;">Loading...</div>
       <div id="purchases-list"
@@ -261,6 +292,26 @@
           err.textContent = ex?.message || 'Failed to sign out';
           err.style.display = 'block';
         }
+      }
+    });
+
+    // Setting: Allergy Caution
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('setting-allergy');
+      const knob = toggle ? toggle.parentElement.querySelector('.slider-knob') : null;
+      if (toggle) {
+        // Init
+        const current = localStorage.getItem('nc_show_allergy_info') !== 'false';
+        toggle.checked = current;
+        if (knob) knob.style.transform = current ? 'translateX(24px)' : 'translateX(0)';
+
+        // Change
+        toggle.addEventListener('change', () => {
+          const val = toggle.checked;
+          localStorage.setItem('nc_show_allergy_info', val ? 'true' : 'false');
+          // Update transform manually since CSS sibling selector might fail depending on precise structure
+          if (knob) knob.style.transform = val ? 'translateX(24px)' : 'translateX(0)';
+        });
       }
     });
 
