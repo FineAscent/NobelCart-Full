@@ -1,37 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin • Backups</title>
-  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body class="backup-standalone">
   <style>
     /* Standalone Backup view: centered, white background */
-    body.backup-standalone { background: #ffffff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .bk-wrap { max-width: 980px; width: 100%; padding: 24px 16px; }
-    .bk-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; }
-    .bk-card { background:#ffffff; border:1px solid #e5e7eb; border-radius: 12px; padding:16px; margin-bottom: 14px; }
-    .bk-status { margin-top:12px; font-weight: 500; }
-    .bk-status.success { color: #059669; }
-    .bk-status.error { color: #dc2626; }
-    .btn-primary { background: #1f648d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
-    .btn-primary:hover { background: #164e6e; }
-    .backup-history { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .backup-history th, .backup-history td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
-    .backup-history th { color: #6b7280; font-weight: 600; }
+    body.backup-standalone {
+      background: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bk-wrap {
+      max-width: 980px;
+      width: 100%;
+      padding: 24px 16px;
+    }
+
+    .bk-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+
+    .bk-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .bk-status {
+      margin-top: 12px;
+      font-weight: 500;
+    }
+
+    .bk-status.success {
+      color: #059669;
+    }
+
+    .bk-status.error {
+      color: #dc2626;
+    }
+
+    .btn-primary {
+      background: #1f648d;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn-primary:hover {
+      background: #164e6e;
+    }
+
+    .backup-history {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .backup-history th,
+    .backup-history td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+
+    .backup-history th {
+      color: #6b7280;
+      font-weight: 600;
+    }
   </style>
 
   <div class="bk-wrap">
     <div class="bk-title" style="display:flex; align-items:center; gap:10px;">
       <span>User Data Backups</span>
-      <a href="../admin/index.html" class="btn" style="margin-left:auto; height:28px; padding:4px 10px; display:inline-flex; align-items:center; background:#efefef; border-radius:6px; text-decoration:none; color:#374151;">Back to Home</a>
+      <a href="index.html" class="btn"
+        style="margin-left:auto; height:28px; padding:4px 10px; display:inline-flex; align-items:center; background:#efefef; border-radius:6px; text-decoration:none; color:#374151;">Back
+        to Home</a>
     </div>
 
     <div class="bk-card">
       <h3>Create New Backup</h3>
-      <p style="color:#6b7280; margin-bottom:16px;">Securely snapshot all user profiles and account data to the backup database.</p>
+      <p style="color:#6b7280; margin-bottom:16px;">Securely snapshot all user profiles and account data to the backup
+        database.</p>
       <button id="trigger-backup" class="btn-primary">Backup Now</button>
       <div id="backup-status" class="bk-status"></div>
     </div>
@@ -48,7 +115,9 @@
           </tr>
         </thead>
         <tbody id="backup-list">
-          <tr><td colspan="4" style="color:#6b7280; text-align:center; padding: 12px;">Loading history...</td></tr>
+          <tr>
+            <td colspan="4" style="color:#6b7280; text-align:center; padding: 12px;">Loading history...</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -56,28 +125,28 @@
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../config.js"></script>
-  
+  <script src="../../config.js"></script>
+
   <!-- Auth Guard -->
   <script>
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
+        if (!window.sb) return (window.location.href = '../../signin.html?admin=1');
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-          return (window.location.href = '../signin.html?admin=1');
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+          return (window.location.href = '../../signin.html?admin=1');
         }
         // Verify admin role
         const uid = session.user.id;
         const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
         if (!prof || !prof.is_admin) {
           alert('Admin access required.');
-          return (window.location.href = '../index.html');
+          return (window.location.href = '../../index.html');
         }
       } catch (e) {
-        return (window.location.href = '../signin.html?admin=1');
+        return (window.location.href = '../../signin.html?admin=1');
       }
     })();
   </script>
@@ -98,15 +167,15 @@
         // Actually, listing raw entries is fine if volume is low, or we just select distinct times.
         // Supabase select distinct on timestamp might be tricky without a view.
         // Let's just show the last 10 entries for now.
-        
+
         const { data, error } = await window.sb
           .from('profiles_backup')
           .select('*')
           .order('backup_created_at', { ascending: false })
           .limit(10);
-          
+
         if (error) throw error;
-        
+
         if (!data || data.length === 0) {
           listEl.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#6b7280; padding:12px;">No backups found.</td></tr>';
           return;
@@ -120,11 +189,11 @@
             <td>${row.is_admin ? 'Yes' : 'No'}</td>
           </tr>
         `).join('');
-        
+
       } catch (e) {
         console.error(e);
         if (e.code === 'PGRST205' || e.message?.includes('profiles_backup')) {
-           listEl.innerHTML = `
+          listEl.innerHTML = `
              <tr>
                <td colspan="4" style="text-align:center; padding:20px; color:#b91c1c; background:#fef2f2;">
                  <strong>Setup Required:</strong> The backup table does not exist yet.<br/>
@@ -132,7 +201,7 @@
                </td>
              </tr>`;
         } else {
-           listEl.innerHTML = '<tr><td colspan="4" style="color:#dc2626; text-align:center;">Failed to load history. ' + (e.message || '') + '</td></tr>';
+          listEl.innerHTML = '<tr><td colspan="4" style="color:#dc2626; text-align:center;">Failed to load history. ' + (e.message || '') + '</td></tr>';
         }
       }
     }
@@ -147,7 +216,7 @@
       try {
         // Call the RPC function
         const { data, error } = await window.sb.rpc('backup_all_profiles', { reason: 'manual_admin_trigger' });
-        
+
         if (error) throw error;
 
         statusEl.textContent = `Success! ${data} profiles backed up.`;
@@ -172,4 +241,5 @@
     document.addEventListener('DOMContentLoaded', loadHistory);
   </script>
 </body>
+
 </html>

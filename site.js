@@ -95,25 +95,34 @@ function showAllergyModal({ name, allergyText, onConfirm }) {
   setTimeout(() => btnOk.focus(), 50);
 }
 
-function showWeightModal({ name, unit, onConfirm }) {
+function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   ensureModalRoot();
   const root = document.querySelector('#modal-root');
   if (!root) return;
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'modal weight-modal';
   const u = unit || '';
+  const ppu = Number(pricePerUnit) || 0;
+  const ppuDisplay = ppu ? `$${ppu.toFixed(2)}` : '';
+  const unitLabel = u || 'unit';
+
   modal.innerHTML = `
-    <div class="modal-header">Enter Weight</div>
-    <div class="modal-body">
-      <div class="modal-product">${(name || '').replace(/</g, '&lt;')}</div>
+    <div class="modal-body" style="padding-top:18px;">
       <label class="modal-label">Weight${u ? ' (' + u + ')' : ''}</label>
-      <input type="number" class="modal-input" min="0" step="0.01" placeholder="0${u ? ' ' + u : ''}">
+      <div class="modal-input-row">
+        <input type="number" class="modal-input" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+        ${u ? `<span class="modal-input-unit">${u}</span>` : ''}
+      </div>
+      <div class="modal-estimate" style="display:none;">
+        <span class="modal-estimate-label">Estimated Total:</span>
+        <span class="modal-estimate-price">$0.00</span>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary">Cancel</button>
-      <button class="btn btn-primary">Add</button>
+      <button class="btn btn-primary" disabled>Add to Cart</button>
     </div>
   `;
   overlay.appendChild(modal);
@@ -122,7 +131,28 @@ function showWeightModal({ name, unit, onConfirm }) {
   const input = modal.querySelector('.modal-input');
   const btnCancel = modal.querySelector('.btn-secondary');
   const btnOk = modal.querySelector('.btn-primary');
+  const estimateEl = modal.querySelector('.modal-estimate');
+  const estimatePriceEl = modal.querySelector('.modal-estimate-price');
   const close = () => { try { root.removeChild(overlay); } catch (_) { } };
+
+  // Live price calculation as user types
+  const updateEstimate = () => {
+    const val = Number(input.value);
+    if (val > 0 && ppu > 0) {
+      const total = val * ppu;
+      estimatePriceEl.textContent = `$${total.toFixed(2)}`;
+      estimateEl.style.display = 'flex';
+      btnOk.removeAttribute('disabled');
+    } else if (val > 0) {
+      estimateEl.style.display = 'none';
+      btnOk.removeAttribute('disabled');
+    } else {
+      estimateEl.style.display = 'none';
+      btnOk.setAttribute('disabled', 'true');
+    }
+  };
+  input.addEventListener('input', updateEstimate);
+
   btnCancel.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   btnOk.addEventListener('click', () => {
@@ -130,7 +160,14 @@ function showWeightModal({ name, unit, onConfirm }) {
     if (!val || val <= 0) { input.focus(); return; }
     try { onConfirm && onConfirm(val); } finally { close(); }
   });
-  setTimeout(() => { input.focus(); input.select?.(); }, 0);
+  // Allow Enter key to submit
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnOk.click();
+    }
+  });
+  setTimeout(() => { input.focus(); input.select?.(); }, 50);
 }
 
 async function fetchProducts({ availability = 'In Stock', limit = 24 } = {}) {
@@ -191,6 +228,18 @@ async function getProduct(id) {
     return await response.json();
   } catch (error) {
     console.error('Network error:', error);
+    return null;
+  }
+}
+
+// Look up a product by its physical barcode number (uses ?barcode= query parameter)
+async function getProductByBarcode(barcode) {
+  try {
+    const data = await apiFetch(`/products?barcode=${encodeURIComponent(barcode)}`);
+    const items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+    return items.length > 0 ? items[0] : null;
+  } catch (error) {
+    console.error('Barcode lookup error:', error);
     return null;
   }
 }
@@ -706,7 +755,7 @@ function renderCart() {
 
   if (selectedItemKey) selectCartItem(selectedItemKey);
 
-  // Disable checkout button if cart is empty
+  // Disable checkout button if cart is empty OR user is not signed in
   const checkoutBtn = document.querySelector('.checkout-btn');
   if (checkoutBtn) {
     if (items.length === 0) {
@@ -714,11 +763,37 @@ function renderCart() {
       checkoutBtn.style.opacity = '0.5';
       checkoutBtn.style.pointerEvents = 'none';
       checkoutBtn.style.cursor = 'not-allowed';
+      checkoutBtn.title = '';
     } else {
-      checkoutBtn.removeAttribute('disabled');
-      checkoutBtn.style.opacity = '1';
-      checkoutBtn.style.pointerEvents = 'auto';
-      checkoutBtn.style.cursor = 'pointer';
+      // Check auth state and disable if not signed in
+      (async () => {
+        try {
+          let isSignedIn = false;
+          if (window.sb) {
+            const { data } = await window.sb.auth.getSession();
+            isSignedIn = !!(data && data.session && data.session.user);
+          }
+          if (!isSignedIn) {
+            checkoutBtn.setAttribute('disabled', 'true');
+            checkoutBtn.style.opacity = '0.5';
+            checkoutBtn.style.cursor = 'not-allowed';
+            checkoutBtn.style.pointerEvents = 'auto'; // keep clickable so tap shows toast
+            checkoutBtn.title = 'Sign in to checkout';
+          } else {
+            checkoutBtn.removeAttribute('disabled');
+            checkoutBtn.style.opacity = '1';
+            checkoutBtn.style.pointerEvents = 'auto';
+            checkoutBtn.style.cursor = 'pointer';
+            checkoutBtn.title = '';
+          }
+        } catch (_) {
+          // On error, allow checkout (don't block)
+          checkoutBtn.removeAttribute('disabled');
+          checkoutBtn.style.opacity = '1';
+          checkoutBtn.style.pointerEvents = 'auto';
+          checkoutBtn.style.cursor = 'pointer';
+        }
+      })();
     }
   }
 }
@@ -847,7 +922,7 @@ function bindGridForCart(gridEl) {
     const proceed = () => {
       if (needsScale) {
         showWeightModal({
-          name, unit, onConfirm: (weightVal) => {
+          name, unit, pricePerUnit: price, onConfirm: (weightVal) => {
             const w = Number(weightVal);
             if (!w || w <= 0) return; // ignore invalid
             addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price, image, imageKey });
@@ -1095,6 +1170,104 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- USB Barcode Scanner Support (non-admin pages only) ---
+  if (!isAdminPath) {
+    let scanBuffer = '';
+    let scanTimeout = null;
+    let scanProcessing = false;
+    const SCAN_CHAR_TIMEOUT = 80; // max ms between chars for scanner input
+
+    document.addEventListener('keydown', (e) => {
+      // Skip if user is typing in an input, textarea, or contenteditable
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+      // Skip if a modal is currently open
+      if (document.querySelector('.modal-overlay')) return;
+      // Skip if already processing a scan
+      if (scanProcessing) return;
+
+      if (e.key === 'Enter' && scanBuffer.length >= 3) {
+        e.preventDefault();
+        const barcode = scanBuffer;
+        scanBuffer = '';
+        if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+        handleBarcodeScan(barcode);
+      } else if (/^[0-9]$/.test(e.key)) {
+        scanBuffer += e.key;
+        // Reset timeout — if no next char within SCAN_CHAR_TIMEOUT, clear buffer
+        if (scanTimeout) clearTimeout(scanTimeout);
+        scanTimeout = setTimeout(() => { scanBuffer = ''; }, SCAN_CHAR_TIMEOUT);
+      } else {
+        // Non-numeric key breaks the scan sequence
+        scanBuffer = '';
+        if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+      }
+    });
+
+    async function handleBarcodeScan(barcode) {
+      scanProcessing = true;
+      try { showHintToast(`Scanning: ${barcode}…`); } catch (_) { }
+      try {
+        const product = await getProductByBarcode(barcode);
+        if (!product) {
+          try { showHintToast(`Item not found: ${barcode}`); } catch (_) { }
+          scanProcessing = false;
+          return;
+        }
+
+        const id = product.id || barcode;
+        const name = product.name || '';
+        const price = Number(product.price) || 0;
+        const unit = product.priceUnit || null;
+        const needsScale = !!product.scaleNeed;
+        const allergyVal = (product.allergySummary && product.allergySummary !== 'none') ? product.allergySummary : null;
+
+        // Resolve image if available
+        let image = null;
+        let imageKey = null;
+        if (Array.isArray(product.imageKeys) && product.imageKeys.length) {
+          imageKey = product.imageKeys[0];
+          try { image = await getImageUrlForKey(imageKey); } catch (_) { }
+        } else if (product.image_url) {
+          if (/^https?:\/\//i.test(product.image_url)) {
+            image = product.image_url;
+          } else {
+            imageKey = product.image_url;
+            try { image = await getImageUrlForKey(product.image_url); } catch (_) { }
+          }
+        }
+
+        // Same flow as manual tap: allergy check → scale check → add
+        const proceed = () => {
+          if (needsScale) {
+            showWeightModal({
+              name, unit, pricePerUnit: price, onConfirm: (weightVal) => {
+                const w = Number(weightVal);
+                if (!w || w <= 0) return;
+                addToCart({ id, name, price, qty: w, weighted: true, unit, unitPrice: price, image, imageKey });
+                try { showHintToast(`Added ${name}`); } catch (_) { }
+              }
+            });
+          } else {
+            addToCart({ id, name, price, image, imageKey });
+            try { showHintToast(`Added ${name}`); } catch (_) { }
+          }
+        };
+
+        const showAllergy = localStorage.getItem('nc_show_allergy_info') !== 'false';
+        if (showAllergy && allergyVal) {
+          showAllergyModal({ name, allergyText: allergyVal, onConfirm: proceed });
+        } else {
+          proceed();
+        }
+      } catch (err) {
+        console.error('[Barcode] Error processing scan:', err);
+        try { showHintToast('Scan error — try again'); } catch (_) { }
+      }
+      scanProcessing = false;
+    }
+  }
+
   // Inactivity monitor (non-admin pages only)
   try {
     const isAdminPath = /(^|\/)admin\//.test(location.pathname);
@@ -1271,6 +1444,20 @@ document.addEventListener('DOMContentLoaded', () => {
         try { showHintToast('Your cart is empty'); } catch (_) { }
         return;
       }
+
+      // Check if user is signed in before allowing checkout
+      try {
+        let isSignedIn = false;
+        if (window.sb) {
+          const { data } = await window.sb.auth.getSession();
+          isSignedIn = !!(data && data.session && data.session.user);
+        }
+        if (!isSignedIn) {
+          e.preventDefault();
+          try { showHintToast('Please sign in to checkout'); } catch (_) { }
+          return;
+        }
+      } catch (_) { }
 
       const onCheckoutPage = location.pathname.includes('checkout.html');
       // Redirect into dedicated checkout page if not already there

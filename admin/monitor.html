@@ -1,37 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin • Active Sessions</title>
-  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="styles.css" />
   <style>
-    body.refunds-standalone { background: #f7fafc; min-height: 100vh; }
-    .admin-wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
-    .admin-title { font-size: 28px; font-weight: 700; color: #111827; margin-bottom: 16px; display:flex; align-items:center; gap:12px; }
-    .session-toolbar { display:flex; gap:8px; align-items:center; margin-bottom: 12px; }
-    .session-grid { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-    .session-grid th, .session-grid td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; text-align: left; font-size: 14px; }
-    .session-grid th { background: #f9fafb; font-weight: 600; color: #374151; }
-    .muted { color: #6b7280; }
-    .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; font-size:12px; background:#eef2ff; color:#3730a3; }
-    .btn { border: 1px solid #d1d5db; background: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-    .btn:hover { background: #f9fafb; }
-    .btn-danger { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
-    .btn-danger:hover { background: #fecaca; }
-    .right { text-align: right; }
-    .nowrap { white-space: nowrap; }
+    body.refunds-standalone {
+      background: #f7fafc;
+      min-height: 100vh;
+    }
+
+    .admin-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .admin-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .session-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .session-grid {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .session-grid th,
+    .session-grid td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .session-grid th {
+      background: #f9fafb;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .muted {
+      color: #6b7280;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+
+    .btn {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #f9fafb;
+    }
+
+    .btn-danger {
+      background: #fee2e2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+
+    .btn-danger:hover {
+      background: #fecaca;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .nowrap {
+      white-space: nowrap;
+    }
   </style>
 </head>
+
 <body class="refunds-standalone">
   <style>
     /* Standalone centered with white background */
-    body.refunds-standalone { background: #ffffff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .admin-wrap { max-width: 1200px; width: 100%; padding: 24px 16px; }
+    body.refunds-standalone {
+      background: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .admin-wrap {
+      max-width: 1200px;
+      width: 100%;
+      padding: 24px 16px;
+    }
   </style>
   <div class="admin-wrap">
     <div class="admin-title" style="display:flex; align-items:center; gap:10px;">
-      <a class="btn" href="index.html" style="height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Admin</a>
+      <a class="btn" href="index.html"
+        style="height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Admin</a>
       <span>Active Sessions</span>
     </div>
 
@@ -54,7 +146,9 @@
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="6" class="muted">Loading…</td></tr>
+          <tr>
+            <td colspan="6" class="muted">Loading…</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -62,32 +156,32 @@
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../config.js"></script>
+  <script src="../../config.js"></script>
   <script>
     // Route guard: require active session and admin role
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
+        if (!window.sb) return (window.location.href = '../../signin.html?admin=1');
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-          return (window.location.href = '../signin.html?admin=1');
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+          return (window.location.href = '../../signin.html?admin=1');
         }
         const uid = session.user.id;
         const { data: prof } = await window.sb.from('profiles').select('is_admin, email').eq('id', uid).single();
         if (!prof || !prof.is_admin) {
           alert('Admin access required.');
-          return (window.location.href = '../index.html');
+          return (window.location.href = '../../index.html');
         }
       } catch (e) {
-        try { await window.sb.auth.signOut({ scope: 'local' }); } catch {}
-        return (window.location.href = '../signin.html?admin=1');
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+        return (window.location.href = '../../signin.html?admin=1');
       }
     })();
   </script>
   <script>
-    const fmt = (n) => '$' + (Number(n||0).toFixed(2));
+    const fmt = (n) => '$' + (Number(n || 0).toFixed(2));
     const el = (id) => document.getElementById(id);
 
     async function loadSessions() {
@@ -130,8 +224,8 @@
       }
       tb.innerHTML = rows.map(r => {
         const last = new Date(r.last_seen).toLocaleTimeString();
-        const ua = (r.user_agent || '').slice(0, 48).replace(/</g,'&lt;');
-        const email = (r.email || '').replace(/</g,'&lt;');
+        const ua = (r.user_agent || '').slice(0, 48).replace(/</g, '&lt;');
+        const email = (r.email || '').replace(/</g, '&lt;');
         const deviceTxt = (r.__device_count && r.__device_count > 1)
           ? `${r.__device_count} devices`
           : r.device_id;
@@ -141,7 +235,7 @@
             <td><span class="pill">${deviceTxt}</span></td>
             <td class="right">${fmt(r.subtotal)}</td>
             <td class="nowrap">${last}</td>
-            <td class="nowrap muted" title="${(r.user_agent||'').replace(/"/g,'&quot;')}">${ua}</td>
+            <td class="nowrap muted" title="${(r.user_agent || '').replace(/"/g, '&quot;')}">${ua}</td>
             <td>
               <button class="btn btn-danger" onclick="forceSignOut('${r.user_id}','${r.device_id}')">Force Sign-out</button>
               <button class="btn" onclick="signOutAll('${r.user_id}')">Sign out all</button>
@@ -199,4 +293,5 @@
     })();
   </script>
 </body>
+
 </html>

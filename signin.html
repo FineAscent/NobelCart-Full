@@ -40,6 +40,18 @@
               <button type="button" id="toggle-password" class="password-toggle"
                 aria-label="Show password">Show</button>
             </div>
+            <script>
+              document.getElementById('toggle-password').addEventListener('click', function () {
+                const input = document.getElementById('password');
+                if (input.type === 'password') {
+                  input.type = 'text';
+                  this.textContent = 'Hide';
+                } else {
+                  input.type = 'password';
+                  this.textContent = 'Show';
+                }
+              });
+            </script>
           </div>
 
           <button type="submit" class="auth-button">Sign In</button>
@@ -454,7 +466,7 @@
         // On success, show logo overlay for 4 seconds, then go to cabinet
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin')) {
-          window.location.href = 'admin/index.html';
+          window.location.href = 'TableUiBackend/admin/index.html';
           return;
         }
 
@@ -483,7 +495,7 @@
           // Login Success
           const urlParams = new URLSearchParams(window.location.search);
           if (urlParams.get('admin')) {
-            window.location.href = 'admin/index.html';
+            window.location.href = 'TableUiBackend/admin/index.html';
             return;
           }
           try { showLoadingOverlay('', { logo: true }); } catch (_) { }
@@ -655,7 +667,7 @@
 
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.get('admin')) {
-                  window.location.href = 'admin/index.html';
+                  window.location.href = 'TableUiBackend/admin/index.html';
                   return;
                 }
 
