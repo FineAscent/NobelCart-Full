@@ -237,7 +237,15 @@ async function getProductByBarcode(barcode) {
   try {
     const data = await apiFetch(`/products?barcode=${encodeURIComponent(barcode)}`);
     const items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
-    return items.length > 0 ? items[0] : null;
+    if (!items.length) return null;
+    // Guard against API fuzzy-match or cached results returning the wrong product:
+    // verify the returned item's barcode (or id) actually equals the scanned value.
+    const barcodeStr = String(barcode);
+    const match = items.find(item => {
+      const val = item.barcode ?? item.id;
+      return val != null && String(val) === barcodeStr;
+    });
+    return match ?? null;
   } catch (error) {
     console.error('Barcode lookup error:', error);
     return null;
