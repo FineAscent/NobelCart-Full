@@ -164,6 +164,14 @@
                 <span class="subtotal-amount">$25.00</span>
             </div>
 
+            <div id="scale-weight-row" style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:13px;color:#9ca3af;border-top:1px solid #f3f4f6;margin-top:4px;">
+                <span style="display:flex;align-items:center;gap:6px;">
+                    <span id="scale-live-dot" style="width:7px;height:7px;border-radius:50%;background:#d1d5db;display:inline-block;transition:background 0.4s;"></span>
+                    Scale
+                </span>
+                <span id="scale-weight-display" style="font-weight:500;color:#6b7280;font-variant-numeric:tabular-nums;">—</span>
+            </div>
+
             <button class="checkout-btn">Checkout</button>
         </div>
     </div>
@@ -209,6 +217,57 @@
                 });
             }
         });
+    </script>
+    <script>
+        // --- Live Cart Scale Weight (Supabase Realtime) ---
+        (function () {
+            const CART_ID = 'cart_01'; // match the Pi's hardcoded CART_ID
+            const displayEl = document.getElementById('scale-weight-display');
+            const dotEl = document.getElementById('scale-live-dot');
+            let dotTimer = null;
+
+            function showWeight(kg) {
+                if (displayEl) displayEl.textContent = Number(kg).toFixed(3) + ' kg';
+                if (dotEl) {
+                    dotEl.style.background = '#22c55e';
+                    clearTimeout(dotTimer);
+                    dotTimer = setTimeout(() => { dotEl.style.background = '#d1d5db'; }, 3000);
+                }
+            }
+
+            async function initScale() {
+                if (!window.sb) return;
+                // Fetch current value before first realtime event fires
+                try {
+                    const { data } = await window.sb
+                        .from('carts')
+                        .select('weight_kg')
+                        .eq('cart_id', CART_ID)
+                        .single();
+                    if (data && data.weight_kg != null) showWeight(data.weight_kg);
+                } catch (_) {}
+
+                // Subscribe to live updates
+                window.sb.channel('cart-weight')
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'carts',
+                        filter: 'cart_id=eq.' + CART_ID
+                    }, (payload) => {
+                        if (payload.new && payload.new.weight_kg != null) {
+                            showWeight(payload.new.weight_kg);
+                        }
+                    })
+                    .subscribe();
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initScale);
+            } else {
+                initScale();
+            }
+        })();
     </script>
 </body>
 
