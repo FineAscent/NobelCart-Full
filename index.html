@@ -251,10 +251,11 @@
                         .select('weight_kg')
                         .eq('cart_id', CART_ID)
                         .maybeSingle();
+                    console.log('[Scale] Supabase URL:', window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL);
                     console.log('[Scale] cart_id:', CART_ID, '| data:', data, '| error:', error);
                     // Debug: show all rows so we can see the real cart_id values
-                    const { data: allRows } = await window.sb.from('carts').select('cart_id, weight_kg');
-                    console.log('[Scale] All rows in carts table:', allRows);
+                    const { data: allRows, error: allErr } = await window.sb.from('carts').select('*');
+                    console.log('[Scale] All rows in carts table:', allRows, '| error:', allErr);
                     if (data && data.weight_kg != null) showWeight(data.weight_kg);
                     else if (error) console.error('[Scale] Query error:', error);
                 } catch (e) { console.error('[Scale] Fetch threw:', e); }
