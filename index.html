@@ -246,13 +246,15 @@
                 if (!window.sb) return;
                 // Fetch current value before first realtime event fires
                 try {
-                    const { data } = await window.sb
+                    const { data, error } = await window.sb
                         .from('carts')
                         .select('weight_kg')
                         .eq('cart_id', CART_ID)
                         .maybeSingle();
+                    console.log('[Scale] cart_id:', CART_ID, '| data:', data, '| error:', error);
                     if (data && data.weight_kg != null) showWeight(data.weight_kg);
-                } catch (_) {}
+                    else if (error) console.error('[Scale] Query error:', error);
+                } catch (e) { console.error('[Scale] Fetch threw:', e); }
 
                 // Subscribe to live updates
                 window.sb.channel('cart-weight')
