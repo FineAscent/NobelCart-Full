@@ -1,6 +1,11 @@
 // --- API helpers ---
 const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-const CART_ID = new URLSearchParams(window.location.search).get('cart') || '';
+const CART_ID = (function () {
+  var id = new URLSearchParams(window.location.search).get('cart') || '';
+  if (!id) { try { id = sessionStorage.getItem('nc_cart_id') || ''; } catch (_) {} }
+  if (id) { try { sessionStorage.setItem('nc_cart_id', id); } catch (_) {} }
+  return id;
+})();
 async function apiFetch(path, options = {}) {
   const url = API_BASE + path;
   const opts = {

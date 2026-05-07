@@ -10,10 +10,21 @@
 
     <link rel="stylesheet" href="styles.css">
     <script>
-        // Gate: require ?cart= in URL or redirect immediately
+        // Gate: require ?cart= — save to sessionStorage, recover from it if URL loses it
         (function () {
-            var cartId = new URLSearchParams(window.location.search).get('cart');
-            if (!cartId) window.location.replace('bad.html');
+            var params = new URLSearchParams(window.location.search);
+            var cartId = params.get('cart');
+            if (!cartId) {
+                cartId = sessionStorage.getItem('nc_cart_id');
+                if (cartId) {
+                    params.set('cart', cartId);
+                    window.location.replace(window.location.pathname + '?' + params.toString());
+                } else {
+                    window.location.replace('bad.html');
+                }
+            } else {
+                sessionStorage.setItem('nc_cart_id', cartId);
+            }
         })();
     </script>
 </head>
