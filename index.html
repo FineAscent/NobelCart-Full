@@ -243,7 +243,7 @@
                         .from('carts')
                         .select('weight_kg')
                         .eq('cart_id', CART_ID)
-                        .single();
+                        .maybeSingle();
                     if (data && data.weight_kg != null) showWeight(data.weight_kg);
                 } catch (_) {}
 

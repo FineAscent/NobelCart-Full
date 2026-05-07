@@ -194,7 +194,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   // --- Scale integration via Supabase ---
   if (window.sb) {
     // Fetch current weight immediately so the field is pre-filled
-    window.sb.from('carts').select('weight_kg').eq('cart_id', CART_ID).single()
+    window.sb.from('carts').select('weight_kg').eq('cart_id', CART_ID).maybeSingle()
       .then(({ data }) => {
         if (data && data.weight_kg != null) {
           setScaleWeight(data.weight_kg);
