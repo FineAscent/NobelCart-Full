@@ -1,5 +1,6 @@
 // --- API helpers ---
 const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+const CART_ID = 'cart_01'; // Raspberry Pi cart identifier — must match cart.py
 async function apiFetch(path, options = {}) {
   const url = API_BASE + path;
   const opts = {
@@ -111,8 +112,12 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   modal.innerHTML = `
     <div class="modal-body" style="padding-top:18px;">
       <label class="modal-label">Weight${u ? ' (' + u + ')' : ''}</label>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:8px;">
+        <span class="wm-scale-dot" style="width:6px;height:6px;border-radius:50%;background:#d1d5db;display:inline-block;transition:background 0.3s;"></span>
+        <span class="wm-scale-status">Connecting to scale…</span>
+      </div>
       <div class="modal-input-row">
-        <input type="number" class="modal-input" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+        <input type="number" class="modal-input" min="0" step="0.001" placeholder="0.000" inputmode="decimal">
         ${u ? `<span class="modal-input-unit">${u}</span>` : ''}
       </div>
       <div class="modal-estimate" style="display:none;">
@@ -133,9 +138,19 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   const btnOk = modal.querySelector('.btn-primary');
   const estimateEl = modal.querySelector('.modal-estimate');
   const estimatePriceEl = modal.querySelector('.modal-estimate-price');
-  const close = () => { try { root.removeChild(overlay); } catch (_) { } };
+  const dotEl = modal.querySelector('.wm-scale-dot');
+  const statusEl = modal.querySelector('.wm-scale-status');
+  let scaleChannel = null;
+  let dotTimer = null;
 
-  // Live price calculation as user types
+  const close = () => {
+    if (scaleChannel && window.sb) {
+      try { window.sb.removeChannel(scaleChannel); } catch (_) {}
+    }
+    try { root.removeChild(overlay); } catch (_) {}
+  };
+
+  // Live price calculation as user types or scale updates
   const updateEstimate = () => {
     const val = Number(input.value);
     if (val > 0 && ppu > 0) {
@@ -151,8 +166,20 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
       btnOk.setAttribute('disabled', 'true');
     }
   };
-  input.addEventListener('input', updateEstimate);
 
+  // Fill input from scale reading and pulse the dot
+  const setScaleWeight = (kg) => {
+    input.value = Number(kg).toFixed(3);
+    updateEstimate();
+    if (dotEl) {
+      dotEl.style.background = '#22c55e';
+      clearTimeout(dotTimer);
+      dotTimer = setTimeout(() => { dotEl.style.background = '#d1d5db'; }, 3000);
+    }
+    if (statusEl) statusEl.textContent = 'Live from scale';
+  };
+
+  input.addEventListener('input', updateEstimate);
   btnCancel.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   btnOk.addEventListener('click', () => {
@@ -160,13 +187,40 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     if (!val || val <= 0) { input.focus(); return; }
     try { onConfirm && onConfirm(val); } finally { close(); }
   });
-  // Allow Enter key to submit
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      btnOk.click();
-    }
+    if (e.key === 'Enter') { e.preventDefault(); btnOk.click(); }
   });
+
+  // --- Scale integration via Supabase ---
+  if (window.sb) {
+    // Fetch current weight immediately so the field is pre-filled
+    window.sb.from('carts').select('weight_kg').eq('cart_id', CART_ID).single()
+      .then(({ data }) => {
+        if (data && data.weight_kg != null) {
+          setScaleWeight(data.weight_kg);
+        } else {
+          if (statusEl) statusEl.textContent = 'Scale not connected';
+        }
+      })
+      .catch(() => { if (statusEl) statusEl.textContent = 'Scale not connected'; });
+
+    // Live updates while modal is open
+    scaleChannel = window.sb.channel('wm-scale-live')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'carts',
+        filter: 'cart_id=eq.' + CART_ID
+      }, (payload) => {
+        if (payload.new && payload.new.weight_kg != null) {
+          setScaleWeight(payload.new.weight_kg);
+        }
+      })
+      .subscribe();
+  } else {
+    if (statusEl) statusEl.textContent = 'Scale not connected';
+  }
+
   setTimeout(() => { input.focus(); input.select?.(); }, 50);
 }
 
