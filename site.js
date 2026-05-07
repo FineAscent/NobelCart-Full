@@ -1433,6 +1433,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Listen for dynamic auth changes (e.g. late hydration)
           window.sb.auth.onAuthStateChange((event, session) => {
+            // Delink this cart from the user on sign-out
+            if (event === 'SIGNED_OUT' && CART_ID && window.sb) {
+              try { window.sb.from('carts').update({ user_id: null }).eq('cart_id', CART_ID).then(() => {}).catch(() => {}); } catch (_) {}
+            }
+
             const wasSignedIn = isUserSignedIn;
 
             // Check if we are on an auth page

@@ -470,8 +470,15 @@
           return;
         }
 
+        // Link this cart to the signed-in user
+        const cartId = urlParams.get('cart');
+        if (cartId && data?.user?.id) {
+          try { await window.sb.from('carts').update({ user_id: data.user.id }).eq('cart_id', cartId); } catch (_) {}
+        }
+
         try { showLoadingOverlay('', { logo: true }); } catch (_) { }
-        setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
+        const dest = cartId ? 'cabinet.html?cart=' + encodeURIComponent(cartId) : 'cabinet.html';
+        setTimeout(() => { window.location.href = dest; }, 4000);
       } catch (e) {
         err.textContent = e.message || 'Sign-in failed.';
         err.style.display = 'block';
@@ -671,8 +678,17 @@
                   return;
                 }
 
+                // Link this cart to the signed-in user (QR flow)
+                const cartId = urlParams.get('cart');
+                const qrSession = await window.sb.auth.getSession();
+                const qrUid = qrSession?.data?.session?.user?.id;
+                if (cartId && qrUid) {
+                  try { await window.sb.from('carts').update({ user_id: qrUid }).eq('cart_id', cartId); } catch (_) {}
+                }
+
                 try { showLoadingOverlay('', { logo: true }); } catch (_) { }
-                setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
+                const qrDest = cartId ? 'cabinet.html?cart=' + encodeURIComponent(cartId) : 'cabinet.html';
+                setTimeout(() => { window.location.href = qrDest; }, 4000);
               }
             } catch (e) {
               console.error('QR decrypt/setSession failed', e);
