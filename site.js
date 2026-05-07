@@ -147,6 +147,10 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   const statusEl = modal.querySelector('.wm-scale-status');
   let scaleChannel = null;
   let dotTimer = null;
+  const readings = [];
+  const AUTO_COUNT = 3;
+  const MIN_KG = 0.01; // ignore noise / empty-cart negative offset
+  let autoConfirmed = false;
 
   const close = () => {
     if (scaleChannel && window.sb) {
@@ -172,16 +176,33 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     }
   };
 
-  // Fill input from scale reading and pulse the dot
+  // Fill input from scale reading, collect readings, auto-add after AUTO_COUNT positives
   const setScaleWeight = (kg) => {
-    input.value = Number(kg).toFixed(3);
+    const w = Number(kg);
+    input.value = w.toFixed(3);
     updateEstimate();
     if (dotEl) {
       dotEl.style.background = '#22c55e';
       clearTimeout(dotTimer);
       dotTimer = setTimeout(() => { dotEl.style.background = '#d1d5db'; }, 3000);
     }
-    if (statusEl) statusEl.textContent = 'Live from scale';
+    if (autoConfirmed) return; // already triggered
+    if (w > MIN_KG) {
+      readings.push(w);
+      const left = AUTO_COUNT - readings.length;
+      if (left > 0) {
+        if (statusEl) statusEl.textContent = `Live from scale \u00b7 auto-adding in ${left}\u2026`;
+      } else {
+        autoConfirmed = true;
+        const avg = readings.reduce((a, b) => a + b, 0) / readings.length;
+        input.value = Number(avg).toFixed(3);
+        updateEstimate();
+        if (statusEl) statusEl.textContent = `Adding ${Number(avg).toFixed(3)} ${u || 'kg'}\u2026`;
+        setTimeout(() => { btnOk.click(); }, 600);
+      }
+    } else {
+      if (statusEl) statusEl.textContent = 'Place item on cart\u2026';
+    }
   };
 
   input.addEventListener('input', updateEstimate);
