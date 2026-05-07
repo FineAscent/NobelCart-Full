@@ -1018,11 +1018,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// Append ?cart= param to any URL so it survives every navigation
+function withCart(url) {
+  if (!CART_ID) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  // Don't double-add if already present
+  if (url.includes('cart=')) return url;
+  return url + sep + 'cart=' + encodeURIComponent(CART_ID);
+}
+
 // Smooth navigation helper
 window.smoothNavigate = function (url) {
   document.body.classList.add('page-fade-out');
   setTimeout(() => {
-    window.location.href = url;
+    window.location.href = withCart(url);
   }, 300);
 };
 
@@ -1612,7 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Wait for animation
         setTimeout(() => {
-          window.location.href = 'category.html' + q;
+          window.location.href = withCart('category.html' + q);
         }, 300);
       });
     });
@@ -1806,7 +1815,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dest) {
           tabNavigating = true;
           document.body.classList.add('page-transition-fade-out');
-          setTimeout(() => { window.location.href = dest; }, 500);
+          setTimeout(() => { window.location.href = withCart(dest); }, 500);
           return;
         }
 
