@@ -1,6 +1,6 @@
 // --- API helpers ---
 const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
-const CART_ID = 'cart_01'; // Raspberry Pi cart identifier — must match cart.py
+const CART_ID = new URLSearchParams(window.location.search).get('cart') || '';
 async function apiFetch(path, options = {}) {
   const url = API_BASE + path;
   const opts = {
@@ -207,7 +207,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     // Live updates while modal is open
     scaleChannel = window.sb.channel('wm-scale-live')
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
         table: 'carts',
         filter: 'cart_id=eq.' + CART_ID

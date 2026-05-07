@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cart Not Found</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#f9fafb; margin:0; }
+    .bad-card { text-align:center; padding:40px 32px; background:#fff; border:1px solid #e5e7eb; border-radius:16px; max-width:360px; width:90%; }
+    .bad-icon { font-size:48px; margin-bottom:16px; }
+    .bad-title { font-size:22px; font-weight:700; color:#111827; margin-bottom:8px; }
+    .bad-msg { font-size:14px; color:#6b7280; line-height:1.6; }
+    .bad-code { display:inline-block; margin-top:18px; font-size:12px; color:#9ca3af; font-family:monospace; background:#f3f4f6; padding:4px 10px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <div class="bad-card">
+    <div class="bad-icon">🛒</div>
+    <div class="bad-title">No Cart ID</div>
+    <div class="bad-msg">This terminal is not linked to a cart.<br>Please scan the cart QR code or contact a staff member.</div>
+    <div class="bad-code">Missing: ?cart=cart_id</div>
+  </div>
+</body>
+</html>

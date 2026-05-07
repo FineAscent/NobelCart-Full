@@ -9,6 +9,13 @@
     <link href='fonts.googleapis.com' rel='stylesheet'>
 
     <link rel="stylesheet" href="styles.css">
+    <script>
+        // Gate: require ?cart= in URL or redirect immediately
+        (function () {
+            var cartId = new URLSearchParams(window.location.search).get('cart');
+            if (!cartId) window.location.replace('bad.html');
+        })();
+    </script>
 </head>
 
 <body class="index opensearch-active page-opacity-0">
@@ -221,7 +228,7 @@
     <script>
         // --- Live Cart Scale Weight (Supabase Realtime) ---
         (function () {
-            const CART_ID = 'cart_01'; // match the Pi's hardcoded CART_ID
+            const CART_ID = new URLSearchParams(window.location.search).get('cart');
             const displayEl = document.getElementById('scale-weight-display');
             const dotEl = document.getElementById('scale-live-dot');
             let dotTimer = null;
@@ -250,7 +257,7 @@
                 // Subscribe to live updates
                 window.sb.channel('cart-weight')
                     .on('postgres_changes', {
-                        event: 'UPDATE',
+                        event: '*',
                         schema: 'public',
                         table: 'carts',
                         filter: 'cart_id=eq.' + CART_ID
