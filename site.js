@@ -682,7 +682,7 @@ async function ensureForceSignoutWatcher() {
             try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
             // Redirect to sign-in if not already there
             if (!location.pathname.includes('signin.html')) {
-              window.location.href = 'signin.html';
+              window.location.href = withCart('signin.html');
             } else {
               // We are already on signin.html, just ensure we are clean
               // No need to reload as it causes a loop if the DB flag isn't cleared fast enough
@@ -1370,7 +1370,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.sb) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
         }
-        window.location.href = 'signin.html?reason=inactive';
+        window.location.href = withCart('signin.html?reason=inactive');
       };
 
       const handleIdleTimeout = () => {
@@ -1407,7 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } else {
           // Guest user: Redirect to idle loop immediately (no prompt)
-          window.location.href = 'image.html';
+          window.location.href = withCart('image.html');
         }
       };
 

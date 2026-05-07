@@ -90,7 +90,8 @@
       idle.classList.add("fade-out");
 
       setTimeout(() => {
-        window.location.href = "signin.html";
+        const cartId = new URLSearchParams(window.location.search).get('cart');
+        window.location.href = cartId ? 'signin.html?cart=' + encodeURIComponent(cartId) : 'signin.html';
       }, 1200); // must match CSS transition
     }
 
