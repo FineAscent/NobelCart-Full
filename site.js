@@ -178,7 +178,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
 
   // Fill input from scale reading, collect readings, auto-add after AUTO_COUNT positives
   const setScaleWeight = (kg) => {
-    const w = Number(kg);
+    const w = Math.abs(Number(kg));
     input.value = w.toFixed(3);
     updateEstimate();
     if (dotEl) {
