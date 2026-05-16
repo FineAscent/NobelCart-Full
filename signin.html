@@ -20,7 +20,7 @@
         <div style="text-align: center; margin-bottom: 12px;">
           <button type="button" id="qr-signin-btn-top" class="auth-button shine-button"
             style="background: #1b7991; color: #f2f2f2; font-size: 14px; padding: 12px 16px;">
-            Sign in with phone
+            Sign in with App
           </button>
         </div>
 
@@ -61,6 +61,18 @@
             <a href="create-account.html" id="create-link">Create account</a>
           </div>
         </form>
+
+        <!-- App QR Sign-in Panel (shown instead of form when user taps "Sign in with App") -->
+        <div id="qr-app-panel" style="display:none; text-align:center; padding:4px 0;">
+          <div id="qr-app-canvas" style="display:flex; justify-content:center; margin-bottom:10px;"></div>
+          <p style="font-size:13px; color:#555; margin:0 0 10px 0;">Open NobelCart app and scan to sign in</p>
+          <div id="qr-app-status" style="font-size:13px; color:#888; display:flex; align-items:center; justify-content:center; gap:8px; min-height:20px;">
+            <span id="qr-app-dot" style="width:8px;height:8px;border-radius:50%;background:#1b7991;display:inline-block;animation:qrPulse 1.4s ease-in-out infinite;"></span>
+            <span id="qr-app-msg">Waiting for scan…</span>
+          </div>
+          <button type="button" id="qr-app-back" style="margin-top:18px;background:none;border:none;color:#888;font-size:13px;cursor:pointer;text-decoration:underline;">Use email instead</button>
+        </div>
+        <style>@keyframes qrPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.3;transform:scale(0.8);}}</style>
 
         <!-- OTP Verification Overlay (Temporarily Disabled)
         <div id="otp-overlay" class="otp-overlay" style="display: none;">
@@ -252,6 +264,7 @@
     })();
   </script>
 
+  <script src="qrcode.min.js"></script>
   <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
@@ -521,191 +534,143 @@
     */
   </script>
   <script>
-    // QR Sign-in flow using Supabase Realtime broadcast and WebCrypto (AES-GCM)
+    // App QR Sign-in: kiosk shows QR encoding cart_id, mobile app scans,
+    // app calls qr-cart-approve edge fn, edge fn writes token_hash to DB,
+    // Realtime fires here, kiosk calls verifyOtp to sign in automatically.
     (function () {
-      const btn = document.getElementById('qr-signin-btn');
+      const urlParams = new URLSearchParams(window.location.search);
+      const cartId = urlParams.get('cart');
       const btnTop = document.getElementById('qr-signin-btn-top');
-      if (!btn && !btnTop) return;
 
-      // Minimal modal for QR display
-      function ensureModalRoot() {
-        if (!document.querySelector('#modal-root')) {
-          const root = document.createElement('div');
-          root.id = 'modal-root';
-          document.body.appendChild(root);
+      if (!btnTop) return;
+      if (!cartId) { btnTop.style.display = 'none'; return; }
+
+      const form = document.getElementById('signin-form');
+      const qrPanel = document.getElementById('qr-app-panel');
+      const qrCanvas = document.getElementById('qr-app-canvas');
+      const qrMsg = document.getElementById('qr-app-msg');
+      const qrDot = document.getElementById('qr-app-dot');
+      const backBtn = document.getElementById('qr-app-back');
+
+      let channel = null;
+      let expireTimer = null;
+
+      function setStatus(msg, isError) {
+        if (qrMsg) qrMsg.textContent = msg;
+        if (qrDot) qrDot.style.background = isError ? '#dc2626' : '#1b7991';
+      }
+
+      function cleanup() {
+        if (channel) { try { window.sb && window.sb.removeChannel(channel); } catch (_) {} channel = null; }
+        if (expireTimer) { clearTimeout(expireTimer); expireTimer = null; }
+      }
+
+      function showForm() {
+        cleanup();
+        if (qrPanel) qrPanel.style.display = 'none';
+        if (form) form.style.display = 'block';
+      }
+
+      async function handleApproved(tokenHash) {
+        cleanup();
+        setStatus('Scan detected — signing you in…');
+        if (qrDot) qrDot.style.animation = 'none';
+        try {
+          const { data, error } = await window.sb.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'email',
+          });
+          if (error) throw error;
+
+          try {
+            const uid = data?.user?.id;
+            const em = data?.user?.email;
+            if (uid) await window.sb.from('profiles').upsert({ id: uid, email: em, active: true });
+          } catch (_) {}
+
+          try {
+            const uid = data?.user?.id;
+            if (uid) await window.sb.from('carts').update({ user_id: uid }).eq('cart_id', cartId);
+          } catch (_) {}
+
+          try { showLoadingOverlay('', { logo: true }); } catch (_) {}
+          setTimeout(() => { window.location.href = 'cabinet.html?cart=' + encodeURIComponent(cartId); }, 4000);
+        } catch (e) {
+          setStatus('Sign-in failed: ' + (e.message || 'Unknown error'), true);
+          if (qrDot) qrDot.style.animation = 'none';
         }
       }
-      function showQRModal(html) {
-        ensureModalRoot();
-        const root = document.querySelector('#modal-root');
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = html;
-        overlay.appendChild(modal);
-        root.appendChild(overlay);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) { try { root.removeChild(overlay); } catch (_) { } } });
-        const closeBtn = modal.querySelector('.qr-close');
-        if (closeBtn) closeBtn.addEventListener('click', () => { try { root.removeChild(overlay); } catch (_) { } });
-        return { overlay, modal, close: () => { try { root.removeChild(overlay); } catch (_) { } } };
-      }
 
-      function randString(len) {
-        const arr = new Uint8Array(len);
-        crypto.getRandomValues(arr);
-        return btoa(String.fromCharCode(...arr)).replace(/[^a-zA-Z0-9]/g, '').slice(0, len);
-      }
+      async function startQrSession() {
+        if (!window.sb) { setStatus('Auth not ready', true); return; }
 
-      async function sha256Hex(str) {
-        const enc = new TextEncoder();
-        const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
-        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-      }
-      async function deriveKey(secret) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveKey']);
-        return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: enc.encode('nc-qr-salt'), iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-      }
-      async function encryptJson(secret, obj) {
-        const key = await deriveKey(secret);
-        const iv = crypto.getRandomValues(new Uint8Array(12));
-        const enc = new TextEncoder();
-        const data = enc.encode(JSON.stringify(obj));
-        const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data));
-        return { iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...ct)) };
-      }
+        setStatus('Waiting for scan…');
+        if (qrDot) qrDot.style.animation = 'qrPulse 1.4s ease-in-out infinite';
 
-      async function startQrSignin() {
+        // Remove any previous refresh button
+        const oldRefBtn = qrPanel && qrPanel.querySelector('.qr-refresh-btn');
+        if (oldRefBtn) oldRefBtn.remove();
+
         try {
-          if (!window.sb) throw new Error('Auth not initialized');
-          // Create a short code (channel name) and a longer secret for encryption
-          const code = randString(10);
-          const secret = randString(24);
-          const channelName = 'qr_login_' + code;
+          const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-          const baseOrigin = window.location.origin.replace(/\/$/, '');
-          let approveUrl = baseOrigin + '/qr-approve.html?code=' + encodeURIComponent(code) + '&secret=' + encodeURIComponent(secret);
+          const { data: sessionRow, error: insertErr } = await window.sb
+            .from('cart_qr_sessions')
+            .insert({ cart_id: cartId, status: 'pending', expires_at: expiresAt })
+            .select('id')
+            .single();
 
-          const html = `
-            <div class="modal-body">
-              <div id="qr-canvas" style="display:flex; flex-direction:column; align-items:center; padding:6px;"></div>
-              <div style="font-size: 13px; color:#4b5563; margin-top:6px; text-align:center;">
-                Open your phone camera and scan. Then sign in on your phone to approve this device.
-              </div>
-              <div style="margin-top:10px; font-size:12px; color:#4b5563;">
-                If this page shows <code>localhost</code>, your phone won't be able to reach it. Enter your computer's LAN IP or hostname below and update the QR:
-                <div style="display:flex; gap:8px; margin-top:6px;">
-                  <input id="qr-host" class="auth-input" placeholder="e.g. 192.168.1.23" style="flex:1;" />
-                  <button type="button" id="qr-update" class="btn btn-primary">Update</button>
-                </div>
-              </div>
-            </div>
-            <div class="modal-actions" style="justify-content: center;">
-              <button class="btn btn-secondary qr-close">Close</button>
-            </div>`;
+          if (insertErr) throw insertErr;
+          const sessionId = sessionRow.id;
 
-          const modal = showQRModal(html);
-          function renderQR(targetEl, url) {
-            const img = new Image();
-            img.alt = 'QR code';
-            img.width = 224;
-            const qrApi = 'https://api.qrserver.com/v1/create-qr-code/?size=224x224&data=' + encodeURIComponent(url);
-            img.src = qrApi;
-            targetEl.innerHTML = '';
-            targetEl.appendChild(img);
-            const link = document.createElement('div');
-            link.style.cssText = 'margin-top:8px; font-size:12px; color:#4b5563; word-break:break-all; text-align:center;';
-            link.innerHTML = '<a href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
-            targetEl.appendChild(link);
-            if (baseOrigin.startsWith('file:')) {
-              const warn = document.createElement('div');
-              warn.style.cssText = 'margin-top:6px; color:#b91c1c; font-size:12px; text-align:center;';
-              warn.textContent = 'Warning: You are opening this page from a local file. Your phone cannot access file:// links. Please serve the site over http(s).';
-              targetEl.appendChild(warn);
-            }
-          }
+          qrCanvas.innerHTML = '';
+          const canvas = document.createElement('canvas');
+          qrCanvas.appendChild(canvas);
+          await QRCode.toCanvas(canvas, cartId, { width: 220, margin: 2 });
 
-          // Initial render
-          (function () {
-            const target = document.getElementById('qr-canvas');
-            if (!target) return;
-            renderQR(target, approveUrl);
-          })();
-
-          // Allow overriding host for mobile accessibility
-          (function () {
-            const updateBtn = document.getElementById('qr-update');
-            const hostInput = document.getElementById('qr-host');
-            const target = document.getElementById('qr-canvas');
-            if (!updateBtn || !hostInput || !target) return;
-            updateBtn.addEventListener('click', () => {
-              const host = (hostInput.value || '').trim();
-              if (!host) return;
-              try {
-                const u = new URL(baseOrigin);
-                u.hostname = host;
-                approveUrl = u.origin + '/qr-approve.html?code=' + encodeURIComponent(code) + '&secret=' + encodeURIComponent(secret);
-                renderQR(target, approveUrl);
-              } catch (_) { }
-            });
-          })();
-
-          // Subscribe to realtime channel waiting for encrypted session payload
-          const channel = window.sb.channel(channelName, { config: { broadcast: { ack: true } } });
-          channel.on('broadcast', { event: 'login_session' }, async (payload) => {
-            try {
-              const { iv, ct } = payload?.payload || {};
-              if (!iv || !ct) return;
-              // Decrypt
-              const decKey = await deriveKey(secret);
-              const ivBytes = Uint8Array.from(atob(iv), c => c.charCodeAt(0));
-              const ctBytes = Uint8Array.from(atob(ct), c => c.charCodeAt(0));
-              const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, decKey, ctBytes);
-              const txt = new TextDecoder().decode(plainBuf);
-              const obj = JSON.parse(txt);
-              const { access_token, refresh_token } = obj || {};
-              if (access_token && refresh_token) {
-                // Set session locally
-                const { error } = await window.sb.auth.setSession({ access_token, refresh_token });
-                if (error) throw error;
-                // Close modal, show logo overlay for 4 seconds, then go to cabinet
-                try { modal.close(); } catch (_) { }
-
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('admin')) {
-                  window.location.href = 'TableUiBackend/admin/index.html';
-                  return;
-                }
-
-                // Link this cart to the signed-in user (QR flow)
-                const cartId = urlParams.get('cart');
-                const qrSession = await window.sb.auth.getSession();
-                const qrUid = qrSession?.data?.session?.user?.id;
-                if (cartId && qrUid) {
-                  try { await window.sb.from('carts').update({ user_id: qrUid }).eq('cart_id', cartId); } catch (_) {}
-                }
-
-                try { showLoadingOverlay('', { logo: true }); } catch (_) { }
-                const qrDest = cartId ? 'cabinet.html?cart=' + encodeURIComponent(cartId) : 'cabinet.html';
-                setTimeout(() => { window.location.href = qrDest; }, 4000);
+          channel = window.sb.channel('qr-session-' + sessionId)
+            .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'cart_qr_sessions',
+              filter: 'id=eq.' + sessionId,
+            }, (payload) => {
+              const row = payload.new;
+              if (row && row.status === 'approved' && row.token_hash) {
+                handleApproved(row.token_hash);
               }
-            } catch (e) {
-              console.error('QR decrypt/setSession failed', e);
+            });
+          await channel.subscribe();
+
+          expireTimer = setTimeout(() => {
+            cleanup();
+            setStatus('QR expired — tap to refresh', true);
+            if (qrDot) qrDot.style.animation = 'none';
+            if (backBtn) {
+              const refBtn = document.createElement('button');
+              refBtn.type = 'button';
+              refBtn.className = 'qr-refresh-btn';
+              refBtn.textContent = 'Refresh QR';
+              refBtn.style.cssText = 'margin-top:10px;padding:10px 20px;border-radius:12px;border:1px solid #000;background:#000;color:#fff;font-size:14px;cursor:pointer;display:block;width:100%;';
+              refBtn.onclick = startQrSession;
+              backBtn.parentNode.insertBefore(refBtn, backBtn);
             }
-          });
-          await channel.subscribe(async (status) => {
-            // no-op; waiting for broadcast
-          });
+          }, 5 * 60 * 1000);
 
         } catch (e) {
-          const err = document.getElementById('auth-error');
-          if (err) { err.textContent = e.message || 'QR sign-in failed.'; err.style.display = 'block'; }
+          setStatus('Error: ' + (e.message || 'Failed to start'), true);
+          if (qrDot) qrDot.style.animation = 'none';
         }
       }
 
-      if (btn) btn.addEventListener('click', startQrSignin);
-      if (btnTop) btnTop.addEventListener('click', startQrSignin);
+      function showQrPanel() {
+        if (form) form.style.display = 'none';
+        if (qrPanel) qrPanel.style.display = 'block';
+        startQrSession();
+      }
+
+      btnTop.addEventListener('click', showQrPanel);
+      if (backBtn) backBtn.addEventListener('click', showForm);
     })();
   </script>
   <script src="site.js"></script>
