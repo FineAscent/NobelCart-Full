@@ -584,7 +584,7 @@
         try {
           const { data, error } = await window.sb.auth.verifyOtp({
             token_hash: tokenHash,
-            type: 'email',
+            type: 'magiclink',
           });
           if (error) throw error;
 
