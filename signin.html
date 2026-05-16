@@ -626,10 +626,14 @@
           qrCanvas.innerHTML = '';
           const wrap = document.createElement('div');
           wrap.style.cssText = 'background:#fff; padding:16px; display:inline-block; border-radius:8px;';
-          const canvas = document.createElement('canvas');
-          wrap.appendChild(canvas);
+          const img = document.createElement('img');
+          img.alt = 'QR code';
+          img.width = 260;
+          img.height = 260;
+          img.style.display = 'block';
+          img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=520x520&qzone=4&data=' + encodeURIComponent(cartId);
+          wrap.appendChild(img);
           qrCanvas.appendChild(wrap);
-          await QRCode.toCanvas(canvas, cartId, { width: 260, margin: 4 });
 
           channel = window.sb.channel('qr-session-' + sessionId)
             .on('postgres_changes', {
