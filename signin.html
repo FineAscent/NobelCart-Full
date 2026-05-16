@@ -624,9 +624,12 @@
           const sessionId = sessionRow.id;
 
           qrCanvas.innerHTML = '';
+          const wrap = document.createElement('div');
+          wrap.style.cssText = 'background:#fff; padding:16px; display:inline-block; border-radius:8px;';
           const canvas = document.createElement('canvas');
-          qrCanvas.appendChild(canvas);
-          await QRCode.toCanvas(canvas, cartId, { width: 220, margin: 2 });
+          wrap.appendChild(canvas);
+          qrCanvas.appendChild(wrap);
+          await QRCode.toCanvas(canvas, cartId, { width: 260, margin: 4 });
 
           channel = window.sb.channel('qr-session-' + sessionId)
             .on('postgres_changes', {
