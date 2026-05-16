@@ -2181,7 +2181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           try { window.sb?.auth?.signOut?.({ scope: 'local' }); } catch (_) { }
           setTimeout(() => {
             mountEl.innerHTML = '<div class="qr-box"><div class="qr-title">Thank you!</div><div class="qr-meta">Payment received. You will be redirected.</div></div>';
-            window.location.href = 'signin.html';
+            window.location.href = withCart('signin.html');
           }, 800);
         } else if (status === 'expired' || status === 'canceled') {
           clearInterval(pollTimer);

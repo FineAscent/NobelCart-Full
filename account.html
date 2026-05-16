@@ -96,14 +96,23 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script>
+    // Preserve cart param across sign-out redirects
+    const _cartParam = new URLSearchParams(window.location.search).get('cart');
+    function signinHref(extra) {
+      const base = 'signin.html' + (extra ? '?' + extra : '');
+      if (!_cartParam) return base;
+      const sep = base.includes('?') ? '&' : '?';
+      return base + sep + 'cart=' + encodeURIComponent(_cartParam);
+    }
+
     // Route guard and populate account info
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = 'signin.html');
+        if (!window.sb) return (window.location.href = signinHref());
         const { data, error } = await window.sb.auth.getSession();
         if (error || !data?.session) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-          return (window.location.href = 'signin.html');
+          return (window.location.href = signinHref());
         }
         const { data: u } = await window.sb.auth.getUser();
         const email = u?.user?.email || '(unknown)';
@@ -121,7 +130,7 @@
         } catch (_) { }
       } catch (e) {
         try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-        return (window.location.href = 'signin.html');
+        return (window.location.href = signinHref());
       }
     })();
 
@@ -293,7 +302,7 @@
         try {
           await window.sb.auth.signOut({ scope: 'local' });
           ok.style.display = 'block';
-          setTimeout(() => { window.location.href = 'signin.html'; }, 300);
+          setTimeout(() => { window.location.href = signinHref(); }, 300);
         } catch (ex) {
           err.textContent = ex?.message || 'Failed to sign out';
           err.style.display = 'block';
