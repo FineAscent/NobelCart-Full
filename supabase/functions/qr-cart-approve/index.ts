@@ -120,6 +120,27 @@ serve(async (req: any) => {
       return badRequest("Failed to approve session: " + updateErr.message, 500);
     }
 
+    // Broadcast token_hash directly to the kiosk channel — no RLS, instant delivery
+    try {
+      await fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "apikey": SUPABASE_SERVICE_ROLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages: [{
+            topic: `realtime:qr-${cart_id}`,
+            event: "approved",
+            payload: { token_hash },
+          }],
+        }),
+      });
+    } catch (_broadcastErr) {
+      // Broadcast failure is non-fatal; DB row is already approved
+    }
+
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { "content-type": "application/json", ...corsHeaders } }

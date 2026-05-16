@@ -635,17 +635,10 @@
           wrap.appendChild(img);
           qrCanvas.appendChild(wrap);
 
-          channel = window.sb.channel('qr-session-' + sessionId)
-            .on('postgres_changes', {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'cart_qr_sessions',
-              filter: 'id=eq.' + sessionId,
-            }, (payload) => {
-              const row = payload.new;
-              if (row && row.status === 'approved' && row.token_hash) {
-                handleApproved(row.token_hash);
-              }
+          channel = window.sb.channel('qr-' + cartId)
+            .on('broadcast', { event: 'approved' }, (payload) => {
+              const th = payload?.payload?.token_hash;
+              if (th) handleApproved(th);
             });
           await channel.subscribe();
 
