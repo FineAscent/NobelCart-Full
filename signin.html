@@ -554,6 +554,7 @@
 
       let channel = null;
       let expireTimer = null;
+      let pollInterval = null;
 
       function setStatus(msg, isError) {
         if (qrMsg) qrMsg.textContent = msg;
@@ -563,6 +564,7 @@
       function cleanup() {
         if (channel) { try { window.sb && window.sb.removeChannel(channel); } catch (_) {} channel = null; }
         if (expireTimer) { clearTimeout(expireTimer); expireTimer = null; }
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
       }
 
       function showForm() {
@@ -594,7 +596,7 @@
           } catch (_) {}
 
           try { showLoadingOverlay('', { logo: true }); } catch (_) {}
-          setTimeout(() => { window.location.href = 'cabinet.html?cart=' + encodeURIComponent(cartId); }, 4000);
+          setTimeout(() => { window.location.href = 'index.html?cart=' + encodeURIComponent(cartId); }, 4000);
         } catch (e) {
           setStatus('Sign-in failed: ' + (e.message || 'Unknown error'), true);
           if (qrDot) qrDot.style.animation = 'none';
@@ -641,6 +643,24 @@
               if (th) handleApproved(th);
             });
           await channel.subscribe();
+
+          // Polling fallback: every 3 s check DB directly in case broadcast is missed
+          let alreadyHandled = false;
+          pollInterval = setInterval(async () => {
+            if (alreadyHandled) return;
+            try {
+              const { data } = await window.sb
+                .from('cart_qr_sessions')
+                .select('status, token_hash')
+                .eq('id', sessionId)
+                .maybeSingle();
+              if (data && data.status === 'approved' && data.token_hash) {
+                alreadyHandled = true;
+                clearInterval(pollInterval);
+                handleApproved(data.token_hash);
+              }
+            } catch (_) {}
+          }, 3000);
 
           expireTimer = setTimeout(() => {
             cleanup();
