@@ -70,7 +70,10 @@
             <span id="qr-app-dot" style="width:8px;height:8px;border-radius:50%;background:#1b7991;display:inline-block;animation:qrPulse 1.4s ease-in-out infinite;"></span>
             <span id="qr-app-msg">Waiting for scan…</span>
           </div>
-          <button type="button" id="qr-app-back" style="margin-top:18px;background:none;border:none;color:#888;font-size:13px;cursor:pointer;text-decoration:underline;">Use email instead</button>
+          <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+            <button type="button" id="qr-app-refresh" style="padding:9px 18px;border-radius:10px;border:1px solid #000;background:#000;color:#fff;font-size:13px;cursor:pointer;">Refresh QR</button>
+            <button type="button" id="qr-app-back" style="padding:9px 18px;border-radius:10px;border:1px solid #ccc;background:none;color:#888;font-size:13px;cursor:pointer;">Use email</button>
+          </div>
         </div>
         <style>@keyframes qrPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.3;transform:scale(0.8);}}</style>
 
@@ -551,6 +554,7 @@
       const qrMsg = document.getElementById('qr-app-msg');
       const qrDot = document.getElementById('qr-app-dot');
       const backBtn = document.getElementById('qr-app-back');
+      const refreshBtn = document.getElementById('qr-app-refresh');
 
       let channel = null;
       let expireTimer = null;
@@ -644,7 +648,8 @@
             });
           await channel.subscribe();
 
-          // Polling fallback: every 3 s check DB directly in case broadcast is missed
+          // Polling fallback: every 3 s check DB for ANY approved session for this cart
+          // (catches cases where the app updated a different row than the one we created)
           let alreadyHandled = false;
           pollInterval = setInterval(async () => {
             if (alreadyHandled) return;
@@ -652,9 +657,14 @@
               const { data } = await window.sb
                 .from('cart_qr_sessions')
                 .select('status, token_hash')
-                .eq('id', sessionId)
+                .eq('cart_id', cartId)
+                .eq('status', 'approved')
+                .not('token_hash', 'is', null)
+                .gt('expires_at', new Date().toISOString())
+                .order('created_at', { ascending: false })
+                .limit(1)
                 .maybeSingle();
-              if (data && data.status === 'approved' && data.token_hash) {
+              if (data && data.token_hash) {
                 alreadyHandled = true;
                 clearInterval(pollInterval);
                 handleApproved(data.token_hash);
@@ -691,6 +701,7 @@
 
       btnTop.addEventListener('click', showQrPanel);
       if (backBtn) backBtn.addEventListener('click', showForm);
+      if (refreshBtn) refreshBtn.addEventListener('click', () => { cleanup(); startQrSession(); });
     })();
   </script>
   <script src="site.js"></script>
