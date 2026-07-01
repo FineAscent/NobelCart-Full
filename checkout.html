@@ -6,6 +6,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Checkout</title>
+  <script>
+    (function () {
+      var ua = navigator.userAgent || '';
+      var isTouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+      var isPhoneOrTablet = isTouchMac || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua);
+      if (isPhoneOrTablet) {
+        window.location.replace('bad.html');
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="checkout.css" />
   <script src="https://js.stripe.com/v3/"></script>
