@@ -78,6 +78,42 @@
         </style>
       </div>
 
+      <!-- Danger Zone: Delete Account -->
+      <div style="margin-top: 24px; padding: 16px; max-width: 520px; border: 1px solid #e5e7eb; border-radius: 12px; background:#fff;">
+        <div style="font-size: 16px; color:#2d2a26; font-weight: 700; margin-bottom: 6px;">Delete Account</div>
+        <div style="font-size: 13px; color:#6b6a67; margin-bottom: 12px;">
+          Permanently delete your account and all associated data (profile, cabinet, receipts, checkout history).
+          This action cannot be undone.
+        </div>
+        <button id="delete-account-btn"
+          style="background:#fff; color:#3a372f; border:1px solid #d1d1d1; border-radius:10px; padding:10px 14px; font-size:14px; font-weight:600; cursor:pointer;">
+          Delete my account
+        </button>
+      </div>
+
+      <!-- Delete Account Confirmation Modal -->
+      <div id="delete-modal-overlay" class="modal-overlay" style="display:none;">
+        <div class="modal" style="max-width:440px;">
+          <div class="modal-header">Delete Account</div>
+          <div class="modal-body" style="font-size:14px; color:#3a372f; line-height:1.5;">
+            This will <b>permanently</b> delete your account, profile, cabinet, and purchase history.
+            This cannot be undone.<br/><br/>
+            Type <b>DELETE</b> below to confirm.
+          </div>
+          <input id="delete-confirm-input" class="modal-input" type="text"
+            placeholder="Type DELETE" autocomplete="off" autocorrect="off"
+            autocapitalize="characters" spellcheck="false"
+            style="margin-bottom:12px; text-transform:uppercase;" />
+          <div id="delete-modal-error" class="auth-error" style="display:none; margin-bottom:10px;"></div>
+          <div class="modal-actions">
+            <button id="delete-cancel-btn" class="btn btn-secondary" style="height:40px; padding:8px 14px;">Cancel</button>
+            <button id="delete-confirm-btn" class="btn"
+              style="height:40px; padding:8px 14px; background:#8b7355; color:#fff; border:none; border-radius:10px; font-weight:600; cursor:pointer;"
+              disabled>Delete Account</button>
+          </div>
+        </div>
+      </div>
+
       <h2 class="section-title" style="font-size: 22px; margin: 18px 0 10px;">Previous Purchases</h2>
       <div id="purchases-status" style="color:#6b7280; margin-bottom:8px;">Loading...</div>
       <div id="purchases-list"
@@ -309,6 +345,79 @@
         }
       }
     });
+
+    // --- Delete Account flow ---
+    (function () {
+      const openBtn = document.getElementById('delete-account-btn');
+      const overlay = document.getElementById('delete-modal-overlay');
+      const cancelBtn = document.getElementById('delete-cancel-btn');
+      const confirmBtn = document.getElementById('delete-confirm-btn');
+      const confirmInput = document.getElementById('delete-confirm-input');
+      const errorBox = document.getElementById('delete-modal-error');
+
+      if (!openBtn || !overlay) return;
+
+      function openModal() {
+        errorBox.style.display = 'none';
+        errorBox.textContent = '';
+        if (confirmInput) confirmInput.value = '';
+        if (confirmBtn) confirmBtn.disabled = true;
+        overlay.style.display = 'flex';
+        if (confirmInput) setTimeout(() => confirmInput.focus(), 50);
+      }
+
+      function closeModal() {
+        overlay.style.display = 'none';
+        if (confirmInput) confirmInput.value = '';
+        if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Delete Account'; }
+        errorBox.style.display = 'none';
+      }
+
+      openBtn.addEventListener('click', openModal);
+      cancelBtn.addEventListener('click', closeModal);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+      // Enable confirm button only when user types DELETE
+      confirmInput.addEventListener('input', () => {
+        const val = (confirmInput.value || '').trim().toUpperCase();
+        confirmBtn.disabled = val !== 'DELETE';
+      });
+      confirmInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !confirmBtn.disabled) confirmBtn.click();
+      });
+
+      confirmBtn.addEventListener('click', async () => {
+        errorBox.style.display = 'none';
+        errorBox.textContent = '';
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Deleting...';
+        try {
+          if (!window.sb) throw new Error('Auth not ready');
+          const { data: { user } } = await window.sb.auth.getUser();
+          if (!user) throw new Error('No signed-in user');
+
+          const { data, error } = await window.sb.functions.invoke('delete-account', {
+            body: { confirm: 'DELETE' },
+          });
+          if (error) throw error;
+          if (data && data.error) throw new Error(data.error);
+
+          // Account deleted server-side; clear local session and redirect
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+          try { localStorage.removeItem('nc_show_allergy_info'); } catch (_) { }
+          overlay.style.display = 'none';
+          // Brief success note before redirect
+          const ok = document.getElementById('acct-ok');
+          if (ok) { ok.textContent = 'Account deleted.'; ok.style.display = 'block'; }
+          setTimeout(() => { window.location.href = signinHref(); }, 800);
+        } catch (ex) {
+          errorBox.textContent = ex?.message || 'Failed to delete account. Please try again.';
+          errorBox.style.display = 'block';
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Delete Account';
+        }
+      });
+    })();
 
     // Setting: Allergy Caution
     document.addEventListener('DOMContentLoaded', async () => {
