@@ -1617,6 +1617,95 @@ body.signin.keyboard-visible .auth-wrapper {
     border-color: #8b7355;
 }
 
+.vk .vk-key.is-pressed {
+    background: #8b7355;
+    border-color: #6f5b43;
+    color: #fff;
+    transform: translateY(2px) scale(0.95);
+    box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.28);
+    /* Press-in must land instantly or a fast tap never reaches full colour;
+       the fade back out keeps the slower timing from .vk-key. */
+    transition-duration: 0s;
+}
+
+.vk .vk-key--done.is-pressed {
+    background: #6f5b43;
+}
+
+.vk-preview {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    min-width: 74px;
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(45, 42, 38, 0.08);
+    color: #2d2a26;
+    border-radius: 22px;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    /* Heavy ambient shadow is what separates the bubble from the key grid it
+       floats over, since both are near-white. */
+    box-shadow:
+        0 14px 30px rgba(45, 42, 38, 0.22),
+        0 4px 10px rgba(45, 42, 38, 0.14),
+        0 1px 2px rgba(45, 42, 38, 0.10);
+    pointer-events: none;
+    transform-origin: bottom center;
+    /* Compositor-only properties, so the fade holds up on a low-refresh panel. */
+    will-change: opacity, transform;
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.985);
+    /* Leaving: a symmetric ease-in-out so it eases off rather than dropping most
+       of its opacity in the first few frames. */
+    transition: opacity 340ms cubic-bezier(0.4, 0, 0.6, 1),
+        transform 340ms cubic-bezier(0.4, 0, 0.6, 1);
+    z-index: 2;
+}
+
+/* Entry is a keyframed spring rather than a transition, so the overshoot on the
+   way in does not also apply in reverse on the way out. */
+@keyframes vk-preview-pop {
+    from {
+        transform: translate(-50%, 8px) scale(0.72);
+    }
+
+    to {
+        transform: translate(-50%, 0) scale(1);
+    }
+}
+
+.vk-preview.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+    transition: opacity 110ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: vk-preview-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.vk-preview--wide {
+    font-size: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vk .vk-key.is-pressed {
+        transform: none;
+    }
+
+    .vk-preview {
+        transition: opacity 200ms ease-out;
+        transform: translate(-50%, 0);
+    }
+
+    .vk-preview.is-visible {
+        transition: opacity 120ms ease-out;
+        transform: translate(-50%, 0);
+        animation: none;
+    }
+}
+
 @media (max-width: 880px) {
     .vk-inner {
         max-width: none;
@@ -1646,6 +1735,16 @@ body.signin.keyboard-visible .auth-wrapper {
         padding: 12px 0;
         font-size: 16px;
         border-radius: 12px;
+    }
+
+    .vk-preview {
+        min-width: 52px;
+        padding: 8px 12px;
+        font-size: 26px;
+    }
+
+    .vk-preview--wide {
+        font-size: 18px;
     }
 }
 

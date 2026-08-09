@@ -5,6 +5,67 @@
   let input = null;
   let active = false;
 
+  // Press feedback: the cabinet hardware has no haptics, so a highlighted key
+  // plus a preview bubble is the only way a shopper can spot a mistap.
+  function createFeedback(vkEl) {
+    const preview = document.createElement('div');
+    preview.className = 'vk-preview';
+    preview.setAttribute('aria-hidden', 'true');
+    vkEl.appendChild(preview);
+
+    let pressedBtn = null;
+    let hideTimer = null;
+
+    function labelFor(btn) {
+      const code = btn.dataset.key;
+      if (code === 'SPACE') return 'Space';
+      if (code === '←') return 'Delete';
+      const text = (btn.textContent || '').trim();
+      return text.length === 1 ? text.toUpperCase() : text;
+    }
+
+    function press(btn) {
+      if (!btn) return;
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (pressedBtn && pressedBtn !== btn) pressedBtn.classList.remove('is-pressed');
+      pressedBtn = btn;
+      btn.classList.add('is-pressed');
+
+      if (btn.dataset.key === 'DONE') { preview.classList.remove('is-visible'); return; }
+
+      const label = labelFor(btn);
+      preview.textContent = label;
+      preview.classList.toggle('vk-preview--wide', label.length > 1);
+
+      const vkRect = vkEl.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      const center = btnRect.left - vkRect.left + btnRect.width / 2;
+      preview.style.left = Math.min(Math.max(center, 48), Math.max(vkRect.width - 48, 48)) + 'px';
+      preview.style.bottom = (vkRect.bottom - btnRect.top + 10) + 'px';
+
+      // Replay the entry spring on every tap, including when the bubble is
+      // already up and only moving to another key.
+      preview.style.animation = 'none';
+      void preview.offsetWidth;
+      preview.style.animation = '';
+      preview.classList.add('is-visible');
+    }
+
+    function release() {
+      if (pressedBtn) { pressedBtn.classList.remove('is-pressed'); pressedBtn = null; }
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => { preview.classList.remove('is-visible'); }, 400);
+    }
+
+    function clear() {
+      if (pressedBtn) { pressedBtn.classList.remove('is-pressed'); pressedBtn = null; }
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      preview.classList.remove('is-visible');
+    }
+
+    return { press, release, clear };
+  }
+
   function ensureKeyboard() {
     if (vkEl) return vkEl;
     vkEl = document.createElement('div');
@@ -69,6 +130,9 @@
     // Initial render
     renderRows();
 
+    const feedback = createFeedback(vkEl);
+    vkEl.__vkFeedback = feedback;
+
     let repeatDelayTimer = null;
     let repeatIntervalTimer = null;
 
@@ -87,6 +151,7 @@
       if (code === 'MODE') {
         isNumbersMode = !isNumbersMode;
         renderRows();
+        feedback.clear();
         if (input) { try { input.focus(); } catch (_) { } }
         return;
       }
@@ -113,6 +178,7 @@
       if (!btn) return;
 
       stopRepeat();
+      feedback.press(btn);
       processKey(btn);
 
       const code = btn.dataset.key;
@@ -129,10 +195,15 @@
     vkEl.addEventListener('mousedown', startPress);
     vkEl.addEventListener('touchstart', startPress, { passive: false });
 
-    vkEl.addEventListener('mouseup', stopRepeat);
-    vkEl.addEventListener('mouseleave', stopRepeat);
-    vkEl.addEventListener('touchend', stopRepeat);
-    vkEl.addEventListener('touchcancel', stopRepeat);
+    function endPress() {
+      stopRepeat();
+      feedback.release();
+    }
+
+    vkEl.addEventListener('mouseup', endPress);
+    vkEl.addEventListener('mouseleave', endPress);
+    vkEl.addEventListener('touchend', endPress);
+    vkEl.addEventListener('touchcancel', endPress);
 
     return vkEl;
   }
@@ -180,6 +251,7 @@
 
   function hide() {
     if (!vkEl) return;
+    if (vkEl.__vkFeedback) vkEl.__vkFeedback.clear();
     vkEl.style.display = 'none';
     active = false;
     window.__vkActive = false;
