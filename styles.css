@@ -1492,6 +1492,18 @@ body.signin.keyboard-visible .auth-wrapper {
     }
 }
 
+/* --- Inactivity presence check --- */
+.presence-modal .presence-countdown {
+    margin-top: 14px;
+    font-size: 15px;
+    color: #6b6a67;
+}
+
+.presence-modal .presence-countdown strong {
+    color: #2d2a26;
+    font-variant-numeric: tabular-nums;
+}
+
 /* --- Enhanced Weight Modal --- */
 .weight-modal {
     animation: modalSlideIn 220ms cubic-bezier(0.22, 0.61, 0.36, 1);

@@ -387,6 +387,15 @@
     const passwordSection = document.getElementById('password-section');
     const err = document.getElementById('auth-error');
 
+    // Landed here after the inactivity monitor signed the shopper out.
+    try {
+      const reason = new URLSearchParams(window.location.search).get('reason');
+      if (reason === 'inactive' && err) {
+        err.textContent = 'Signed out after 5 minutes of inactivity. Sign in again to continue.';
+        err.style.display = 'block';
+      }
+    } catch (_) { }
+
     /* OTP Elements Temporarily Disabled
     const otpOverlay = document.getElementById('otp-overlay');
     const otpInput = document.getElementById('otp-input');

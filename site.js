@@ -41,28 +41,49 @@ function ensureModalRoot() {
 }
 
 // ---- Lightweight modal for presence check (are you still there?) ----
-function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm here", onConfirm, onRender } = {}) {
+function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm here", countdownSec = 0, onConfirm, onRender } = {}) {
   ensureModalRoot();
   const root = document.querySelector('#modal-root');
   if (!root) return null;
   const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
+  overlay.className = 'modal-overlay presence-overlay';
   const modal = document.createElement('div');
-  modal.className = 'modal';
+  modal.className = 'modal presence-modal';
+  const safeMsg = String(message).replace(/</g, '&lt;');
+  const safeBtn = String(buttonText).replace(/</g, '&lt;');
   modal.innerHTML = `
-    <div class="modal-header">Session Check</div>
+    <div class="modal-header">Still there?</div>
     <div class="modal-body">
-      <div class="modal-product">${String(message).replace(/</g, '&lt;')}</div>
+      <div class="modal-product">${safeMsg}</div>
+      ${countdownSec > 0 ? `<div class="presence-countdown" aria-live="polite">Signing out in <strong>${countdownSec}</strong>s</div>` : ''}
     </div>
     <div class="modal-actions">
-      <button class="btn btn-primary presence-ok">${String(buttonText).replace(/</g, '&lt;')}</button>
+      <button class="btn btn-primary presence-ok">${safeBtn}</button>
     </div>
   `;
   overlay.appendChild(modal);
   root.appendChild(overlay);
 
+  let tick = null;
+  const countdownEl = modal.querySelector('.presence-countdown strong');
+  if (countdownEl && countdownSec > 0) {
+    let left = countdownSec;
+    tick = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(tick);
+        tick = null;
+        return;
+      }
+      countdownEl.textContent = String(left);
+    }, 1000);
+  }
+
   const btnOk = modal.querySelector('.presence-ok');
-  const close = () => { try { root.removeChild(overlay); } catch (_) { } };
+  const close = () => {
+    if (tick) { clearInterval(tick); tick = null; }
+    try { root.removeChild(overlay); } catch (_) { }
+  };
   if (btnOk) btnOk.addEventListener('click', () => { try { onConfirm && onConfirm(); } finally { close(); } });
   if (onRender) { try { onRender({ close, overlay, modal }); } catch (_) { } }
   return { close, overlay, modal };
@@ -1384,9 +1405,11 @@ document.addEventListener('DOMContentLoaded', () => {
       let presenceHandle = null;
       let isUserSignedIn = false;
 
-      const AUTH_IDLE_MS = 6 * 60 * 1000;    // 6 mins for signed-in users
-      const AUTH_GRACE_MS = 60 * 1000;       // 1 min grace to respond
-      const GUEST_IDLE_MS = 3 * 60 * 1000;   // 3 mins for non-signed-in users
+      // Signed-in: warn after 5 min with no input, then log out if still idle.
+      // Guest: shorter idle loop back to the attract screen (unchanged).
+      const AUTH_IDLE_MS = 5 * 60 * 1000;
+      const AUTH_GRACE_MS = 60 * 1000;
+      const GUEST_IDLE_MS = 3 * 60 * 1000;
 
       const clearPresence = () => {
         if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
@@ -1408,20 +1431,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const handleIdleTimeout = () => {
         if (isUserSignedIn) {
-          // Signed-in user: Show presence modal
           presenceShown = true;
+          const graceSec = Math.round(AUTH_GRACE_MS / 1000);
           presenceHandle = showPresenceModal({
-            message: 'Are you still there? We will sign you out for security if you are inactive.',
-            buttonText: "I'm here",
+            message: 'No activity for 5 minutes. Tap below to stay signed in, or you will be signed out.',
+            buttonText: "I'm still here",
+            countdownSec: graceSec,
             onConfirm: () => {
               clearPresence();
               resetIdleTimer();
             },
           });
 
-          // Fallback if modal fails
           if (!presenceHandle) {
-            const confirmed = window.confirm('Are you still there? You will be signed out for security if inactive.');
+            const confirmed = window.confirm('No activity for 5 minutes. Stay signed in?');
             if (confirmed) {
               clearPresence();
               resetIdleTimer();
@@ -1431,7 +1454,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // Start grace period
           graceTimer = setTimeout(() => {
             if (!presenceShown) return;
             clearPresence();
@@ -1439,7 +1461,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }, AUTH_GRACE_MS);
 
         } else {
-          // Guest user: Redirect to idle loop immediately (no prompt)
+          // Guest: back to the idle attract loop (no prompt)
           window.location.href = withCart('image.html');
         }
       };
@@ -1447,10 +1469,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const resetIdleTimer = () => {
         clearPresence();
         if (idleTimer) clearTimeout(idleTimer);
-
-        // Determine timeout based on auth state
         const timeout = isUserSignedIn ? AUTH_IDLE_MS : GUEST_IDLE_MS;
         idleTimer = setTimeout(handleIdleTimeout, timeout);
+      };
+
+      // Any real input resets the idle clock. While the warning is up, ignore
+      // mouse-move / scroll / focus noise so the modal does not vanish by itself.
+      const onActivity = (e) => {
+        if (presenceShown && (e.type === 'mousemove' || e.type === 'scroll' || e.type === 'focus')) {
+          return;
+        }
+        resetIdleTimer();
       };
 
       const initMonitor = async () => {
@@ -1531,11 +1560,9 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
-        // Setup listeners (use capture to catch non-bubbling events like scroll)
         const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
-        activityEvents.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true, capture: true }));
+        activityEvents.forEach(ev => window.addEventListener(ev, onActivity, { passive: true, capture: true }));
 
-        // Start monitoring
         resetIdleTimer();
       };
 
