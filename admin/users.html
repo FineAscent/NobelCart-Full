@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • Users</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .admin-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .admin-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .session-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .session-grid {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .session-grid th,
+    .session-grid td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f3f4f6;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    .session-grid th {
+      background: #f9fafb;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .muted {
+      color: #6b7280;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+
+    .pill-admin {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .pill-off {
+      background: #f3f4f6;
+      color: #6b7280;
+    }
+
+    .btn {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #f9fafb;
+    }
+
+    .search {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 6px 10px;
+      min-width: 240px;
+    }
+
+    .nowrap {
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body class="refunds-standalone">
+  <style>
+    body.refunds-standalone {
+      background: #ffffff;
+      min-height: 100vh;
+    }
+
+    .admin-wrap {
+      max-width: 1200px;
+      width: 100%;
+      padding: 24px 16px;
+      margin: 0 auto;
+    }
+  </style>
+  <div class="admin-wrap">
+    <div class="admin-title">
+      <a class="btn" href="index.html"
+        style="height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Admin</a>
+      <span>Users</span>
+    </div>
+
+    <div class="session-toolbar">
+      <button id="refresh" class="btn">Refresh</button>
+      <input id="search" class="search" type="search" placeholder="Filter by name or email…" />
+      <span class="muted" id="status">—</span>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="session-grid" id="grid">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Signed Up</th>
+            <th>Status</th>
+            <th>Role</th>
+            <th>Allergy Warnings</th>
+          </tr>
+        </thead>
+        <tbody id="tbody">
+          <tr>
+            <td colspan="6" class="muted">Loading…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script>
+    // Route guard: require active session and admin role
+    (async () => {
+      try {
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
+        const { data, error } = await window.sb.auth.getSession();
+        const session = data && data.session;
+        if (error || !session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+          return (window.location.href = '../signin.html?admin=1');
+        }
+        const uid = session.user.id;
+        const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
+        if (!prof || !prof.is_admin) {
+          alert('Admin access required.');
+          return (window.location.href = '../index.html');
+        }
+        loadUsers();
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+        return (window.location.href = '../signin.html?admin=1');
+      }
+    })();
+  </script>
+  <script>
+    const el = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+
+    let allUsers = [];
+
+    async function loadUsers() {
+      const status = el('status');
+      status.textContent = 'Loading…';
+      try {
+        // Readable because of the "Admins can view all profiles" RLS policy.
+        const { data, error } = await window.sb
+          .from('profiles')
+          .select('id, display_name, email, created_at, active, is_admin, show_allergy_caution')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        allUsers = Array.isArray(data) ? data : [];
+        render();
+        status.textContent = allUsers.length + ' user' + (allUsers.length === 1 ? '' : 's');
+      } catch (e) {
+        console.error(e);
+        el('tbody').innerHTML = '<tr><td colspan="6" class="muted">Error loading users.</td></tr>';
+        status.textContent = 'Error: ' + (e.message || e);
+      }
+    }
+
+    function render() {
+      const q = (el('search').value || '').trim().toLowerCase();
+      const rows = q
+        ? allUsers.filter(u =>
+          (u.email || '').toLowerCase().includes(q) ||
+          (u.display_name || '').toLowerCase().includes(q))
+        : allUsers;
+
+      const tb = el('tbody');
+      if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="6" class="muted">No users found.</td></tr>';
+        return;
+      }
+
+      tb.innerHTML = rows.map(u => {
+        const created = u.created_at ? new Date(u.created_at).toLocaleString() : '—';
+        const name = u.display_name ? esc(u.display_name) : '<span class="muted">(no name)</span>';
+        const active = u.active === false
+          ? '<span class="pill pill-off">Inactive</span>'
+          : '<span class="pill">Active</span>';
+        const role = u.is_admin
+          ? '<span class="pill pill-admin">Admin</span>'
+          : '<span class="muted">Customer</span>';
+        const allergy = u.show_allergy_caution === false ? 'Off' : 'On';
+        return `
+          <tr data-user-id="${esc(u.id)}">
+            <td>${name}</td>
+            <td class="nowrap">${esc(u.email) || '<span class="muted">(no email)</span>'}</td>
+            <td class="nowrap muted">${esc(created)}</td>
+            <td>${active}</td>
+            <td>${role}</td>
+            <td class="muted">${allergy}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    el('refresh').addEventListener('click', loadUsers);
+    el('search').addEventListener('input', render);
+  </script>
+</body>
+
+</html>

@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Account</title>
+  <script src="cart-id.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 
@@ -47,7 +48,7 @@
           <button type="submit" class="auth-button">Create account</button>
           <div id="create-error" class="auth-error" style="display:none;"></div>
           <div class="auth-links" aria-label="Auth links">
-            <a href="signin.html">Already have an account? Sign in</a>
+            <a href="signin.html" id="signin-link">Already have an account? Sign in</a>
           </div>
         </form>
 
@@ -113,6 +114,11 @@
   <script src="config.js"></script>
   <script src="site.js"></script>
   <script src="vk-auth.js"></script>
+  <script src="policy-gate.js"></script>
+  <script>
+    // Keep the cart id on the way back to sign-in.
+    ncLinkWithCart(document.getElementById('signin-link'), 'signin.html');
+  </script>
   <script>
     // Elevate auth card when focusing inputs and spotlight focused field
     (function () {
@@ -193,6 +199,7 @@
 
         try {
           if (!window.sb) throw new Error('Auth not ready');
+          if (!window.ncPolicy) throw new Error('Privacy policy unavailable. Please try again.');
 
           // 1. Create User with Email/Password + Metadata
           const { data, error } = await window.sb.auth.signUp({
@@ -206,7 +213,20 @@
             }
           });
 
-          if (error) throw error;
+          if (error) {
+            if (/already regist|already exist|user exists/i.test(error.message || '')) {
+              showError('An account with this email already exists. Please sign in instead.');
+              return;
+            }
+            throw error;
+          }
+
+          // When email confirmations are on, Supabase hides an existing address by
+          // returning success with no identities rather than an error.
+          if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) {
+            showError('An account with this email already exists. Please sign in instead.');
+            return;
+          }
 
           /* PHONE VERIFICATION DISABLED
           // 2. If phone number provided, trigger SMS Verification
@@ -237,10 +257,36 @@
           }
           */
 
-          // If no phone, standard redirect
-          window.location.href = 'index.html';
+          // signUp only returns a session when email confirmation is disabled.
+          // Without one the user is not signed in, so don't redirect as if they were,
+          // and don't prompt for the policy: writing it needs their own token. They
+          // are prompted on first sign-in instead.
+          if (!data?.session) {
+            showError('Account created, but it needs email confirmation before you can sign in. Please check your inbox.');
+            return;
+          }
+
+          // 2. Account exists and policy_accepted defaults to false, so this
+          //    prompts, then records the agreement against the new account.
+          const agreed = await window.ncPolicy.requireAccepted(window.sb, data.user.id);
+          if (!agreed) {
+            try { await window.sb.auth.signOut(); } catch (_) { }
+            showError('You must accept the Privacy Policy to use NobleCart. Your account was created — sign in to try again.');
+            return;
+          }
+
+          window.location.href = ncCartId()
+            ? 'index.html?cart=' + encodeURIComponent(ncCartId())
+            : 'index.html';
         } catch (ex) {
-          showError(ex?.message || 'Failed to create account.');
+          const msg = ex?.message || '';
+          if (/rate limit|too many/i.test(msg)) {
+            showError('Too many signups right now. Please try again in a few minutes.');
+          } else if (/confirmation email|sending/i.test(msg)) {
+            showError('We could not send your confirmation email. Please try again shortly.');
+          } else {
+            showError(msg || 'Failed to create account.');
+          }
         }
       });
 

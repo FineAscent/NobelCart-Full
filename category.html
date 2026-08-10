@@ -6,23 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Category</title>
   <link rel="stylesheet" href="styles.css">
-  <script>
-    (function () {
-      var params = new URLSearchParams(window.location.search);
-      var cartId = params.get('cart');
-      if (!cartId) {
-        cartId = sessionStorage.getItem('nc_cart_id');
-        if (cartId) {
-          params.set('cart', cartId);
-          window.location.replace(window.location.pathname + '?' + params.toString());
-        } else {
-          window.location.replace('bad.html');
-        }
-      } else {
-        sessionStorage.setItem('nc_cart_id', cartId);
-      }
-    })();
-  </script>
+  <!-- Gate: require ?cart= — recovers the device's stored id if the URL loses it -->
+  <script src="cart-id.js"></script>
+  <script>ncRequireCart();</script>
 </head>
 
 <body class="category-page">

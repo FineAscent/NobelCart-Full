@@ -6,27 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
 
-    <link href='fonts.googleapis.com' rel='stylesheet'>
 
     <link rel="stylesheet" href="styles.css">
-    <script>
-        // Gate: require ?cart= — save to sessionStorage, recover from it if URL loses it
-        (function () {
-            var params = new URLSearchParams(window.location.search);
-            var cartId = params.get('cart');
-            if (!cartId) {
-                cartId = sessionStorage.getItem('nc_cart_id');
-                if (cartId) {
-                    params.set('cart', cartId);
-                    window.location.replace(window.location.pathname + '?' + params.toString());
-                } else {
-                    window.location.replace('bad.html');
-                }
-            } else {
-                sessionStorage.setItem('nc_cart_id', cartId);
-            }
-        })();
-    </script>
+    <!-- Gate: require ?cart= — recovers the device's stored id if the URL loses it -->
+    <script src="cart-id.js"></script>
+    <script>ncRequireCart();</script>
 </head>
 
 <body class="index opensearch-active page-opacity-0">
@@ -79,62 +63,62 @@
                         <div class="category-card">
                             <div class="category-title">Fruits & Veggies</div>
                             <div class="category-icons">
-                                <img src="Images/strawberry.png" alt="Strawberry icon" />
-                                <img src="Images/tomato.png" alt="Tomato icon" />
+                                <img src="Images/strawberry.webp" alt="Strawberry icon" />
+                                <img src="Images/tomato.webp" alt="Tomato icon" />
                             </div>
                         </div>
 
                         <div class="category-card">
                             <div class="category-title">Dairy & Eggs</div>
                             <div class="category-icons">
-                                <img src="Images/milk-bottle.png" alt="Salmon icon" />
-                                <img src="Images/egg.png" alt="Egg icon" />
+                                <img src="Images/milk-bottle.webp" alt="Salmon icon" />
+                                <img src="Images/egg.webp" alt="Egg icon" />
                             </div>
                         </div>
 
                         <div class="category-card">
                             <div class="category-title">Bakery</div>
                             <div class="category-icons">
-                                <img src="Images/bread.png" alt="Bread icon" />
+                                <img src="Images/bread.webp" alt="Bread icon" />
                             </div>
                         </div>
 
                         <div class="category-card">
                             <div class="category-title">Frozen Foods</div>
                             <div class="category-icons">
-                                <img src="Images/snowflake.png" alt="snowflake icon" />
+                                <img src="Images/snowflake.webp" alt="snowflake icon" />
                             </div>
                         </div>
                         <div class="category-card">
                             <div class="category-title">Beverages</div>
                             <div class="category-icons">
-                                <img src="Images/soda drink.png" alt="soda drink icon" />
+                                <img src="Images/soda drink.webp" alt="soda drink icon" />
                             </div>
                         </div>
                         <div class="category-card">
                             <div class="category-title">Snacks</div>
                             <div class="category-icons">
-                                <img src="Images/candies.png" alt="candies icon" />
+                                <img src="Images/candies.webp" alt="candies icon" />
                             </div>
                         </div>
                         <div class="category-card">
                             <div class="category-title">Spices</div>
                             <div class="category-icons">
-                                <img src="Images/spices.png" alt="spices icon" />
+                                <img src="Images/spices.webp" alt="spices icon" />
                             </div>
                         </div>
                         <div class="category-card">
                             <div class="category-title">Sauces and Oils</div>
                             <div class="category-icons">
-                                <img src="Images/ketchup.png" alt="ketchup icon" />
-                                <img src="Images/olive-oil.png" alt="oil icon" />
+                                <img src="Images/ketchup.webp" alt="ketchup icon" />
+                                <img src="Images/olive-oil.webp" alt="oil icon" />
 
                             </div>
                         </div>
                         <div class="category-card">
                             <div class="category-title">Meat & Poultry</div>
                             <div class="category-icons">
-                                <img src="Images/meat.png" alt="meat icon" />
+                                <img src="Images/meat.webp" alt="meat icon" />
                             </div>
                         </div>
                     </div>

@@ -112,33 +112,33 @@
   <!-- Supabase (for auth + functions) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- App config (creates window.sb if supabase is available) -->
-  <script src="../../config.js"></script>
+  <script src="../config.js"></script>
   <!-- Basic route guard: require active session to access admin refund tool -->
   <script>
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = '../../signin.html?admin=1');
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-          return (window.location.href = '../../signin.html?admin=1');
+          return (window.location.href = '../signin.html?admin=1');
         }
         // Verify admin role
         const uid = session.user.id;
         const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
         if (!prof || !prof.is_admin) {
           alert('Admin access required.');
-          return (window.location.href = '../../index.html');
+          return (window.location.href = '../index.html');
         }
       } catch (e) {
         try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-        return (window.location.href = '../../signin.html?admin=1');
+        return (window.location.href = '../signin.html?admin=1');
       }
     })();
   </script>
   <!-- Site logic (refunds wiring lives in site.js) -->
-  <script src="../../site.js"></script>
+  <script src="../site.js"></script>
 </body>
 
 </html>

@@ -1387,6 +1387,111 @@ body.signin.keyboard-visible .auth-wrapper {
     gap: 10px;
 }
 
+/* --- Privacy Policy Agreement Modal --- */
+.policy-modal {
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    max-height: 86vh;
+}
+
+.policy-subtitle {
+    font-size: 13px;
+    color: #6b6a67;
+    margin-bottom: 12px;
+}
+
+.policy-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    border-radius: 12px;
+    background: #faf9f8;
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #3a372f;
+    text-align: left;
+}
+
+.policy-scroll:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(139, 115, 85, 0.12);
+}
+
+.policy-scroll .policy-lede {
+    color: #6b6a67;
+}
+
+.policy-scroll h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #2d2a26;
+    margin: 18px 0 6px;
+}
+
+.policy-scroll h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2d2a26;
+    margin: 14px 0 4px;
+}
+
+.policy-scroll p {
+    margin: 0 0 10px;
+}
+
+.policy-scroll ul {
+    margin: 0 0 10px;
+    padding-left: 20px;
+}
+
+.policy-scroll li {
+    margin-bottom: 4px;
+}
+
+.policy-agree {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    border-radius: 12px;
+    background: #f9f8f7;
+    font-size: 14px;
+    color: #2d2a26;
+    cursor: pointer;
+    user-select: none;
+}
+
+.policy-agree-box {
+    /* Oversized for a touch kiosk: the default checkbox is a hard target. */
+    width: 24px;
+    height: 24px;
+    flex: none;
+    accent-color: #8b7355;
+    cursor: pointer;
+}
+
+.policy-confirm:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+@media (max-width: 680px) {
+    .policy-modal {
+        max-height: 92vh;
+    }
+
+    .policy-scroll {
+        font-size: 13px;
+    }
+}
+
 /* --- Enhanced Weight Modal --- */
 .weight-modal {
     animation: modalSlideIn 220ms cubic-bezier(0.22, 0.61, 0.36, 1);

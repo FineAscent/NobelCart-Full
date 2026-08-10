@@ -66,7 +66,7 @@
 
   <div class="admin-wrap">
     <div class="admin-title" style="display:flex; align-items:center; gap:10px;">
-      <a href="../../account.html" class="btn"
+      <a href="../account.html" class="btn"
         style="height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Account</a>
       <span>Admin</span>
     </div>
@@ -79,6 +79,10 @@
         <h3>Monitor Active Carts</h3>
         <p>View signed-in customers and their live cart subtotals.</p>
       </a>
+      <a class="admin-card" href="users.html">
+        <h3>Users</h3>
+        <p>Browse everyone who signed up and their profile info.</p>
+      </a>
       <a class="admin-card" href="backup.html">
         <h3>User Backups</h3>
         <p>Snapshot and secure user profile data.</p>
@@ -88,28 +92,28 @@
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../../config.js"></script>
+  <script src="../config.js"></script>
   <!-- Route guard: require active session to access admin -->
   <script>
     (async () => {
       try {
-        if (!window.sb) return (window.location.href = '../../signin.html?admin=1');
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
         const { data, error } = await window.sb.auth.getSession();
         const session = data && data.session;
         if (error || !session) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-          return (window.location.href = '../../signin.html?admin=1');
+          return (window.location.href = '../signin.html?admin=1');
         }
         // Verify admin role
         const uid = session.user.id;
         const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
         if (!prof || !prof.is_admin) {
           alert('Admin access required.');
-          return (window.location.href = '../../index.html');
+          return (window.location.href = '../index.html');
         }
       } catch (e) {
         try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-        return (window.location.href = '../../signin.html?admin=1');
+        return (window.location.href = '../signin.html?admin=1');
       }
     })();
   </script>

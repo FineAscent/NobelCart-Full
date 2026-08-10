@@ -27,7 +27,7 @@ services:
         destination: "/refund.html"
       - type: rewrite
         source: "/admin"
-        destination: "/TableUiBackend/admin/index.html"
+        destination: "/admin/index.html"
       # Catch-all to index.html (optional; helps with unknown paths)
       - type: rewrite
         source: "/(.*)"

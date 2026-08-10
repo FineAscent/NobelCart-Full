@@ -1,9 +1,16 @@
 // --- API helpers ---
 const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
 const CART_ID = (function () {
+  // cart-id.js owns this when it is loaded; the rest is a fallback for pages that
+  // do not include it. localStorage is checked so the id survives a browser restart.
+  if (typeof window.ncCartId === 'function') return window.ncCartId();
   var id = new URLSearchParams(window.location.search).get('cart') || '';
+  if (!id) { try { id = localStorage.getItem('nc_cart_id') || ''; } catch (_) {} }
   if (!id) { try { id = sessionStorage.getItem('nc_cart_id') || ''; } catch (_) {} }
-  if (id) { try { sessionStorage.setItem('nc_cart_id', id); } catch (_) {} }
+  if (id) {
+    try { localStorage.setItem('nc_cart_id', id); } catch (_) {}
+    try { sessionStorage.setItem('nc_cart_id', id); } catch (_) {}
+  }
   return id;
 })();
 async function apiFetch(path, options = {}) {
@@ -1661,8 +1668,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const isCabinetPage = /(^|\/)cabinet\.html(\?|$)/.test(location.pathname) || document.title === 'Cabinet';
     const isCategoryPage = /(^|\/)category\.html(\?|$)/.test(location.pathname);
 
-    // Category page only: set title from query parameter
-    if (!isCabinetPage) {
+    // Category page only: set title from query parameter.
+    // This used to run on every non-cabinet page, which overwrote the title on
+    // index/signin/create-account and replaced account.html's first heading with
+    // "Category".
+    if (isCategoryPage) {
       const params = new URLSearchParams(window.location.search);
       const name = params.get('name');
       const heading = document.querySelector('.section-title');

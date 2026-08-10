@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign In</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="cart-id.js"></script>
 </head>
 
 <body class="signin">
@@ -57,7 +58,7 @@
           <button type="submit" class="auth-button">Sign In</button>
           <div id="auth-error" class="auth-error" style="display:none;"></div>
           <div class="auth-links" aria-label="Helpful links">
-            <a href="#" id="forgot-link">Forgot password?</a>
+            <!-- Password reset is handled in the phone app, not on this kiosk page. -->
             <a href="create-account.html" id="create-link">Create account</a>
           </div>
         </form>
@@ -272,6 +273,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="vk-auth.js"></script>
+  <script src="policy-gate.js"></script>
   <script>
     // Clear stale/invalid local session to avoid 400 token errors and prevent watcher loops
     (async () => {
@@ -468,26 +470,39 @@
           throw error;
         }
 
-        // Mark profile active on sign-in (idempotent upsert)
+        // Mark profile active on sign-in. The row itself is created by the
+        // on_auth_user_created trigger at signup, so this only refreshes state.
+        // is_admin is intentionally not set here: it is granted in SQL only.
         try {
           const uid = data?.user?.id;
           const em = data?.user?.email || email;
           if (uid) {
-            const isAdmin = (em && em.toLowerCase() === 'admin@example.com');
-            const payload = { id: uid, email: em, active: true };
-            if (isAdmin) payload.is_admin = true;
-            await window.sb.from('profiles').upsert(payload);
+            // Plain update, never upsert: 0012 revoked table-level UPDATE and did
+            // not re-grant it on id, and PostgREST puts every posted column into
+            // an upsert's ON CONFLICT DO UPDATE list. Upserting here 403s.
+            await window.sb.from('profiles').update({ email: em, active: true }).eq('id', uid);
           }
         } catch (_) { }
+
+        // Accounts created through the app, or from before the policy existed,
+        // can reach here without ever having agreed.
+        const agreed = await window.ncPolicy.requireAccepted(window.sb, data?.user?.id);
+        if (!agreed) {
+          try { await window.sb.auth.signOut(); } catch (_) { }
+          err.textContent = 'You must accept the Privacy Policy to use NobleCart.';
+          err.style.display = 'block';
+          return;
+        }
+
         // On success, show logo overlay for 4 seconds, then go to cabinet
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin')) {
-          window.location.href = 'TableUiBackend/admin/index.html';
+          window.location.href = 'admin/index.html';
           return;
         }
 
         // Link this cart to the signed-in user
-        const cartId = urlParams.get('cart');
+        const cartId = window.ncCartId ? window.ncCartId() : urlParams.get('cart');
         if (cartId && data?.user?.id) {
           try { await window.sb.from('carts').update({ user_id: data.user.id }).eq('cart_id', cartId); } catch (_) {}
         }
@@ -496,7 +511,16 @@
         const dest = cartId ? 'cabinet.html?cart=' + encodeURIComponent(cartId) : 'cabinet.html';
         setTimeout(() => { window.location.href = dest; }, 4000);
       } catch (e) {
-        err.textContent = e.message || 'Sign-in failed.';
+        const msg = e?.message || '';
+        // Supabase returns the same "Invalid login credentials" for an unknown
+        // email and a wrong password, on purpose, so the message has to cover both.
+        if (/invalid login credentials/i.test(msg)) {
+          err.textContent = 'No account found with that email, or the password is incorrect. Tap “Create account” below if you are new.';
+        } else if (/email not confirmed/i.test(msg)) {
+          err.textContent = 'Please confirm your email address before signing in.';
+        } else {
+          err.textContent = msg || 'Sign-in failed.';
+        }
         err.style.display = 'block';
       }
     });
@@ -541,8 +565,9 @@
     // app calls qr-cart-approve edge fn, edge fn writes token_hash to DB,
     // Realtime fires here, kiosk calls verifyOtp to sign in automatically.
     (function () {
-      const urlParams = new URLSearchParams(window.location.search);
-      const cartId = urlParams.get('cart');
+      // Use the device's persisted cart id, not just the URL, so the App sign-in
+      // option survives navigation and reloads.
+      const cartId = window.ncCartId ? window.ncCartId() : null;
       const btnTop = document.getElementById('qr-signin-btn-top');
 
       if (!btnTop) return;
@@ -591,8 +616,18 @@
           try {
             const uid = data?.user?.id;
             const em = data?.user?.email;
-            if (uid) await window.sb.from('profiles').upsert({ id: uid, email: em, active: true });
+            // Plain update, never upsert: see the note on the password path.
+            if (uid) await window.sb.from('profiles').update({ email: em, active: true }).eq('id', uid);
           } catch (_) {}
+
+          // verifyOtp signs in an existing user and creates a brand-new one with
+          // the same call, so an app signup lands here without having agreed.
+          const agreed = await window.ncPolicy.requireAccepted(window.sb, data?.user?.id);
+          if (!agreed) {
+            try { await window.sb.auth.signOut(); } catch (_) {}
+            setStatus('You must accept the Privacy Policy to continue.', true);
+            return;
+          }
 
           try {
             const uid = data?.user?.id;
@@ -705,6 +740,10 @@
     })();
   </script>
   <script src="site.js"></script>
+  <script>
+    // Carry the cart id over to create-account so coming back here still has it.
+    ncLinkWithCart(document.getElementById('create-link'), 'create-account.html');
+  </script>
 </body>
 
 </html>
