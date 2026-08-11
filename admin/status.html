@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • Platform Status</title>
+  <script src="../phone-gate.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body.refunds-standalone {
+      background: #f7fafc;
+      min-height: 100vh;
+    }
+
+    .admin-wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .admin-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .admin-sub {
+      color: #6b7280;
+      font-size: 14px;
+      margin: 0 0 18px;
+    }
+
+    .status-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .status-toolbar .btn {
+      height: 36px;
+      padding: 0 14px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .status-toolbar .btn-primary {
+      background: #111827;
+      color: #fff;
+      border-color: #111827;
+    }
+
+    .status-toolbar .btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+    .meta {
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .overall {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      margin-bottom: 14px;
+      font-weight: 600;
+    }
+
+    .overall[data-state="ok"] { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+    .overall[data-state="degraded"] { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+    .overall[data-state="down"] { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+    .overall[data-state="unconfigured"] { border-color: #e5e7eb; background: #f9fafb; color: #374151; }
+    .overall[data-state="checking"] { color: #6b7280; }
+
+    .platform-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .platform-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 16px;
+      align-items: start;
+    }
+
+    .platform-card h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #111827;
+    }
+
+    .platform-card .detail {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: #6b7280;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .platform-card .meta-row {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .platform-card .meta-row a {
+      color: #6b7280;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .badge[data-state="ok"] { background: #dcfce7; color: #166534; }
+    .badge[data-state="degraded"] { background: #fef3c7; color: #92400e; }
+    .badge[data-state="down"] { background: #fee2e2; color: #991b1b; }
+    .badge[data-state="unconfigured"] { background: #f3f4f6; color: #4b5563; }
+    .badge[data-state="checking"] { background: #f3f4f6; color: #6b7280; }
+
+    .legend {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .legend strong { color: #374151; }
+  </style>
+</head>
+
+<body class="refunds-standalone">
+  <div class="admin-wrap">
+    <div class="admin-title">
+      <a href="index.html" class="btn"
+        style="height:28px; padding:4px 10px; display:inline-flex; align-items:center; text-decoration:none; border:1px solid #e5e7eb; border-radius:8px; background:#fff; color:#111827;">Admin</a>
+      <span>Platform Status</span>
+    </div>
+    <p class="admin-sub">Live health of the services Nobel Cart depends on. Red means something is broken or misconfigured — not just a public status banner.</p>
+
+    <div class="status-toolbar">
+      <button type="button" class="btn btn-primary" id="refresh-btn">Check now</button>
+      <span class="meta" id="checked-at">Not checked yet</span>
+    </div>
+
+    <div class="overall" id="overall" data-state="checking">Checking platforms…</div>
+    <div class="platform-list" id="platform-list"></div>
+
+    <div class="legend">
+      <strong>Active</strong> — we can talk to it.
+      <strong>Degraded</strong> — reachable but unhealthy or slow.
+      <strong>Down</strong> — unreachable, auth failed, or hard error (the “really bad” state).
+      <strong>Not configured</strong> — API key / endpoint missing in this environment.
+      Deep checks for Stripe and Brevo use the admin edge function when deployed; otherwise browser probes still run.
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script>
+    (async () => {
+      try {
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
+        const { data, error } = await window.sb.auth.getSession();
+        const session = data && data.session;
+        if (error || !session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+          return (window.location.href = '../signin.html?admin=1');
+        }
+        const uid = session.user.id;
+        const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
+        if (!prof || !prof.is_admin) {
+          alert('Admin access required.');
+          return (window.location.href = '../index.html');
+        }
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+        return (window.location.href = '../signin.html?admin=1');
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      const LABEL = {
+        ok: 'Active',
+        degraded: 'Degraded',
+        down: 'Down',
+        unconfigured: 'Not configured',
+        checking: 'Checking',
+      };
+      const RANK = { down: 3, unconfigured: 2, degraded: 1, ok: 0, checking: -1 };
+
+      const listEl = document.getElementById('platform-list');
+      const overallEl = document.getElementById('overall');
+      const checkedAtEl = document.getElementById('checked-at');
+      const refreshBtn = document.getElementById('refresh-btn');
+
+      const PLATFORMS = [
+        { id: 'stripe', name: 'Stripe', status_page: 'https://status.stripe.com' },
+        { id: 'supabase', name: 'Supabase', status_page: 'https://status.supabase.com' },
+        { id: 'aws', name: 'AWS', status_page: 'https://health.aws.amazon.com/health/status' },
+        { id: 'github', name: 'GitHub', status_page: 'https://www.githubstatus.com' },
+        { id: 'brevo', name: 'Brevo', status_page: 'https://status.brevo.com' },
+      ];
+
+      function worstState(states) {
+        return states.reduce((acc, s) => (RANK[s] > RANK[acc] ? s : acc), 'ok');
+      }
+
+      function render(platforms, overall, checkedAt, source) {
+        overallEl.dataset.state = overall;
+        overallEl.textContent = overall === 'ok'
+          ? 'All checked platforms look healthy'
+          : overall === 'degraded'
+            ? 'Some platforms are degraded — dig into the cards below'
+            : overall === 'unconfigured'
+              ? 'Something is missing configuration'
+              : overall === 'checking'
+                ? 'Checking platforms…'
+                : 'One or more platforms are down — site communication may be broken';
+
+        checkedAtEl.textContent = checkedAt
+          ? `Last check ${new Date(checkedAt).toLocaleString()} · ${source}`
+          : 'Not checked yet';
+
+        listEl.innerHTML = platforms.map((p) => `
+          <article class="platform-card" data-id="${p.id}">
+            <h3>${escapeHtml(p.name)}</h3>
+            <span class="badge" data-state="${p.state}">${LABEL[p.state] || p.state}</span>
+            <p class="detail">${escapeHtml(p.detail || '')}</p>
+            <div class="meta-row">
+              ${p.latency_ms != null ? `<span>${p.latency_ms} ms</span>` : ''}
+              ${p.status_page ? `<a href="${escapeAttr(p.status_page)}" target="_blank" rel="noopener">Status page</a>` : ''}
+            </div>
+          </article>
+        `).join('');
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+      function escapeAttr(s) {
+        return escapeHtml(s).replace(/'/g, '&#39;');
+      }
+
+      async function timed(fn, timeoutMs) {
+        const start = performance.now();
+        const result = await Promise.race([
+          fn().then((v) => ({ ok: true, v })).catch((e) => ({ ok: false, e })),
+          new Promise((resolve) => setTimeout(() => resolve({ ok: false, e: new Error('Timed out') }), timeoutMs)),
+        ]);
+        const ms = Math.round(performance.now() - start);
+        if (!result.ok) throw Object.assign(result.e || new Error('Failed'), { latency_ms: ms });
+        return { value: result.v, ms };
+      }
+
+      async function checkStatusJson(url) {
+        const { value, ms } = await timed(async () => {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        }, 8000);
+        const indicator = (value?.status?.indicator || '').toLowerCase();
+        const description = value?.status?.description || 'Unknown';
+        let state = 'ok';
+        if (indicator === 'minor') state = 'degraded';
+        else if (indicator === 'major' || indicator === 'critical') state = 'down';
+        return { state, detail: description, latency_ms: ms };
+      }
+
+      async function probeStripeClient() {
+        // Public summary (same lag as status page) + prove Stripe.js CDN is reachable.
+        try {
+          const pub = await checkStatusJson('https://status.stripe.com/api/v2/summary.json');
+          const cdn = await timed(async () => {
+            const res = await fetch('https://js.stripe.com/v3/', { method: 'HEAD', mode: 'no-cors' });
+            return res;
+          }, 8000).catch(() => null);
+
+          if (pub.state !== 'ok') {
+            return {
+              id: 'stripe', name: 'Stripe', state: pub.state,
+              latency_ms: pub.latency_ms, detail: 'Status page: ' + pub.detail,
+              status_page: 'https://status.stripe.com',
+            };
+          }
+          return {
+            id: 'stripe', name: 'Stripe', state: 'ok',
+            latency_ms: pub.latency_ms,
+            detail: cdn
+              ? 'Status page healthy; Stripe.js reachable (deep API check needs edge function)'
+              : 'Status page healthy; Stripe.js probe inconclusive',
+            status_page: 'https://status.stripe.com',
+          };
+        } catch (e) {
+          return {
+            id: 'stripe', name: 'Stripe', state: 'down',
+            latency_ms: e.latency_ms ?? null,
+            detail: e.message || 'Stripe unreachable from this browser',
+            status_page: 'https://status.stripe.com',
+          };
+        }
+      }
+
+      async function probeSupabaseClient() {
+        if (!window.sb) {
+          return {
+            id: 'supabase', name: 'Supabase', state: 'down', latency_ms: null,
+            detail: 'Supabase client not initialized (config.js / CDN)',
+            status_page: 'https://status.supabase.com',
+          };
+        }
+        try {
+          const { ms } = await timed(async () => {
+            const { error } = await window.sb.from('profiles').select('id').limit(1);
+            if (error) throw new Error(error.message);
+            return true;
+          }, 8000);
+          return {
+            id: 'supabase', name: 'Supabase', state: 'ok', latency_ms: ms,
+            detail: 'Database query succeeded',
+            status_page: 'https://status.supabase.com',
+          };
+        } catch (e) {
+          return {
+            id: 'supabase', name: 'Supabase', state: 'down',
+            latency_ms: e.latency_ms ?? null,
+            detail: e.message || 'Supabase query failed',
+            status_page: 'https://status.supabase.com',
+          };
+        }
+      }
+
+      async function probeAwsClient() {
+        const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+        if (!base) {
+          return {
+            id: 'aws', name: 'AWS', state: 'unconfigured', latency_ms: null,
+            detail: 'API_BASE missing in config.js',
+            status_page: 'https://health.aws.amazon.com/health/status',
+          };
+        }
+        try {
+          const { value, ms } = await timed(async () => {
+            // Any HTTP response means API Gateway is up (403/404 are normal without a route).
+            const res = await fetch(base.replace(/\/$/, '') + '/', {
+              method: 'GET',
+              mode: 'cors',
+              cache: 'no-store',
+            }).catch(async (err) => {
+              // CORS failures still often mean the host answered — try no-cors as reachability.
+              await fetch(base.replace(/\/$/, '') + '/', { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+              return { status: 0, opaque: true, _cors: String(err && err.message) };
+            });
+            return res;
+          }, 8000);
+
+          if (value && value.status >= 500) {
+            return {
+              id: 'aws', name: 'AWS', state: 'down', latency_ms: ms,
+              detail: 'API Gateway HTTP ' + value.status,
+              status_page: 'https://health.aws.amazon.com/health/status',
+            };
+          }
+          return {
+            id: 'aws', name: 'AWS', state: 'ok', latency_ms: ms,
+            detail: value && value.opaque
+              ? 'API Gateway host reachable (CORS blocked body — expected for some routes)'
+              : 'API Gateway reachable (HTTP ' + (value && value.status) + ')',
+            status_page: 'https://health.aws.amazon.com/health/status',
+          };
+        } catch (e) {
+          return {
+            id: 'aws', name: 'AWS', state: 'down',
+            latency_ms: e.latency_ms ?? null,
+            detail: (e.message || 'Cannot reach API Gateway') + ' — ' + base,
+            status_page: 'https://health.aws.amazon.com/health/status',
+          };
+        }
+      }
+
+      async function probeGithubClient() {
+        try {
+          const pub = await checkStatusJson('https://www.githubstatus.com/api/v2/status.json');
+          return {
+            id: 'github', name: 'GitHub', state: pub.state,
+            latency_ms: pub.latency_ms, detail: pub.detail,
+            status_page: 'https://www.githubstatus.com',
+          };
+        } catch (e) {
+          return {
+            id: 'github', name: 'GitHub', state: 'down',
+            latency_ms: e.latency_ms ?? null,
+            detail: e.message || 'GitHub status API unreachable',
+            status_page: 'https://www.githubstatus.com',
+          };
+        }
+      }
+
+      async function probeBrevoClient() {
+        // No browser-side API key. Hit the public status page if present; otherwise mark as needing deep check.
+        try {
+          const pub = await checkStatusJson('https://status.brevo.com/api/v2/status.json');
+          return {
+            id: 'brevo', name: 'Brevo', state: pub.state,
+            latency_ms: pub.latency_ms,
+            detail: pub.detail + ' (deep API key check needs edge function)',
+            status_page: 'https://status.brevo.com',
+          };
+        } catch (_) {
+          try {
+            const { ms } = await timed(async () => {
+              await fetch('https://status.brevo.com', { method: 'HEAD', mode: 'no-cors' });
+              return true;
+            }, 8000);
+            return {
+              id: 'brevo', name: 'Brevo', state: 'degraded',
+              latency_ms: ms,
+              detail: 'Status page reachable, but no public JSON feed from this browser. Deploy platform-health for an API-key probe.',
+              status_page: 'https://status.brevo.com',
+            };
+          } catch (e) {
+            return {
+              id: 'brevo', name: 'Brevo', state: 'down',
+              latency_ms: e.latency_ms ?? null,
+              detail: e.message || 'Brevo unreachable',
+              status_page: 'https://status.brevo.com',
+            };
+          }
+        }
+      }
+
+      async function runClientProbes() {
+        const results = await Promise.all([
+          probeStripeClient(),
+          probeSupabaseClient(),
+          probeAwsClient(),
+          probeGithubClient(),
+          probeBrevoClient(),
+        ]);
+        return results;
+      }
+
+      async function runDeepCheck() {
+        if (!window.sb?.functions?.invoke) return null;
+        const { data: sess } = await window.sb.auth.getSession();
+        if (!sess?.session) return null;
+        try {
+          const { data, error } = await window.sb.functions.invoke('platform-health', {
+            body: { api_base: (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '' },
+          });
+          if (error) throw error;
+          if (!data?.platforms) throw new Error(data?.error || 'Empty health response');
+          return data;
+        } catch (e) {
+          console.warn('[status] Deep check unavailable:', e);
+          return null;
+        }
+      }
+
+      function mergeById(clientList, deepList) {
+        if (!deepList?.length) return clientList;
+        const map = Object.fromEntries(clientList.map((p) => [p.id, p]));
+        for (const d of deepList) {
+          // Prefer deep (API-key) results when present.
+          map[d.id] = { ...map[d.id], ...d };
+        }
+        return PLATFORMS.map((p) => map[p.id]).filter(Boolean);
+      }
+
+      async function checkAll() {
+        refreshBtn.disabled = true;
+        render(
+          PLATFORMS.map((p) => ({ ...p, state: 'checking', detail: 'Checking…', latency_ms: null })),
+          'checking',
+          null,
+          '',
+        );
+
+        const client = await runClientProbes();
+        render(client, worstState(client.map((p) => p.state)), new Date().toISOString(), 'browser probes');
+
+        const deep = await runDeepCheck();
+        if (deep?.platforms) {
+          const merged = mergeById(client, deep.platforms);
+          render(
+            merged,
+            deep.overall || worstState(merged.map((p) => p.state)),
+            deep.checked_at || new Date().toISOString(),
+            'browser + edge deep check',
+          );
+        }
+
+        refreshBtn.disabled = false;
+      }
+
+      refreshBtn.addEventListener('click', checkAll);
+      checkAll();
+    })();
+  </script>
+</body>
+
+</html>

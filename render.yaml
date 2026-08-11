@@ -28,6 +28,12 @@ services:
       - type: rewrite
         source: "/admin"
         destination: "/admin/index.html"
+      - type: rewrite
+        source: "/admin/status"
+        destination: "/admin/status.html"
+      - type: rewrite
+        source: "/admin/errors"
+        destination: "/admin/errors.html"
       # Catch-all to index.html (optional; helps with unknown paths)
       - type: rewrite
         source: "/(.*)"

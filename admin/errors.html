@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • Error Log</title>
+  <script src="../phone-gate.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body.refunds-standalone {
+      background: #f7fafc;
+      min-height: 100vh;
+    }
+
+    .admin-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    .admin-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .admin-sub {
+      color: #6b7280;
+      font-size: 14px;
+      margin: 0 0 16px;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font: inherit;
+      color: #111827;
+    }
+
+    .btn:hover { background: #f9fafb; }
+    .btn:disabled { opacity: 0.55; cursor: default; }
+
+    .btn-primary {
+      background: #111827;
+      color: #fff;
+      border-color: #111827;
+    }
+
+    .search, .filter {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .search { min-width: 220px; }
+
+    .muted { color: #6b7280; font-size: 13px; }
+
+    .counts {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .count-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #f3f4f6;
+      color: #374151;
+    }
+
+    .count-pill[data-k="new"] { background: #fee2e2; color: #991b1b; }
+    .count-pill[data-k="seen"] { background: #fef3c7; color: #92400e; }
+    .count-pill[data-k="resolved"] { background: #dcfce7; color: #166534; }
+
+    .error-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .error-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+
+    .error-card[data-status="new"] { border-color: #fecaca; }
+    .error-card[data-status="seen"] { border-color: #fde68a; }
+    .error-card[data-status="resolved"] { border-color: #bbf7d0; }
+
+    .error-top {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .error-msg {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #111827;
+      word-break: break-word;
+    }
+
+    .error-meta {
+      margin-top: 8px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .pill-new { background: #fee2e2; color: #991b1b; }
+    .pill-seen { background: #fef3c7; color: #92400e; }
+    .pill-resolved { background: #dcfce7; color: #166534; }
+    .pill-src { background: #eef2ff; color: #3730a3; }
+
+    .error-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .stack {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      color: #374151;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 220px;
+      overflow: auto;
+      display: none;
+    }
+
+    .stack.open { display: block; }
+
+    .empty {
+      padding: 28px;
+      text-align: center;
+      color: #6b7280;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+
+<body class="refunds-standalone">
+  <div class="admin-wrap">
+    <div class="admin-title">
+      <a class="btn" href="index.html"
+        style="height:28px; padding:4px 10px; display:inline-flex; align-items:center; text-decoration:none;">Admin</a>
+      <span>Error Log</span>
+    </div>
+    <p class="admin-sub">Kiosk errors from signed-in members. Rows older than 7 days are deleted automatically.</p>
+
+    <div class="toolbar">
+      <button type="button" class="btn btn-primary" id="refresh">Refresh</button>
+      <select id="status-filter" class="filter" aria-label="Status filter">
+        <option value="new">New</option>
+        <option value="all">All</option>
+        <option value="seen">Seen</option>
+        <option value="resolved">Resolved</option>
+      </select>
+      <select id="source-filter" class="filter" aria-label="Source filter">
+        <option value="all">All sources</option>
+        <option value="js">JS</option>
+        <option value="supabase">Supabase</option>
+        <option value="stripe">Stripe</option>
+        <option value="network">Network</option>
+        <option value="other">Other</option>
+      </select>
+      <input id="search" class="search" type="search" placeholder="Filter message or page…" />
+      <span class="muted" id="status-line">—</span>
+    </div>
+
+    <div class="counts" id="counts"></div>
+    <div class="error-list" id="list">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script>
+    (async () => {
+      try {
+        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
+        const { data, error } = await window.sb.auth.getSession();
+        const session = data && data.session;
+        if (error || !session) {
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+          return (window.location.href = '../signin.html?admin=1');
+        }
+        const uid = session.user.id;
+        const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
+        if (!prof || !prof.is_admin) {
+          alert('Admin access required.');
+          return (window.location.href = '../index.html');
+        }
+        boot();
+      } catch (e) {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
+        return (window.location.href = '../signin.html?admin=1');
+      }
+    })();
+
+    function boot() {
+      const listEl = document.getElementById('list');
+      const statusLine = document.getElementById('status-line');
+      const countsEl = document.getElementById('counts');
+      const refreshBtn = document.getElementById('refresh');
+      const statusFilter = document.getElementById('status-filter');
+      const sourceFilter = document.getElementById('source-filter');
+      const searchEl = document.getElementById('search');
+
+      let rows = [];
+      let emailByUser = Object.create(null);
+
+      function escapeHtml(s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function fmtTime(iso) {
+        try { return new Date(iso).toLocaleString(); } catch { return iso || '—'; }
+      }
+
+      function filtered() {
+        const st = statusFilter.value;
+        const src = sourceFilter.value;
+        const q = (searchEl.value || '').trim().toLowerCase();
+        return rows.filter((r) => {
+          if (st !== 'all' && r.status !== st) return false;
+          if (src !== 'all' && r.source !== src) return false;
+          if (q) {
+            const hay = ((r.message || '') + ' ' + (r.page || '') + ' ' + (r.cart_id || '')).toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
+      }
+
+      function renderCounts() {
+        const c = { new: 0, seen: 0, resolved: 0 };
+        for (const r of rows) if (c[r.status] != null) c[r.status] += 1;
+        countsEl.innerHTML = `
+          <span class="count-pill" data-k="new">${c.new} new</span>
+          <span class="count-pill" data-k="seen">${c.seen} seen</span>
+          <span class="count-pill" data-k="resolved">${c.resolved} resolved</span>
+          <span class="count-pill">${rows.length} total (7-day window)</span>
+        `;
+      }
+
+      function render() {
+        const list = filtered();
+        renderCounts();
+        statusLine.textContent = list.length + ' shown';
+
+        if (!list.length) {
+          listEl.innerHTML = '<div class="empty">No errors match these filters.</div>';
+          return;
+        }
+
+        listEl.innerHTML = list.map((r) => {
+          const email = emailByUser[r.user_id] || r.user_id?.slice?.(0, 8) || '—';
+          const stackId = 'stack-' + r.id;
+          return `
+            <article class="error-card" data-status="${escapeHtml(r.status)}" data-id="${r.id}">
+              <div class="error-top">
+                <div>
+                  <p class="error-msg">${escapeHtml(r.message)}</p>
+                  <div class="error-meta">
+                    <span class="pill pill-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
+                    <span class="pill pill-src">${escapeHtml(r.source)}</span>
+                    <span>${escapeHtml(r.page)}</span>
+                    <span>${fmtTime(r.created_at)}</span>
+                    <span>${escapeHtml(email)}</span>
+                    ${r.cart_id ? `<span>cart ${escapeHtml(r.cart_id)}</span>` : ''}
+                  </div>
+                </div>
+                <div class="error-actions">
+                  ${r.stack ? `<button type="button" class="btn" data-act="stack" data-target="${stackId}">Stack</button>` : ''}
+                  ${r.status !== 'seen' && r.status !== 'resolved' ? `<button type="button" class="btn" data-act="seen" data-id="${r.id}">Mark seen</button>` : ''}
+                  ${r.status !== 'resolved' ? `<button type="button" class="btn" data-act="resolved" data-id="${r.id}">Resolve</button>` : ''}
+                </div>
+              </div>
+              ${r.stack ? `<pre class="stack" id="${stackId}">${escapeHtml(r.stack)}</pre>` : ''}
+            </article>
+          `;
+        }).join('');
+      }
+
+      async function setStatus(id, status) {
+        const { error } = await window.sb
+          .from('client_errors')
+          .update({ status })
+          .eq('id', id);
+        if (error) {
+          alert(error.message || 'Update failed');
+          return;
+        }
+        const row = rows.find((r) => String(r.id) === String(id));
+        if (row) row.status = status;
+        render();
+      }
+
+      listEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        const act = btn.getAttribute('data-act');
+        if (act === 'stack') {
+          const el = document.getElementById(btn.getAttribute('data-target'));
+          if (el) el.classList.toggle('open');
+          return;
+        }
+        if (act === 'seen' || act === 'resolved') {
+          setStatus(btn.getAttribute('data-id'), act);
+        }
+      });
+
+      async function load() {
+        refreshBtn.disabled = true;
+        statusLine.textContent = 'Loading…';
+        try {
+          const { data, error } = await window.sb
+            .from('client_errors')
+            .select('id, created_at, user_id, cart_id, page, source, message, stack, severity, status, fingerprint')
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+          if (error) throw error;
+          rows = data || [];
+
+          const ids = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+          emailByUser = Object.create(null);
+          if (ids.length) {
+            const { data: profs } = await window.sb
+              .from('profiles')
+              .select('id, email, display_name')
+              .in('id', ids);
+            for (const p of (profs || [])) {
+              emailByUser[p.id] = p.display_name
+                ? `${p.display_name} <${p.email || ''}>`
+                : (p.email || p.id);
+            }
+          }
+
+          render();
+        } catch (e) {
+          listEl.innerHTML = `<div class="empty">${escapeHtml(e.message || 'Failed to load errors')}</div>`;
+          statusLine.textContent = 'Error';
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      }
+
+      refreshBtn.addEventListener('click', load);
+      statusFilter.addEventListener('change', render);
+      sourceFilter.addEventListener('change', render);
+      searchEl.addEventListener('input', render);
+      load();
+    }
+  </script>
+</body>
+
+</html>
