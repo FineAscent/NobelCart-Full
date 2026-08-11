@@ -2418,89 +2418,87 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- Inactivity Timer for Grid/Category Views ---
+// On index, the category grid should fall back to the OpenSearch (main) view
+// after idle. Activity must reliably reset that clock — listen on document in
+// the capture phase so taps on cards, tabs, and the cart still count.
 document.addEventListener('DOMContentLoaded', () => {
-  const INACTIVITY_LIMIT_MS = 15000;
+  const INACTIVITY_LIMIT_MS = 100 * 1000; // 100 seconds
   let inactivityTimer = null;
-  const leftSection = document.querySelector('.left-section');
 
-  // Elements for index.html view switching
   const viewOpenSearch = document.getElementById('view-opensearch');
   const viewCategoryGrid = document.getElementById('view-category-grid');
+  const isIndexPage = document.body.classList.contains('index');
+  const isCategoryPage = document.body.classList.contains('category-page');
+
+  // Only these pages need the grid/category idle revert.
+  if (!isIndexPage && !isCategoryPage) return;
 
   function isGridOrCategoryActive() {
-    // 1. Are we on category.html?
-    if (document.body.classList.contains('category-page')) return true;
-
-    // 2. Are we on index.html with Grid View visible?
-    if (viewCategoryGrid && !viewCategoryGrid.classList.contains('hidden')) {
-      return true;
-    }
-
+    if (isCategoryPage) return true;
+    if (viewCategoryGrid && !viewCategoryGrid.classList.contains('hidden')) return true;
     return false;
   }
 
+  function clearIdleTimer() {
+    if (inactivityTimer) {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = null;
+    }
+  }
+
   function revertView() {
-    console.debug('[Inactivity] Time limit reached, reverting view...');
+    clearIdleTimer();
+    if (!isGridOrCategoryActive()) return;
 
-    if (document.body.classList.contains('category-page')) {
-      // If on category page, go back to index
-      window.location.href = 'index.html';
-    } else if (viewOpenSearch && viewCategoryGrid) {
-      // If on index.html grid view, revert to OpenSearch
+    if (isCategoryPage) {
+      // Back to the main OpenSearch index view (not the grid).
+      window.location.href = typeof withCart === 'function' ? withCart('index.html') : 'index.html';
+      return;
+    }
 
-      // 1. Hide Grid
-      viewCategoryGrid.style.opacity = '0';
-      viewCategoryGrid.classList.add('hidden');
+    if (!viewOpenSearch || !viewCategoryGrid) return;
 
-      // 2. Show OpenSearch
-      viewOpenSearch.classList.remove('hidden');
-      viewOpenSearch.classList.remove('slow-fade-out');
-      document.body.classList.add('opensearch-active');
+    viewCategoryGrid.style.opacity = '0';
+    viewCategoryGrid.classList.add('hidden');
+    viewCategoryGrid.classList.remove('fade-out-active');
 
-      // 3. Clear ?view=grid param if present so reload doesn't bring us back
-      const url = new URL(window.location);
+    viewOpenSearch.classList.remove('hidden');
+    viewOpenSearch.classList.remove('slow-fade-out');
+    viewOpenSearch.style.opacity = '';
+    document.body.classList.add('opensearch-active');
+
+    try {
+      const url = new URL(window.location.href);
       if (url.searchParams.get('view') === 'grid') {
         url.searchParams.delete('view');
         window.history.replaceState({}, '', url);
       }
-    }
+    } catch (_) { }
   }
 
   function resetTimer() {
-    if (inactivityTimer) clearTimeout(inactivityTimer);
-
-    // Only start timer if we are in the target state
-    if (isGridOrCategoryActive()) {
-      inactivityTimer = setTimeout(revertView, INACTIVITY_LIMIT_MS);
-    }
+    clearIdleTimer();
+    if (!isGridOrCategoryActive()) return;
+    inactivityTimer = setTimeout(revertView, INACTIVITY_LIMIT_MS);
   }
 
-  // Monitor interactions on the Left Section only
-  if (leftSection) {
-    const events = ['mousedown', 'mousemove', 'touchstart', 'click', 'scroll', 'keydown'];
-    events.forEach(evt => {
-      leftSection.addEventListener(evt, resetTimer, { passive: true });
-    });
-  }
+  // Real interactions only — ignore mousemove/scroll noise so the timer means
+  // "no taps", matching kiosk use. Capture phase so stopPropagation cannot skip us.
+  const activityEvents = ['pointerdown', 'touchstart', 'mousedown', 'click', 'keydown'];
+  activityEvents.forEach((evt) => {
+    document.addEventListener(evt, () => {
+      if (isGridOrCategoryActive()) resetTimer();
+    }, { passive: true, capture: true });
+  });
 
-  // For index.html, we need to detect when the view changes to Grid
+  // Start/stop when index swaps between OpenSearch and the category grid.
   if (viewCategoryGrid) {
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          // If grid just became visible, start/reset the timer
-          if (!viewCategoryGrid.classList.contains('hidden')) {
-            resetTimer();
-          } else {
-            // If grid became hidden, clear timer
-            if (inactivityTimer) clearTimeout(inactivityTimer);
-          }
-        }
-      });
+    const observer = new MutationObserver(() => {
+      if (isGridOrCategoryActive()) resetTimer();
+      else clearIdleTimer();
     });
-    observer.observe(viewCategoryGrid, { attributes: true });
+    observer.observe(viewCategoryGrid, { attributes: true, attributeFilter: ['class'] });
   }
 
-  // Initial check on load
   resetTimer();
 });
