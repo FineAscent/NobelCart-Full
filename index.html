@@ -8,6 +8,8 @@
 
 
     <link rel="stylesheet" href="styles.css">
+    <!-- Block phones from the kiosk UI (allowlist lives in phone-gate.js) -->
+    <script src="phone-gate.js"></script>
     <!-- Gate: require ?cart= — recovers the device's stored id if the URL loses it -->
     <script src="cart-id.js"></script>
     <script>ncRequireCart();</script>

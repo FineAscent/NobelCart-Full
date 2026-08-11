@@ -688,7 +688,28 @@ async function upsertActiveSession(subtotal) {
         subtotal: Number(subtotal || 0),
         last_seen: new Date().toISOString(),
         user_agent: ua,
+        force_sign_out: false,
       });
+  } catch (_) { }
+}
+
+/** Mark this device session inactive so the mobile app drops Active within ~5s */
+async function clearActiveSession() {
+  try {
+    if (!window.sb) return;
+    const { data } = await window.sb.auth.getSession();
+    const user = data?.session?.user;
+    if (!user) return;
+    const deviceId = getDeviceId();
+    await window.sb
+      .from('active_sessions')
+      .update({
+        force_sign_out: false,
+        last_seen: new Date(Date.now() - 60_000).toISOString(),
+        subtotal: 0,
+      })
+      .eq('user_id', user.id)
+      .eq('device_id', deviceId);
   } catch (_) { }
 }
 
@@ -722,15 +743,8 @@ async function ensureForceSignoutWatcher() {
         try {
           const row = payload?.new || {};
           if (row && row.force_sign_out && row.device_id === deviceId && row.user_id === user.id) {
-            // Clear the flag for this row first so future sessions don't instantly sign out
-            try {
-              await window.sb
-                .from('active_sessions')
-                .update({ force_sign_out: false })
-                .eq('user_id', user.id)
-                .eq('device_id', deviceId);
-            } catch (_) { }
-            // Admin requested sign-out: clear local state and sign out
+            // Age out session for the mobile app, then sign out locally
+            try { await clearActiveSession(); } catch (_) { }
             try { localStorage.removeItem(CART_KEY); } catch (_) { }
             try { sessionStorage.clear(); } catch (_) { }
             try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
@@ -1221,11 +1235,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize force sign-out realtime watcher and send an initial heartbeat
     try { ensureForceSignoutWatcher(); } catch (_) { }
     try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
-    // Periodic heartbeat to keep last_seen fresh and subtotal up to date
+    // Periodic heartbeat (~2s) so the mobile app can detect Active / signed-out within ~5s
     try {
       setInterval(() => {
         try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
-      }, 20000);
+      }, 2000);
     } catch (_) { }
     // Ensure weight modal root exists
     try { ensureModalRoot(); } catch (_) { }
@@ -1421,6 +1435,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const signOutForInactivity = async () => {
+        try { await clearActiveSession(); } catch (_) { }
         try { localStorage.removeItem('nc_cart_v1'); } catch (_) { }
         try { sessionStorage.clear(); } catch (_) { }
         if (window.sb) {

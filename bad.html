@@ -3,14 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bad Error</title>
+  <title>Unavailable</title>
   <style>
-    * { -webkit-user-select:none; user-select:none; }
-    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#fff; margin:0; color:#111827; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-    .bad-title { font-size:20px; font-weight:700; }
+    * { -webkit-user-select:none; user-select:none; box-sizing:border-box; }
+    body {
+      display:flex; align-items:center; justify-content:center;
+      min-height:100vh; margin:0; background:#fff; color:#111827;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      padding:24px;
+    }
+    .wrap { text-align:center; max-width:360px; }
+    .title { font-size:22px; font-weight:700; margin:0 0 10px; }
+    .msg { font-size:15px; line-height:1.5; color:#4b5563; margin:0; }
   </style>
 </head>
 <body>
-  <div class="bad-title">Bad Error</div>
+  <div class="wrap">
+    <div class="title" id="title">Bad Error</div>
+    <p class="msg" id="msg" hidden></p>
+  </div>
+  <script>
+    (function () {
+      try {
+        var reason = new URLSearchParams(location.search).get('reason');
+        if (reason === 'phone') {
+          document.title = 'Use the cart screen';
+          document.getElementById('title').textContent = 'Use the cart screen';
+          var msg = document.getElementById('msg');
+          msg.hidden = false;
+          msg.textContent = 'This page is for the Nobel Cart kiosk. On your phone, use the QR code on the cart to sign in or to pay.';
+        }
+      } catch (_) { }
+    })();
+  </script>
 </body>
 </html>
