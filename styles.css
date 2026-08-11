@@ -1753,13 +1753,13 @@ body.signin.keyboard-visible .auth-wrapper {
     position: absolute;
     left: 0;
     bottom: 0;
-    min-width: 74px;
+    min-width: 79px;
     padding: 12px 20px;
     background: rgba(255, 255, 255, 0.96);
     border: 1px solid rgba(45, 42, 38, 0.08);
     color: #2d2a26;
     border-radius: 18px;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
     line-height: 1.1;
     text-align: center;

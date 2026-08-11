@@ -2422,7 +2422,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // after idle. Activity must reliably reset that clock — listen on document in
 // the capture phase so taps on cards, tabs, and the cart still count.
 document.addEventListener('DOMContentLoaded', () => {
-  const INACTIVITY_LIMIT_MS = 100 * 1000; // 100 seconds
+  const INACTIVITY_LIMIT_MS = 30 * 1000; // 30 seconds
   let inactivityTimer = null;
 
   const viewOpenSearch = document.getElementById('view-opensearch');
