@@ -33,13 +33,61 @@
     </section>
 
     <div class="receipt-actions">
-      <button class="receipt-btn btn-primary" onclick="window.close()">Close</button>
-      <div style="text-align:center; font-size:13px; color:#6b7280; margin-top:8px;">You can close this page</div>
+      <button class="receipt-btn btn-primary" id="receipt-close-btn" type="button">Close now</button>
+      <div id="receipt-auto-close" style="text-align:center; font-size:13px; color:#6b7280; margin-top:8px;">
+        This page will close in <span id="receipt-countdown">60</span>s
+      </div>
     </div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="site.js"></script>
+  <script>
+    (function () {
+      // Phones land here after Stripe checkout. Auto-exit so the tab doesn't linger.
+      var SECONDS = 60;
+      var countdownEl = document.getElementById('receipt-countdown');
+      var hintEl = document.getElementById('receipt-auto-close');
+      var closeBtn = document.getElementById('receipt-close-btn');
+      var left = SECONDS;
+      var closed = false;
+
+      function showDoneScreen() {
+        document.body.innerHTML =
+          '<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif;text-align:center;color:#374151;background:#f8fafc;">' +
+          '<div><div style="font-size:40px;margin-bottom:12px;">✓</div>' +
+          '<p style="font-size:18px;font-weight:600;margin:0 0 8px;color:#111827;">You\'re all set</p>' +
+          '<p style="margin:0;font-size:14px;color:#6b7280;">You can leave this page or switch apps.</p></div></main>';
+      }
+
+      function exitPage() {
+        if (closed) return;
+        closed = true;
+        try { window.close(); } catch (_) { }
+        // Most mobile browsers block window.close() on Stripe redirects.
+        try { window.open('', '_self'); window.close(); } catch (_) { }
+        setTimeout(function () {
+          try { window.location.replace('about:blank'); } catch (_) { showDoneScreen(); }
+          // If about:blank is also blocked, blank the thank-you UI.
+          setTimeout(showDoneScreen, 200);
+        }, 250);
+      }
+
+      function tick() {
+        left -= 1;
+        if (countdownEl) countdownEl.textContent = String(Math.max(0, left));
+        if (left <= 0) {
+          if (hintEl) hintEl.textContent = 'Closing…';
+          exitPage();
+          return;
+        }
+        setTimeout(tick, 1000);
+      }
+
+      if (closeBtn) closeBtn.addEventListener('click', exitPage);
+      setTimeout(tick, 1000);
+    })();
+  </script>
 </body>
 
 </html>

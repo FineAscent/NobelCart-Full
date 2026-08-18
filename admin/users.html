@@ -29,6 +29,7 @@
       gap: 8px;
       align-items: center;
       margin-bottom: 12px;
+      flex-wrap: wrap;
     }
 
     .session-grid {
@@ -46,6 +47,7 @@
       border-bottom: 1px solid #f3f4f6;
       text-align: left;
       font-size: 14px;
+      vertical-align: middle;
     }
 
     .session-grid th {
@@ -54,9 +56,7 @@
       color: #374151;
     }
 
-    .muted {
-      color: #6b7280;
-    }
+    .muted { color: #6b7280; }
 
     .pill {
       display: inline-block;
@@ -67,15 +67,10 @@
       color: #3730a3;
     }
 
-    .pill-admin {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .pill-off {
-      background: #f3f4f6;
-      color: #6b7280;
-    }
+    .pill-admin { background: #fef3c7; color: #92400e; }
+    .pill-l2 { background: #ffedd5; color: #9a3412; }
+    .pill-l3 { background: #fee2e2; color: #991b1b; }
+    .pill-off { background: #f3f4f6; color: #6b7280; }
 
     .btn {
       border: 1px solid #d1d5db;
@@ -83,11 +78,11 @@
       border-radius: 8px;
       padding: 6px 10px;
       cursor: pointer;
+      font: inherit;
     }
 
-    .btn:hover {
-      background: #f9fafb;
-    }
+    .btn:hover { background: #f9fafb; }
+    .btn:disabled { opacity: 0.55; cursor: default; }
 
     .search {
       border: 1px solid #d1d5db;
@@ -96,8 +91,27 @@
       min-width: 240px;
     }
 
-    .nowrap {
-      white-space: nowrap;
+    .level-select {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font: inherit;
+      background: #fff;
+    }
+
+    .nowrap { white-space: nowrap; }
+
+    .role-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #6b7280;
+      margin: 0 0 12px;
     }
   </style>
 </head>
@@ -123,6 +137,8 @@
       <span>Users</span>
     </div>
 
+    <p class="hint" id="level-hint">Admin levels: 1 default · 2 elevated · 3 can grant levels</p>
+
     <div class="session-toolbar">
       <button id="refresh" class="btn">Refresh</button>
       <input id="search" class="search" type="search" placeholder="Filter by name or email…" />
@@ -137,7 +153,7 @@
             <th>Email</th>
             <th>Signed Up</th>
             <th>Status</th>
-            <th>Role</th>
+            <th>Role / Level</th>
             <th>Allergy Warnings</th>
           </tr>
         </thead>
@@ -150,33 +166,9 @@
     </div>
   </div>
 
-  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../config.js"></script>
-  <script>
-    // Route guard: require active session and admin role
-    (async () => {
-      try {
-        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
-        const { data, error } = await window.sb.auth.getSession();
-        const session = data && data.session;
-        if (error || !session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-          return (window.location.href = '../signin.html?admin=1');
-        }
-        const uid = session.user.id;
-        const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
-        if (!prof || !prof.is_admin) {
-          alert('Admin access required.');
-          return (window.location.href = '../index.html');
-        }
-        loadUsers();
-      } catch (e) {
-        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-        return (window.location.href = '../signin.html?admin=1');
-      }
-    })();
-  </script>
+  <script src="admin-access.js"></script>
   <script>
     const el = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -184,15 +176,34 @@
     })[c]);
 
     let allUsers = [];
+    let myLevel = 0;
+    let myId = null;
+
+    function rolePill(u) {
+      if (!u.is_admin) return '<span class="muted">Customer</span>';
+      const level = Number(u.admin_level) || 1;
+      const cls = level >= 3 ? 'pill-l3' : level === 2 ? 'pill-l2' : 'pill-admin';
+      return `<span class="pill ${cls}">Admin L${level}</span>`;
+    }
+
+    async function boot() {
+      const access = await window.ncAdminAccess.requireAdminPage('users');
+      if (!access) return;
+      myId = access.userId;
+      myLevel = access.level;
+      el('level-hint').textContent = myLevel >= 3
+        ? 'You are Admin L3 — you can grant or change admin levels below.'
+        : `You are Admin L${myLevel}. Only Admin L3 can change levels.`;
+      loadUsers();
+    }
 
     async function loadUsers() {
       const status = el('status');
       status.textContent = 'Loading…';
       try {
-        // Readable because of the "Admins can view all profiles" RLS policy.
         const { data, error } = await window.sb
           .from('profiles')
-          .select('id, display_name, email, created_at, active, is_admin, show_allergy_caution')
+          .select('id, display_name, email, created_at, active, is_admin, admin_level, show_allergy_caution')
           .order('created_at', { ascending: false });
         if (error) throw error;
         allUsers = Array.isArray(data) ? data : [];
@@ -203,6 +214,18 @@
         el('tbody').innerHTML = '<tr><td colspan="6" class="muted">Error loading users.</td></tr>';
         status.textContent = 'Error: ' + (e.message || e);
       }
+    }
+
+    function levelControls(u) {
+      if (myLevel < 3) return '';
+      const current = u.is_admin ? (Number(u.admin_level) || 1) : 0;
+      return `
+        <select class="level-select" data-user-id="${esc(u.id)}" aria-label="Set admin level">
+          <option value="0" ${current === 0 ? 'selected' : ''}>Customer</option>
+          <option value="1" ${current === 1 ? 'selected' : ''}>Admin L1</option>
+          <option value="2" ${current === 2 ? 'selected' : ''}>Admin L2</option>
+          <option value="3" ${current === 3 ? 'selected' : ''}>Admin L3</option>
+        </select>`;
     }
 
     function render() {
@@ -225,9 +248,6 @@
         const active = u.active === false
           ? '<span class="pill pill-off">Inactive</span>'
           : '<span class="pill">Active</span>';
-        const role = u.is_admin
-          ? '<span class="pill pill-admin">Admin</span>'
-          : '<span class="muted">Customer</span>';
         const allergy = u.show_allergy_caution === false ? 'Off' : 'On';
         return `
           <tr data-user-id="${esc(u.id)}">
@@ -235,14 +255,57 @@
             <td class="nowrap">${esc(u.email) || '<span class="muted">(no email)</span>'}</td>
             <td class="nowrap muted">${esc(created)}</td>
             <td>${active}</td>
-            <td>${role}</td>
+            <td>
+              <div class="role-cell">
+                ${rolePill(u)}
+                ${levelControls(u)}
+              </div>
+            </td>
             <td class="muted">${allergy}</td>
           </tr>`;
       }).join('');
     }
 
+    async function onLevelChange(select) {
+      const userId = select.getAttribute('data-user-id');
+      const value = Number(select.value);
+      const makeAdmin = value > 0;
+      const level = makeAdmin ? value : 1;
+      select.disabled = true;
+      try {
+        const { data, error } = await window.sb.rpc('set_admin_access', {
+          target_user_id: userId,
+          make_admin: makeAdmin,
+          new_level: level,
+        });
+        if (error) throw error;
+        const updated = Array.isArray(data) ? data[0] : data;
+        const idx = allUsers.findIndex(u => u.id === userId);
+        if (idx >= 0 && updated) {
+          allUsers[idx].is_admin = updated.is_admin;
+          allUsers[idx].admin_level = updated.admin_level;
+        } else {
+          await loadUsers();
+          return;
+        }
+        render();
+        el('status').textContent = 'Updated admin access';
+      } catch (e) {
+        alert(e.message || 'Failed to update admin level');
+        render();
+      } finally {
+        select.disabled = false;
+      }
+    }
+
     el('refresh').addEventListener('click', loadUsers);
     el('search').addEventListener('input', render);
+    el('tbody').addEventListener('change', (e) => {
+      const sel = e.target.closest('select.level-select');
+      if (sel) onLevelChange(sel);
+    });
+
+    boot();
   </script>
 </body>
 

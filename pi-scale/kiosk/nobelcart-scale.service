@@ -1,0 +1,17 @@
+[Unit]
+Description=NobelCart scale streamer (HX711 → Supabase)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/nobelcart/kiosk.env
+WorkingDirectory=/home/pi/pi-scale
+ExecStart=/usr/bin/python3 /home/pi/pi-scale/scale_stream.py
+Restart=always
+RestartSec=3
+# Nice so Chromium stays responsive for touch
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

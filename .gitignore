@@ -3,3 +3,6 @@
 .env.local
 supabase/.temp
 node_modules/
+__pycache__/
+pi-scale/config.json
+pi-fleet/

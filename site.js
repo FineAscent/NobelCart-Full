@@ -175,12 +175,37 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   const statusEl = modal.querySelector('.wm-scale-status');
   let scaleChannel = null;
   let dotTimer = null;
-  const readings = [];
-  const AUTO_COUNT = 3;
-  const MIN_KG = 0.01; // ignore noise / empty-cart negative offset
+  let wakeTimer = null;
+  let holdTimer = null;
+  let tickTimer = null;
   let autoConfirmed = false;
+  let closed = false;
+  let acceptLive = false;
+  let lastKg = null;
+  let stableSince = null;
+  const MIN_KG = 0.01; // ignore noise / empty-cart negative offset
+  const STABLE_DELTA_KG = 0.02; // ~0.7 oz — reset hold if the pan is still moving
+  const STABLE_MS = 5000; // keep reading a few seconds after it settles
+  const WAKE_MS = 1200; // skip stale DB weight + the scale_wanted realtime echo
+
+  const setScaleWanted = (wanted) => {
+    if (!window.sb || !CART_ID) return;
+    const payload = wanted
+      ? { scale_wanted: true, scale_wanted_at: new Date().toISOString() }
+      : { scale_wanted: false };
+    window.sb.from('carts').update(payload).eq('cart_id', CART_ID)
+      .then(() => {})
+      .catch(() => {});
+  };
 
   const close = () => {
+    if (closed) return;
+    closed = true;
+    setScaleWanted(false);
+    clearTimeout(dotTimer);
+    clearTimeout(wakeTimer);
+    clearTimeout(holdTimer);
+    if (tickTimer) clearInterval(tickTimer);
     if (scaleChannel && window.sb) {
       try { window.sb.removeChannel(scaleChannel); } catch (_) {}
     }
@@ -204,9 +229,27 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     }
   };
 
-  // Fill input from scale reading, collect readings, auto-add after AUTO_COUNT positives
+  const maybeAutoAdd = () => {
+    if (autoConfirmed || !acceptLive || lastKg == null || lastKg <= MIN_KG || !stableSince) return;
+    const held = Date.now() - stableSince;
+    const w = Math.abs(Number(input.value)) || lastKg;
+    if (held < STABLE_MS) {
+      const leftSec = Math.max(1, Math.ceil((STABLE_MS - held) / 1000));
+      if (statusEl) statusEl.textContent = `Live from scale \u00b7 hold still ${leftSec}s\u2026`;
+      return;
+    }
+    autoConfirmed = true;
+    input.value = w.toFixed(3);
+    updateEstimate();
+    if (statusEl) statusEl.textContent = `Adding ${w.toFixed(3)} ${u || 'kg'}\u2026`;
+    holdTimer = setTimeout(() => { btnOk.click(); }, 700);
+  };
+
+  // Live kg from this cart's Pi. Hold still ~5s after it settles, then auto-add.
   const setScaleWeight = (kg) => {
+    if (!acceptLive) return;
     const w = Math.abs(Number(kg));
+    if (!Number.isFinite(w)) return;
     input.value = w.toFixed(3);
     updateEstimate();
     if (dotEl) {
@@ -214,23 +257,20 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
       clearTimeout(dotTimer);
       dotTimer = setTimeout(() => { dotEl.style.background = '#d1d5db'; }, 3000);
     }
-    if (autoConfirmed) return; // already triggered
-    if (w > MIN_KG) {
-      readings.push(w);
-      const left = AUTO_COUNT - readings.length;
-      if (left > 0) {
-        if (statusEl) statusEl.textContent = `Live from scale \u00b7 auto-adding in ${left}\u2026`;
-      } else {
-        autoConfirmed = true;
-        const avg = readings.reduce((a, b) => a + b, 0) / readings.length;
-        input.value = Number(avg).toFixed(3);
-        updateEstimate();
-        if (statusEl) statusEl.textContent = `Adding ${Number(avg).toFixed(3)} ${u || 'kg'}\u2026`;
-        setTimeout(() => { btnOk.click(); }, 600);
-      }
-    } else {
+    if (autoConfirmed) return;
+
+    if (w <= MIN_KG) {
+      lastKg = w;
+      stableSince = null;
       if (statusEl) statusEl.textContent = 'Place item on cart\u2026';
+      return;
     }
+
+    if (lastKg == null || lastKg <= MIN_KG || Math.abs(w - lastKg) > STABLE_DELTA_KG) {
+      lastKg = w;
+      stableSince = Date.now();
+    }
+    maybeAutoAdd();
   };
 
   input.addEventListener('input', updateEstimate);
@@ -245,21 +285,19 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     if (e.key === 'Enter') { e.preventDefault(); btnOk.click(); }
   });
 
-  // --- Scale integration via Supabase ---
-  if (window.sb) {
-    // Fetch current weight immediately so the field is pre-filled
-    window.sb.from('carts').select('weight_kg').eq('cart_id', CART_ID).maybeSingle()
-      .then(({ data }) => {
-        if (data && data.weight_kg != null) {
-          setScaleWeight(data.weight_kg);
-        } else {
-          if (statusEl) statusEl.textContent = 'Scale not connected';
-        }
-      })
-      .catch(() => { if (statusEl) statusEl.textContent = 'Scale not connected'; });
+  // --- Scale: this cart_id asks the Pi to wake, then says done on close ---
+  if (window.sb && CART_ID) {
+    if (statusEl) statusEl.textContent = 'Starting scale \u2014 keep cart empty\u2026';
+    setScaleWanted(true);
+    wakeTimer = setTimeout(() => {
+      acceptLive = true;
+      if (!autoConfirmed && statusEl && Number(input.value) <= MIN_KG) {
+        statusEl.textContent = 'Place item on cart\u2026';
+      }
+    }, WAKE_MS);
+    tickTimer = setInterval(maybeAutoAdd, 250);
 
-    // Live updates while modal is open
-    scaleChannel = window.sb.channel('wm-scale-live')
+    scaleChannel = window.sb.channel('wm-scale-live-' + CART_ID)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -272,7 +310,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
       })
       .subscribe();
   } else {
-    if (statusEl) statusEl.textContent = 'Scale not connected';
+    if (statusEl) statusEl.textContent = CART_ID ? 'Scale not connected' : 'Missing cart id';
   }
 
   setTimeout(() => { input.focus(); input.select?.(); }, 50);
@@ -666,7 +704,9 @@ function getCartSubtotal() {
   return Number(subtotal || 0);
 }
 
-// Heartbeat: upsert session row with latest subtotal and last_seen
+// Heartbeat: upsert session row with latest subtotal and last_seen.
+// Do NOT touch force_sign_out here — admin / expire_stale_kiosk_sessions set it,
+// and clearing it on every beat would race those force-outs away.
 let __hbScheduled = false;
 let __hbLastSubtotal = 0;
 async function upsertActiveSession(subtotal) {
@@ -679,6 +719,27 @@ async function upsertActiveSession(subtotal) {
     const deviceId = getDeviceId();
     const email = user.email || null;
     const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : null;
+
+    // If the backend already flagged this device, sign out instead of heartbeating.
+    try {
+      const { data: row } = await window.sb
+        .from('active_sessions')
+        .select('force_sign_out, session_started_at')
+        .eq('user_id', user.id)
+        .eq('device_id', deviceId)
+        .maybeSingle();
+      if (row?.force_sign_out) {
+        try { await clearActiveSession(); } catch (_) { }
+        try { localStorage.removeItem(CART_KEY); } catch (_) { }
+        try { sessionStorage.clear(); } catch (_) { }
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+        if (!location.pathname.includes('signin.html')) {
+          window.location.href = withCart('signin.html');
+        }
+        return;
+      }
+    } catch (_) { }
+
     await window.sb
       .from('active_sessions')
       .upsert({
@@ -688,7 +749,6 @@ async function upsertActiveSession(subtotal) {
         subtotal: Number(subtotal || 0),
         last_seen: new Date().toISOString(),
         user_agent: ua,
-        force_sign_out: false,
       });
   } catch (_) { }
 }
@@ -1441,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.sb) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
         }
-        window.location.href = withCart('signin.html?reason=inactive');
+        window.location.href = withCart('signin.html');
       };
 
       const handleIdleTimeout = () => {

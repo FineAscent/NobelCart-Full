@@ -1,0 +1,38 @@
+{
+  "cart_id": "cart-1",
+  "gpio": {
+    "chip": "/dev/gpiochip0",
+    "dat_pin": 17,
+    "clk_pin": 27
+  },
+  "calibration": {
+    "tare_on_start": true,
+    "tare_samples": 20,
+    "tare_offset": null,
+    "counts_per_kg": null,
+    "comment": "HX711 BCM: DT=GPIO17 (header 11), SCK=GPIO27 (header 13)."
+  },
+  "filter": {
+    "median_window": 5,
+    "ema_alpha": 0.4,
+    "outlier_ratio": 0.35,
+    "min_delta_kg": 0.005,
+    "force_send_ms": 1500,
+    "round_digits": 3,
+    "loop_sleep_s": 0.02,
+    "comment": "Clean on the Pi before upload. Raise median_window / lower ema_alpha for more smoothing; raise min_delta_kg to cut traffic."
+  },
+  "supabase": {
+    "url": "https://pkofxkcbdyqcunwjrnnx.supabase.co",
+    "key_env": "SUPABASE_SERVICE_ROLE_KEY",
+    "table": "carts",
+    "cart_id_column": "cart_id",
+    "weight_column": "weight_kg"
+  },
+  "session": {
+    "idle_poll_s": 1.0,
+    "timeout_s": 90,
+    "tare_on_session": true,
+    "comment": "GPIO stays off until carts.scale_wanted is true for this cart_id."
+  }
+}

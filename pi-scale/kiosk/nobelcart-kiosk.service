@@ -1,0 +1,20 @@
+[Unit]
+Description=NobelCart Chromium touch kiosk
+After=graphical.target network-online.target nobelcart-scale.service
+Wants=network-online.target nobelcart-scale.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/nobelcart/kiosk.env
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+# User must match the desktop login (edit in install.sh)
+User=pi
+Group=pi
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/pi/pi-scale/kiosk/start-browser.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

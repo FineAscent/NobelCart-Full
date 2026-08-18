@@ -11,7 +11,6 @@
 
 <body class="refunds-standalone">
   <style>
-    /* Standalone admin layout: centered, white background */
     body.refunds-standalone {
       background: #ffffff;
       min-height: 100vh;
@@ -30,7 +29,13 @@
       font-size: 28px;
       font-weight: 700;
       color: #111827;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
+    }
+
+    .admin-level-note {
+      color: #6b7280;
+      font-size: 13px;
+      margin: 0 0 16px;
     }
 
     .admin-grid {
@@ -71,58 +76,48 @@
         style="height:28px; padding:4px 10px; display:inline-flex; align-items:center;">Account</a>
       <span>Admin</span>
     </div>
-    <div class="admin-grid">
-      <a class="admin-card" href="refund.html">
+    <p class="admin-level-note" id="level-note">Checking access…</p>
+    <div class="admin-grid" id="admin-grid">
+      <a class="admin-card" href="refund.html" data-admin-min="1">
         <h3>Refunds</h3>
         <p>Search receipts and issue item-level refunds.</p>
       </a>
-      <a class="admin-card" href="monitor.html">
+      <a class="admin-card" href="monitor.html" data-admin-min="1">
         <h3>Monitor Active Carts</h3>
         <p>View signed-in customers and their live cart subtotals.</p>
       </a>
-      <a class="admin-card" href="users.html">
+      <a class="admin-card" href="users.html" data-admin-min="3">
         <h3>Users</h3>
         <p>Browse everyone who signed up and their profile info.</p>
       </a>
-      <a class="admin-card" href="status.html">
+      <a class="admin-card" href="status.html" data-admin-min="3">
         <h3>Platform Status</h3>
         <p>Live health of Stripe, Supabase, AWS, GitHub, and Brevo.</p>
       </a>
-      <a class="admin-card" href="errors.html">
+      <a class="admin-card" href="errors.html" data-admin-min="3">
         <h3>Error Log</h3>
         <p>Kiosk errors from signed-in members (kept 7 days).</p>
       </a>
-      <a class="admin-card" href="backup.html">
+      <a class="admin-card" href="backup.html" data-admin-min="3">
         <h3>User Backups</h3>
         <p>Snapshot and secure user profile data.</p>
       </a>
     </div>
   </div>
 
-  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../config.js"></script>
-  <!-- Route guard: require active session to access admin -->
+  <script src="admin-access.js"></script>
   <script>
     (async () => {
-      try {
-        if (!window.sb) return (window.location.href = '../signin.html?admin=1');
-        const { data, error } = await window.sb.auth.getSession();
-        const session = data && data.session;
-        if (error || !session) {
-          try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-          return (window.location.href = '../signin.html?admin=1');
-        }
-        // Verify admin role
-        const uid = session.user.id;
-        const { data: prof } = await window.sb.from('profiles').select('is_admin').eq('id', uid).single();
-        if (!prof || !prof.is_admin) {
-          alert('Admin access required.');
-          return (window.location.href = '../index.html');
-        }
-      } catch (e) {
-        try { await window.sb.auth.signOut({ scope: 'local' }); } catch { }
-        return (window.location.href = '../signin.html?admin=1');
+      const access = await window.ncAdminAccess.requireAdminPage('index');
+      if (!access) return;
+      window.ncAdminAccess.filterAdminMenu(access.level);
+      const note = document.getElementById('level-note');
+      if (note) {
+        note.textContent = access.level >= 3
+          ? 'Admin L3 — full access'
+          : 'Admin L' + access.level + ' — Refunds and Monitor only';
       }
     })();
   </script>

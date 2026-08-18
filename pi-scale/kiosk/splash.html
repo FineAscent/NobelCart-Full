@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Noble Cart</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0a0c10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .wrap {
+      text-align: center;
+      animation: pop 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    img {
+      width: min(46vw, 300px);
+      height: auto;
+      display: block;
+      margin: 0 auto 16px;
+      filter: drop-shadow(0 10px 28px rgba(0,0,0,.4));
+    }
+    p {
+      margin: 0;
+      color: rgba(255,255,255,.55);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+    @keyframes pop {
+      0% { opacity: 0; transform: scale(.84) translateY(10px); }
+      20% { opacity: 1; transform: scale(1.03); }
+      30% { transform: scale(1); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <img src="noble.png" alt="Noble Cart" />
+    <p>Noble Cart</p>
+  </div>
+  <script>
+    (function () {
+      var next = new URLSearchParams(location.search).get('next');
+      if (!next) return;
+      // Brief local splash, then open the live kiosk URL
+      setTimeout(function () {
+        location.replace(next);
+      }, 2200);
+    })();
+  </script>
+</body>
+</html>
