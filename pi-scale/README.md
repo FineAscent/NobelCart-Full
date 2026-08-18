@@ -218,8 +218,10 @@ Folder: **`pi-scale/kiosk/`**
 
 On boot this starts:
 
-1. `scale_stream.py` (weight → Supabase)
-2. Chromium **fullscreen kiosk** for `SITE_URL?cart=CART_ID`
+1. `nobelcart-scale.service` → `scale_stream.py` (weight → Supabase). **Only systemd** should run this.
+2. Desktop autostart → Chromium **fullscreen kiosk** for `SITE_URL?cart=CART_ID` (`start-browser.sh`).
+
+Do **not** point autostart at `start-all.sh` while the scale service is enabled — that starts a second `scale_stream.py` (extra CPU + GPIO fight). `start-all.sh` is for manual debug only.
 
 Kiosk lockdown:
 
@@ -256,7 +258,8 @@ sudo reboot
 ```bash
 sudo systemctl start nobelcart-scale
 sudo -u pi /home/pi/pi-scale/kiosk/start-browser.sh
-# or both:  ./kiosk/start-all.sh
+# debug both in one tree (only if the scale service is STOPPED):
+#   ./kiosk/start-all.sh
 ```
 
 If **two** browsers open after reboot, disable one launcher:
@@ -265,3 +268,24 @@ If **two** browsers open after reboot, disable one launcher:
 sudo systemctl disable nobelcart-kiosk
 # OR remove ~/.config/autostart/nobelcart-kiosk.desktop
 ```
+
+---
+
+## Energy trim (unused Pi OS services)
+
+Carts do not need Bluetooth, printing, mDNS, NFS, or cloud-init. Chromium still uses most of the power; this only cuts idle radios and leftover daemons.
+
+```bash
+sudo bash kiosk/trim-idle.sh
+# optional: also stop Raspberry Pi Connect / wayvnc (keep if you use connect.raspberrypi.com)
+# sudo bash kiosk/trim-idle.sh --also-connect
+```
+
+Undo:
+
+```bash
+sudo bash kiosk/trim-idle.sh --undo
+sudo rfkill unblock bluetooth
+```
+
+The script does **not** disable Wi-Fi, LightDM, SSH, or `nobelcart-*` units.

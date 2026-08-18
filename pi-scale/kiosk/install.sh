@@ -94,14 +94,15 @@ RestartSec=5
 WantedBy=graphical.target
 EOF
 
-# Autostart fallback (desktop session) — starts both if systemd kiosk unit fails on Wayland
+# Autostart: browser only. systemd owns nobelcart-scale — start-all.sh would
+# launch a second scale_stream.py (GPIO fight + extra CPU).
 AUTOSTART_DIR="$REAL_HOME/.config/autostart"
 mkdir -p "$AUTOSTART_DIR"
 cat > "$AUTOSTART_DIR/nobelcart-kiosk.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=NobelCart Kiosk
-Exec=$SCRIPT_DIR/start-all.sh
+Exec=$SCRIPT_DIR/start-browser.sh
 X-GNOME-Autostart-enabled=true
 Hidden=false
 NoDisplay=false
@@ -148,4 +149,7 @@ echo "  sudo -u $REAL_USER $SCRIPT_DIR/start-browser.sh"
 echo
 echo "If TWO browsers open after reboot, disable one path:"
 echo "  sudo systemctl disable nobelcart-kiosk"
-echo "  # keep ~/.config/autostart  OR the opposite"
+echo "  # keep ~/.config/autostart (start-browser.sh)  OR the opposite"
+echo
+echo "Optional energy trim (Bluetooth/CUPS/Avahi/NFS/cloud-init):"
+echo "  sudo bash $SCRIPT_DIR/trim-idle.sh"

@@ -1,6 +1,7 @@
 #!/bin/bash
-# One entry point: scale streamer + kiosk browser.
-# Prefer systemd units from install.sh for boot; this is for manual / debug.
+# Manual / debug: scale streamer + kiosk browser in one process tree.
+# Do NOT use this from desktop autostart when nobelcart-scale.service is enabled —
+# you will get two scale_stream.py processes fighting over GPIO.
 
 set -euo pipefail
 
