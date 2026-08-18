@@ -8,6 +8,12 @@
     user-select: none;
 }
 
+img {
+    -webkit-user-drag: none;
+    user-drag: none;
+    -webkit-touch-callout: none;
+}
+
 input,
 textarea,
 select,
@@ -670,6 +676,7 @@ body.index.opensearch-active .right-section {
     mix-blend-mode: multiply;
     /* Helps integrate white-bg images */
     filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.1));
+    pointer-events: none;
 }
 
 .placeholder-message {
@@ -902,6 +909,7 @@ body.index.opensearch-active .right-section {
     display: inline-block;
     vertical-align: middle;
     margin: 0 4px;
+    pointer-events: none;
 }
 
 /* Hover/focus animations for card contents (text + icons only) */
@@ -912,7 +920,7 @@ body.index.opensearch-active .right-section {
 
 .category-card:hover .category-icons,
 .category-card:focus-within .category-icons {
-    transform: translateY(4px) scale(1.06);
+    transform: translateY(4px);
 }
 
 /* Respect reduced motion */

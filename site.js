@@ -852,7 +852,7 @@ function selectCartItem(key) {
   const displayEl = document.getElementById('selected-item-display');
   if (displayEl) {
     if (item && item.image) {
-      displayEl.innerHTML = `<img src="${item.image}" class="selected-item-image" alt="${item.name}">`;
+      displayEl.innerHTML = `<img src="${item.image}" class="selected-item-image" alt="${item.name}" draggable="false">`;
     } else if (item) {
       // Item selected but no image
       displayEl.innerHTML = `<div class="placeholder-message">${item.name}</div>`;
@@ -1135,6 +1135,11 @@ function bindGridForCart(gridEl) {
     }
   });
 }
+
+// Kiosk: don't let images be dragged into a new window/tab
+document.addEventListener('dragstart', (e) => {
+  if (e.target && e.target.tagName === 'IMG') e.preventDefault();
+}, true);
 
 // Page Transition Fade-In Logic
 document.addEventListener('DOMContentLoaded', () => {
@@ -1736,33 +1741,38 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.body.classList.contains('index')) {
     const cards = document.querySelectorAll('.category-card');
     let navigating = false;
+    const TAP_WINDOW_MS = 3000;
     cards.forEach(card => {
       const titleEl = card.querySelector('.category-title');
       const title = titleEl ? titleEl.textContent.trim() : '';
-      // Single click: show hint to double tap
+      let lastTapAt = 0;
+
+      // Two taps within 3s on the same card opens it (kiosk-friendly vs native dblclick)
       card.addEventListener('click', () => {
         if (navigating) return;
-        showHintToast('Tap twice to open');
-      });
-      // Double click: navigate to category page
-      card.addEventListener('dblclick', () => {
-        if (navigating) return;
-        navigating = true;
+        const now = Date.now();
+        if (lastTapAt && (now - lastTapAt) <= TAP_WINDOW_MS) {
+          navigating = true;
+          lastTapAt = 0;
 
-        // Trigger fade out on the grid container
-        const gridView = document.getElementById('view-category-grid');
-        if (gridView) {
-          gridView.classList.add('fade-out-active');
+          // Trigger fade out on the grid container
+          const gridView = document.getElementById('view-category-grid');
+          if (gridView) {
+            gridView.classList.add('fade-out-active');
+          }
+
+          const q = title ? ('?name=' + encodeURIComponent(title)) : '';
+          if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch { } }
+          try { sessionStorage.setItem('lastView', 'category'); } catch { }
+
+          setTimeout(() => {
+            window.location.href = withCart('category.html' + q);
+          }, 300);
+          return;
         }
 
-        const q = title ? ('?name=' + encodeURIComponent(title)) : '';
-        if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch { } }
-        try { sessionStorage.setItem('lastView', 'category'); } catch { }
-
-        // Wait for animation
-        setTimeout(() => {
-          window.location.href = withCart('category.html' + q);
-        }, 300);
+        lastTapAt = now;
+        showHintToast('Tap twice to open');
       });
     });
   } else {
@@ -2222,36 +2232,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const title = document.createElement('div');
     title.className = 'qr-title';
-    title.textContent = 'Scan to pay with your phone';
-
-    const meta = document.createElement('div');
-    meta.className = 'qr-meta';
-    meta.textContent = 'Your cart is locked into this secure Stripe checkout link.';
+    title.textContent = 'Scan to pay';
 
     const qrHolder = document.createElement('div');
     qrHolder.className = 'qr-holder';
 
-    // Use api.qrserver.com instead of local QRCode library
     const img = document.createElement('img');
     img.alt = 'QR code';
-    img.className = 'qr-canvas'; // retain class for CSS sizing
+    img.className = 'qr-canvas';
+    img.draggable = false;
     const size = opts.width || 340;
     img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(url);
     qrHolder.appendChild(img);
 
+    wrapper.appendChild(title);
+    wrapper.appendChild(qrHolder);
+    wrapper.appendChild(statusEl);
+    mountEl.appendChild(wrapper);
+
     linkEl.href = url;
     linkEl.textContent = 'Open checkout in browser';
 
-    const actions = document.createElement('div');
-    actions.className = 'qr-actions';
-    actions.appendChild(linkEl);
-    actions.appendChild(statusEl);
-
-    wrapper.appendChild(title);
-    wrapper.appendChild(meta);
-    wrapper.appendChild(qrHolder);
-    wrapper.appendChild(actions);
-    mountEl.appendChild(wrapper);
+    const payMeta = document.getElementById('checkout-pay-meta');
+    if (payMeta) {
+      payMeta.innerHTML = '';
+      const meta = document.createElement('div');
+      meta.className = 'qr-meta';
+      meta.textContent = 'Cart is locked to this secure Stripe checkout link.';
+      payMeta.appendChild(meta);
+      payMeta.appendChild(linkEl);
+    }
 
     setStatus('Ready to scan', 'success');
   }

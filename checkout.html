@@ -16,6 +16,14 @@
   <div class="checkout-wrapper">
     <div class="checkout-card">
       <div class="checkout-left">
+        <div id="checkout-mount">
+          <div style="text-align: center; color: #6b7280;">
+            Initializing checkout...
+          </div>
+        </div>
+      </div>
+
+      <div class="checkout-right">
         <div class="checkout-header">
           <button class="back-btn" id="checkout-back-btn">
             <span class="back-icon">←</span>
@@ -23,23 +31,12 @@
           </button>
         </div>
 
-        <div class="custom-inputs">
-          <div class="input-group name-group">
-            <input type="text" placeholder="Name" class="custom-input full-name" id="checkout-full-name" readonly>
-          </div>
-
-          <div class="card-info-label">Payment Details</div>
-
-          <div id="checkout-mount">
-            <!-- Stripe Embedded Checkout will mount here -->
-            <div style="text-align: center; color: #6b7280; margin-top: 40px;">
-              Initializing checkout...
-            </div>
-          </div>
+        <div class="checkout-payer">
+          <div class="card-info-label">Paying as</div>
+          <input type="text" placeholder="Name" class="custom-input full-name" id="checkout-full-name" readonly>
+          <p class="checkout-pay-hint">Scan the code on the left to pay with your phone.</p>
         </div>
-      </div>
 
-      <div class="checkout-right">
         <h2 class="checkout-title">Order Summary</h2>
 
         <div class="cart-items-container">
@@ -54,6 +51,7 @@
             <span class="subtotal-amount">$0.00</span>
           </div>
           <button class="checkout-btn">Refresh Link</button>
+          <div id="checkout-pay-meta" class="checkout-pay-meta"></div>
         </div>
       </div>
     </div>
@@ -73,9 +71,7 @@
         const { data: userData } = await window.sb.auth.getUser();
         const email = userData?.user?.email || '';
 
-        // Try to get name from user metadata or email
         const userMeta = userData?.user?.user_metadata || {};
-        // Prioritize full_name, fallback to first+last, or email part
         let fullName = userMeta.full_name || '';
 
         if (!fullName) {
@@ -86,14 +82,11 @@
           }
         }
 
-        // If still no name, try to extract from email
         if (!fullName && email) {
           const emailPart = email.split('@')[0];
-          // Simple heuristic to capitalize email part
           fullName = emailPart.charAt(0).toUpperCase() + emailPart.slice(1);
         }
 
-        // Fill the input field
         const nameInput = document.getElementById('checkout-full-name');
 
         if (nameInput && fullName) {
@@ -105,7 +98,7 @@
       }
     })();
   </script>
-  <script src="site.js?v=8"></script>
+  <script src="site.js?v=9"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const backBtn = document.getElementById('checkout-back-btn');
@@ -113,7 +106,6 @@
         backBtn.addEventListener('click', () => {
           document.body.classList.add('page-transition-fade-out');
           setTimeout(() => {
-            // Force navigation to index.html (defaults to OpenSearch/Main view)
             window.location.href = 'index.html';
           }, 500);
         });
