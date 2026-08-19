@@ -1986,34 +1986,6 @@ body.index.opensearch-active .total-header {
     color: #111;
 }
 
-/* Category / Cabinet / Account: match Find Item #f3f3f3. Index grid stays #e3e3e3. */
-body.category-page,
-body.page-opacity-0:not(.index) {
-    background-color: #f3f3f3;
-}
-
-body.category-page .container,
-body.page-opacity-0:not(.index) .container,
-body.category-page .left-section,
-body.page-opacity-0:not(.index) .left-section,
-body.category-page .section-header,
-body.page-opacity-0:not(.index) .section-header,
-body.category-page .right-section,
-body.page-opacity-0:not(.index) .right-section {
-    background-color: #f3f3f3 !important;
-    background: #f3f3f3 !important;
-}
-
-body.category-page .tabbar,
-body.page-opacity-0:not(.index) .tabbar {
-    background: rgba(0, 0, 0, 0.06) !important;
-}
-
-body.category-page .vk,
-body.page-opacity-0:not(.index) .vk {
-    background: #f3f3f3;
-}
-
 /* Grid Fade Transitions */
 @keyframes fadeOutGrid {
     from {
