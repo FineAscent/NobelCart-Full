@@ -501,7 +501,7 @@ body.index.opensearch-active .item-image {
 /* This block is kept for structure but overridden at bottom for specificity if needed */
 body.index.opensearch-active .right-section {
     /* Base styles, width overridden at bottom */
-    background-color: #F2EFE9;
+    background-color: #f3f3f3;
     padding: 20px 30px;
 }
 
@@ -1863,6 +1863,19 @@ screen and (max-height: 800px) {
     }
 }
 
+/* OpenSearch split view: flat #f3f3f3 panels; buttons keep their own colors */
+body.index.opensearch-active {
+    background-color: #f3f3f3;
+}
+
+body.index.opensearch-active .container,
+body.index.opensearch-active .left-section,
+body.index.opensearch-active .opensearch-top,
+body.index.opensearch-active .selected-item-display {
+    background-color: #f3f3f3;
+    background: #f3f3f3;
+}
+
 /* --- FORCE OVERRIDES FOR EXPANDED MODE --- */
 
 /* 1. Hide cart images in the right panel when expanded (OpenSearch mode) */
@@ -1878,6 +1891,7 @@ body.index.opensearch-active .right-section {
     flex: 0 0 55vw !important;
     padding: 40px 30px !important;
     max-width: none !important;
+    background-color: #f3f3f3;
     /* Maintain the transition in the active state to ensure it animates back when class is removed */
     transition: width 1.7s cubic-bezier(0.25, 1, 0.5, 1),
         min-width 1.7s cubic-bezier(0.25, 1, 0.5, 1),
