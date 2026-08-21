@@ -136,38 +136,61 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   const modal = document.createElement('div');
-  modal.className = 'modal weight-modal';
+  modal.className = 'modal weight-modal weight-modal--guide';
   const u = unit || '';
   const ppu = Number(pricePerUnit) || 0;
   const ppuDisplay = ppu ? `$${ppu.toFixed(2)}` : '';
   const unitLabel = u || 'unit';
+  const productLabel = (name && String(name).trim()) ? String(name).trim() : 'item';
+  const productSafe = productLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // One full play of the weigh guide (~7s) before weight entry shows
+  const GUIDE_MS = 7000;
+  const guideVideoSrc = 'Images/weigh-guide.mp4?v=3';
 
   modal.innerHTML = `
-    <div class="modal-body" style="padding-top:18px;">
-      <label class="modal-label">Weight${u ? ' (' + u + ')' : ''}</label>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:8px;">
-        <span class="wm-scale-dot" style="width:6px;height:6px;border-radius:50%;background:#d1d5db;display:inline-block;transition:background 0.3s;"></span>
-        <span class="wm-scale-status">Connecting to scale…</span>
+    <div class="wm-guide">
+      <div class="wm-guide-frame">
+        <video class="wm-guide-video" src="${guideVideoSrc}" autoplay muted playsinline loop preload="auto"></video>
       </div>
-      <div class="modal-input-row">
-        <input type="number" class="modal-input" min="0" step="0.001" placeholder="0.000" inputmode="decimal">
-        ${u ? `<span class="modal-input-unit">${u}</span>` : ''}
+      <div class="wm-guide-caption">How to weigh your item</div>
+      <div class="wm-guide-hint">Then place <strong>${productSafe}</strong> on the scale</div>
+    </div>
+    <div class="wm-weigh" hidden>
+      <div class="modal-body" style="padding-top:4px;">
+        <div class="modal-product">${productSafe}</div>
+        <label class="modal-label">Weight${u ? ' (' + u + ')' : ''}</label>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;margin-bottom:8px;">
+          <span class="wm-scale-dot" style="width:6px;height:6px;border-radius:50%;background:#d1d5db;display:inline-block;transition:background 0.3s;"></span>
+          <span class="wm-scale-status">Connecting to scale…</span>
+        </div>
+        <div class="modal-input-row">
+          <input type="number" class="modal-input" min="0" step="0.001" placeholder="0.000" inputmode="decimal">
+          ${u ? `<span class="modal-input-unit">${u}</span>` : ''}
+        </div>
+        <div class="modal-estimate" style="display:none;">
+          <span class="modal-estimate-label">Estimated Total:</span>
+          <span class="modal-estimate-price">$0.00</span>
+        </div>
       </div>
-      <div class="modal-estimate" style="display:none;">
-        <span class="modal-estimate-label">Estimated Total:</span>
-        <span class="modal-estimate-price">$0.00</span>
+      <div class="modal-actions">
+        <button class="btn btn-secondary">Cancel</button>
+        <button class="btn btn-primary" disabled>Add to Cart</button>
       </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary">Cancel</button>
-      <button class="btn btn-primary" disabled>Add to Cart</button>
+    <div class="wm-guide-actions">
+      <button type="button" class="btn btn-secondary wm-guide-cancel">Cancel</button>
     </div>
   `;
   overlay.appendChild(modal);
   root.appendChild(overlay);
 
+  const guideEl = modal.querySelector('.wm-guide');
+  const weighEl = modal.querySelector('.wm-weigh');
+  const guideActions = modal.querySelector('.wm-guide-actions');
+  const videoEl = modal.querySelector('.wm-guide-video');
   const input = modal.querySelector('.modal-input');
-  const btnCancel = modal.querySelector('.btn-secondary');
+  const btnCancel = modal.querySelector('.wm-weigh .btn-secondary');
+  const btnGuideCancel = modal.querySelector('.wm-guide-cancel');
   const btnOk = modal.querySelector('.btn-primary');
   const estimateEl = modal.querySelector('.modal-estimate');
   const estimatePriceEl = modal.querySelector('.modal-estimate-price');
@@ -178,8 +201,10 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   let wakeTimer = null;
   let holdTimer = null;
   let tickTimer = null;
+  let guideTimer = null;
   let autoConfirmed = false;
   let closed = false;
+  let guideDone = false;
   let acceptLive = false;
   let lastKg = null;
   let stableSince = null;
@@ -198,6 +223,27 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
       .catch(() => {});
   };
 
+  const revealWeighUi = () => {
+    if (guideDone || closed) return;
+    guideDone = true;
+    clearTimeout(guideTimer);
+    modal.classList.remove('weight-modal--guide');
+    modal.classList.add('weight-modal--weigh');
+    if (guideActions) {
+      guideActions.hidden = true;
+      try { guideActions.remove(); } catch (_) {}
+    }
+    if (weighEl) {
+      weighEl.hidden = false;
+      // Restart fade in case the class was already applied
+      weighEl.classList.remove('wm-weigh--in');
+      void weighEl.offsetWidth;
+      weighEl.classList.add('wm-weigh--in');
+    }
+    if (guideEl) guideEl.classList.add('wm-guide--compact');
+    try { input.focus(); input.select?.(); } catch (_) {}
+  };
+
   const close = () => {
     if (closed) return;
     closed = true;
@@ -205,7 +251,9 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     clearTimeout(dotTimer);
     clearTimeout(wakeTimer);
     clearTimeout(holdTimer);
+    clearTimeout(guideTimer);
     if (tickTimer) clearInterval(tickTimer);
+    try { if (videoEl) { videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); } } catch (_) {}
     if (scaleChannel && window.sb) {
       try { window.sb.removeChannel(scaleChannel); } catch (_) {}
     }
@@ -230,7 +278,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   };
 
   const maybeAutoAdd = () => {
-    if (autoConfirmed || !acceptLive || lastKg == null || lastKg <= MIN_KG || !stableSince) return;
+    if (!guideDone || autoConfirmed || !acceptLive || lastKg == null || lastKg <= MIN_KG || !stableSince) return;
     const held = Date.now() - stableSince;
     const w = Math.abs(Number(input.value)) || lastKg;
     if (held < STABLE_MS) {
@@ -262,7 +310,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     if (w <= MIN_KG) {
       lastKg = w;
       stableSince = null;
-      if (statusEl) statusEl.textContent = 'Place item on cart\u2026';
+      if (statusEl) statusEl.textContent = 'Place item on the scale\u2026';
       return;
     }
 
@@ -275,6 +323,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
 
   input.addEventListener('input', updateEstimate);
   btnCancel.addEventListener('click', close);
+  if (btnGuideCancel) btnGuideCancel.addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   btnOk.addEventListener('click', () => {
     const val = Number(input.value);
@@ -286,13 +335,14 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   });
 
   // --- Scale: this cart_id asks the Pi to wake, then says done on close ---
+  // Wake during the guide so the scale is ready when weight UI appears.
   if (window.sb && CART_ID) {
     if (statusEl) statusEl.textContent = 'Starting scale \u2014 keep cart empty\u2026';
     setScaleWanted(true);
     wakeTimer = setTimeout(() => {
       acceptLive = true;
       if (!autoConfirmed && statusEl && Number(input.value) <= MIN_KG) {
-        statusEl.textContent = 'Place item on cart\u2026';
+        statusEl.textContent = 'Place item on the scale\u2026';
       }
     }, WAKE_MS);
     tickTimer = setInterval(maybeAutoAdd, 250);
@@ -313,8 +363,21 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     if (statusEl) statusEl.textContent = CART_ID ? 'Scale not connected' : 'Missing cart id';
   }
 
-  setTimeout(() => { input.focus(); input.select?.(); }, 50);
+  // Show guide first; unlock weight entry after one full loop (~7s).
+  // Do not skip the guide if the video fails — keep the frame + caption visible.
+  guideTimer = setTimeout(revealWeighUi, GUIDE_MS);
+  if (videoEl) {
+    videoEl.addEventListener('error', () => {
+      console.warn('Weigh guide video failed to load', guideVideoSrc);
+    }, { once: true });
+    videoEl.addEventListener('loadeddata', () => {
+      try { videoEl.play().catch(() => {}); } catch (_) {}
+    }, { once: true });
+    try { videoEl.play().catch(() => {}); } catch (_) {}
+  }
 }
+
+try { window.showWeightModal = showWeightModal; } catch (_) {}
 
 async function fetchProducts({ availability = 'In Stock', limit = 24 } = {}) {
   const params = new URLSearchParams();
