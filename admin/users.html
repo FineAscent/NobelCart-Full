@@ -152,6 +152,8 @@
             <th>Name</th>
             <th>Email</th>
             <th>Signed Up</th>
+            <th>Logins</th>
+            <th>Last Login</th>
             <th>Status</th>
             <th>Role / Level</th>
             <th>Allergy Warnings</th>
@@ -159,7 +161,7 @@
         </thead>
         <tbody id="tbody">
           <tr>
-            <td colspan="6" class="muted">Loading…</td>
+            <td colspan="8" class="muted">Loading…</td>
           </tr>
         </tbody>
       </table>
@@ -203,7 +205,7 @@
       try {
         const { data, error } = await window.sb
           .from('profiles')
-          .select('id, display_name, email, created_at, active, is_admin, admin_level, show_allergy_caution')
+          .select('id, display_name, email, created_at, active, is_admin, admin_level, show_allergy_caution, login_count, last_login_at')
           .order('created_at', { ascending: false });
         if (error) throw error;
         allUsers = Array.isArray(data) ? data : [];
@@ -211,7 +213,7 @@
         status.textContent = allUsers.length + ' user' + (allUsers.length === 1 ? '' : 's');
       } catch (e) {
         console.error(e);
-        el('tbody').innerHTML = '<tr><td colspan="6" class="muted">Error loading users.</td></tr>';
+        el('tbody').innerHTML = '<tr><td colspan="8" class="muted">Error loading users.</td></tr>';
         status.textContent = 'Error: ' + (e.message || e);
       }
     }
@@ -238,12 +240,14 @@
 
       const tb = el('tbody');
       if (!rows.length) {
-        tb.innerHTML = '<tr><td colspan="6" class="muted">No users found.</td></tr>';
+        tb.innerHTML = '<tr><td colspan="8" class="muted">No users found.</td></tr>';
         return;
       }
 
       tb.innerHTML = rows.map(u => {
         const created = u.created_at ? new Date(u.created_at).toLocaleString() : '—';
+        const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—';
+        const logins = Number.isFinite(Number(u.login_count)) ? Number(u.login_count) : 0;
         const name = u.display_name ? esc(u.display_name) : '<span class="muted">(no name)</span>';
         const active = u.active === false
           ? '<span class="pill pill-off">Inactive</span>'
@@ -254,6 +258,8 @@
             <td>${name}</td>
             <td class="nowrap">${esc(u.email) || '<span class="muted">(no email)</span>'}</td>
             <td class="nowrap muted">${esc(created)}</td>
+            <td class="nowrap">${logins}</td>
+            <td class="nowrap muted">${esc(lastLogin)}</td>
             <td>${active}</td>
             <td>
               <div class="role-cell">

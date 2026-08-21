@@ -505,6 +505,9 @@
           return;
         }
 
+        // Count this UI sign-in on profiles.login_count (RPC; clients cannot set the value).
+        try { await window.sb.rpc('record_profile_login'); } catch (_) { }
+
         // On success, show logo overlay for 4 seconds, then go to cabinet
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('admin')) {
@@ -639,6 +642,8 @@
             setStatus('You must accept the Privacy Policy to continue.', true);
             return;
           }
+
+          try { await window.sb.rpc('record_profile_login'); } catch (_) {}
 
           try {
             const uid = data?.user?.id;
