@@ -129,33 +129,51 @@ function showAllergyModal({ name, allergyText, onConfirm }) {
   setTimeout(() => btnOk.focus(), 50);
 }
 
-function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
+async function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   ensureModalRoot();
   const root = document.querySelector('#modal-root');
   if (!root) return;
+
+  // Returning users (login_count > 3) skip the full ~7s guide; keep compact preview only.
+  let skipFullGuide = false;
+  try {
+    if (window.sb) {
+      const { data: sess } = await window.sb.auth.getSession();
+      const uid = sess?.session?.user?.id;
+      if (uid) {
+        const { data: prof } = await window.sb
+          .from('profiles')
+          .select('login_count')
+          .eq('id', uid)
+          .maybeSingle();
+        skipFullGuide = Number(prof?.login_count) > 3;
+      }
+    }
+  } catch (_) { }
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   const modal = document.createElement('div');
-  modal.className = 'modal weight-modal weight-modal--guide';
+  modal.className = 'modal weight-modal' + (skipFullGuide ? ' weight-modal--weigh' : ' weight-modal--guide');
   const u = unit || '';
   const ppu = Number(pricePerUnit) || 0;
   const ppuDisplay = ppu ? `$${ppu.toFixed(2)}` : '';
   const unitLabel = u || 'unit';
   const productLabel = (name && String(name).trim()) ? String(name).trim() : 'item';
   const productSafe = productLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  // One full play of the weigh guide (~7s) before weight entry shows
+  // One full play of the weigh guide (~7s) before weight entry shows (skipped for login_count > 3)
   const GUIDE_MS = 7000;
   const guideVideoSrc = 'Images/weigh-guide.mp4?v=3';
 
   modal.innerHTML = `
-    <div class="wm-guide">
+    <div class="wm-guide${skipFullGuide ? ' wm-guide--compact' : ''}">
       <div class="wm-guide-frame">
         <video class="wm-guide-video" src="${guideVideoSrc}" autoplay muted playsinline loop preload="auto"></video>
       </div>
       <div class="wm-guide-caption">How to weigh your item</div>
       <div class="wm-guide-hint">Then place <strong>${productSafe}</strong> on the scale</div>
     </div>
-    <div class="wm-weigh" hidden>
+    <div class="wm-weigh${skipFullGuide ? ' wm-weigh--in' : ''}"${skipFullGuide ? '' : ' hidden'}>
       <div class="modal-body" style="padding-top:4px;">
         <div class="modal-product">${productSafe}</div>
         <label class="modal-label">Weight${u ? ' (' + u + ')' : ''}</label>
@@ -177,9 +195,9 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
         <button class="btn btn-primary" disabled>Add to Cart</button>
       </div>
     </div>
-    <div class="wm-guide-actions">
+    ${skipFullGuide ? '' : `<div class="wm-guide-actions">
       <button type="button" class="btn btn-secondary wm-guide-cancel">Cancel</button>
-    </div>
+    </div>`}
   `;
   overlay.appendChild(modal);
   root.appendChild(overlay);
@@ -204,7 +222,7 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   let guideTimer = null;
   let autoConfirmed = false;
   let closed = false;
-  let guideDone = false;
+  let guideDone = !!skipFullGuide;
   let acceptLive = false;
   let lastKg = null;
   let stableSince = null;
@@ -363,9 +381,13 @@ function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     if (statusEl) statusEl.textContent = CART_ID ? 'Scale not connected' : 'Missing cart id';
   }
 
-  // Show guide first; unlock weight entry after one full loop (~7s).
-  // Do not skip the guide if the video fails — keep the frame + caption visible.
-  guideTimer = setTimeout(revealWeighUi, GUIDE_MS);
+  // Full guide for the first few visits; returning users (login_count > 3) get
+  // compact preview + weight UI immediately.
+  if (!skipFullGuide) {
+    guideTimer = setTimeout(revealWeighUi, GUIDE_MS);
+  } else {
+    try { input.focus(); input.select?.(); } catch (_) {}
+  }
   if (videoEl) {
     videoEl.addEventListener('error', () => {
       console.warn('Weigh guide video failed to load', guideVideoSrc);
