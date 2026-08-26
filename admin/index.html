@@ -86,6 +86,10 @@
         <h3>Monitor Active Carts</h3>
         <p>View signed-in customers and their live cart subtotals.</p>
       </a>
+      <a class="admin-card" href="approve-checkout.html" data-admin-min="1">
+        <h3>Approve Checkout</h3>
+        <p>Review carts still shopping and approve checkout requests.</p>
+      </a>
       <a class="admin-card" href="users.html" data-admin-min="3">
         <h3>Users</h3>
         <p>Browse everyone who signed up and their profile info.</p>
@@ -117,7 +121,7 @@
       if (note) {
         note.textContent = access.level >= 3
           ? 'Admin L3 — full access'
-          : 'Admin L' + access.level + ' — Refunds and Monitor only';
+          : 'Admin L' + access.level + ' — Refunds, Monitor, and Approve Checkout';
       }
     })();
   </script>

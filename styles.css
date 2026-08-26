@@ -1396,6 +1396,56 @@ body.signin.keyboard-visible .auth-wrapper {
     gap: 10px;
 }
 
+.checkout-wait-modal {
+    width: min(520px, 92vw);
+    max-width: 520px;
+    text-align: center;
+    padding: 28px 28px 20px;
+    background: #e7e7e7;
+    border-radius: 22px;
+}
+
+.checkout-wait-pulse {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #8b7355;
+    margin: 0 auto 14px;
+    animation: checkoutWaitPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes checkoutWaitPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.82); }
+}
+
+.checkout-wait-modal .modal-header {
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+
+.checkout-wait-copy {
+    margin: 0 0 6px;
+    font-size: 16px;
+    color: #3a372f;
+    line-height: 1.35;
+}
+
+.checkout-wait-hint {
+    margin: 0 0 18px;
+    font-size: 14px;
+    color: #6b6a67;
+}
+
+.checkout-wait-modal .modal-actions {
+    justify-content: center;
+}
+
+.checkout-wait-modal .checkout-wait-cancel {
+    min-width: 140px;
+    min-height: 44px;
+}
+
 /* --- Privacy Policy Agreement Modal --- */
 .policy-modal {
     max-width: 560px;

@@ -1,7 +1,7 @@
 // Shared admin access helpers.
 //
 // Levels:
-//   1 — Refunds + Monitor only
+//   1 — Refunds + Monitor + Approve Checkout
 //   2 — same as 1 for now (reserved)
 //   3 — full admin menu
 //
@@ -11,6 +11,7 @@
     index: 1,
     refund: 1,
     monitor: 1,
+    'approve-checkout': 1,
     users: 3,
     status: 3,
     errors: 3,

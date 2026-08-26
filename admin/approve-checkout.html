@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • Approve Checkout</title>
+  <script src="../phone-gate.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body.refunds-standalone {
+      background: #f3f3f3;
+      min-height: 100vh;
+    }
+
+    .admin-wrap {
+      max-width: 980px;
+      width: 100%;
+      padding: 24px 16px 48px;
+      margin: 0 auto;
+    }
+
+    .admin-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #6b7280;
+      margin: 0 0 16px;
+    }
+
+    .session-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid #d1d5db;
+      background: #f3f3f3;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .btn:hover { background: #f9fafb; }
+    .btn:disabled { opacity: 0.5; cursor: default; }
+
+    .muted { color: #6b7280; }
+
+    .section {
+      margin-bottom: 28px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 10px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .count-pill {
+      display: inline-block;
+      min-width: 1.6em;
+      text-align: center;
+      padding: 1px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .empty {
+      padding: 16px;
+      color: #6b7280;
+      font-size: 14px;
+      background: #ececec;
+      border-radius: 12px;
+    }
+
+    .shop-card {
+      background: #ececec;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+
+    .shop-card summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .shop-card summary::-webkit-details-marker { display: none; }
+
+    .shop-card summary:hover { background: #e7e7e7; }
+
+    .shop-meta {
+      min-width: 0;
+    }
+
+    .shop-title {
+      font-weight: 650;
+      color: #111827;
+      font-size: 14px;
+    }
+
+    .shop-sub {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .shop-right {
+      text-align: right;
+      white-space: nowrap;
+      font-size: 13px;
+      color: #374151;
+    }
+
+    .item-list {
+      border-top: 1px solid #e5e7eb;
+      padding: 8px 14px 12px;
+      background: #f3f3f3;
+    }
+
+    .item-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #eee;
+      color: #374151;
+    }
+
+    .item-row:last-child { border-bottom: 0; }
+    .item-name { font-weight: 600; color: #111827; }
+    .item-qty { color: #6b7280; white-space: nowrap; }
+    .item-line { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    /* Request queue: deeper, more prominent */
+    .req-card {
+      background: #f7f4ef;
+      border: 1px solid #d9cfc0;
+      border-radius: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 8px 24px rgba(45, 42, 38, 0.08);
+      overflow: hidden;
+      border-left: 6px solid #8b7355;
+    }
+
+    .req-card.is-good {
+      border-left-color: #3f7d5a;
+      background: #f3f7f4;
+    }
+
+    .req-card summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 16px 18px 14px;
+    }
+
+    .req-card summary::-webkit-details-marker { display: none; }
+
+    .req-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .req-kicker {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #8b7355;
+      margin-bottom: 4px;
+    }
+
+    .req-card.is-good .req-kicker { color: #3f7d5a; }
+
+    .req-title {
+      font-size: 18px;
+      font-weight: 750;
+      color: #1f2937;
+    }
+
+    .req-sub {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #6b6a67;
+    }
+
+    .req-total {
+      font-size: 20px;
+      font-weight: 750;
+      color: #1f2937;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .req-wait {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+      text-align: right;
+    }
+
+    .req-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 18px 16px;
+    }
+
+    .btn-deny {
+      background: #fee2e2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+
+    .btn-deny:hover { background: #fecaca; }
+
+    .btn-good {
+      background: #e8f1ec;
+      border-color: #c5ddd0;
+      color: #215c3a;
+    }
+
+    .btn-good:hover { background: #d7eadf; }
+
+    .btn-approve {
+      background: #1f2937;
+      border-color: #111827;
+      color: #fff;
+      font-weight: 650;
+    }
+
+    .btn-approve:hover { background: #111827; }
+
+    .req-card .item-list {
+      background: #fbf8f4;
+      border-top: 1px solid #e6dccf;
+      padding: 10px 18px 14px;
+    }
+
+    .req-card.is-good .item-list {
+      background: #f6faf7;
+      border-top-color: #d5e6dc;
+    }
+  </style>
+</head>
+
+<body class="refunds-standalone">
+  <div class="admin-wrap">
+    <div class="admin-title">
+      <a class="btn" href="index.html">Admin</a>
+      <span>Approve Checkout</span>
+    </div>
+    <p class="hint">Still-shopping carts are live. Requested carts are frozen until you deny, mark items good, then approve pay.</p>
+
+    <div class="session-toolbar">
+      <button id="refresh" class="btn" type="button">Refresh</button>
+      <label class="muted">Live updates on</label>
+      <span class="muted" id="status">—</span>
+    </div>
+
+    <section class="section" id="section-requests">
+      <div class="section-head">
+        <h2>Needs approval <span class="count-pill" id="req-count">0</span></h2>
+      </div>
+      <div id="req-list"></div>
+    </section>
+
+    <section class="section" id="section-shopping">
+      <div class="section-head">
+        <h2>Still shopping <span class="count-pill" id="shop-count">0</span></h2>
+      </div>
+      <div id="shop-list"></div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../config.js"></script>
+  <script src="admin-access.js"></script>
+  <script>
+    const LIVE_MS = 45 * 1000;
+    const el = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+
+    const fmtMoney = (n) => {
+      const v = Number(n) || 0;
+      try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(v); }
+      catch (_) { return '$' + v.toFixed(2); }
+    };
+
+    const fmtAgo = (iso) => {
+      if (!iso) return '—';
+      const ms = Date.now() - new Date(iso).getTime();
+      if (!Number.isFinite(ms) || ms < 0) return 'just now';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return s + 's waiting';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm waiting';
+      return Math.floor(m / 60) + 'h waiting';
+    };
+
+    const itemRows = (items) => {
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length) return '<div class="muted" style="padding:8px 0;">No items</div>';
+      return list.map((it) => {
+        const qty = Number(it.qty) || 1;
+        const price = Number(it.price) || 0;
+        const line = qty * price;
+        const unit = it.unit ? String(it.unit) : '';
+        const qtyLabel = it.weighted
+          ? (qty.toFixed(3) + (unit ? ' ' + unit : ''))
+          : ('× ' + qty);
+        return `<div class="item-row">
+          <span class="item-name">${esc(it.name || 'Item')}</span>
+          <span class="item-qty">${esc(qtyLabel)}</span>
+          <span class="item-line">${esc(fmtMoney(line))}</span>
+        </div>`;
+      }).join('');
+    };
+
+    let pollTimer = null;
+    let channel = null;
+    let busyId = null;
+    let loadTimer = null;
+    let loading = false;
+
+    function scheduleLoad() {
+      if (loadTimer) clearTimeout(loadTimer);
+      loadTimer = setTimeout(loadAll, 250);
+    }
+
+    function openKeys(host) {
+      const set = new Set();
+      if (!host) return set;
+      host.querySelectorAll('details[data-key]').forEach((d) => {
+        if (d.open) set.add(d.getAttribute('data-key'));
+      });
+      return set;
+    }
+
+    function knownKeys(host) {
+      const set = new Set();
+      if (!host) return set;
+      host.querySelectorAll('details[data-key]').forEach((d) => {
+        set.add(d.getAttribute('data-key'));
+      });
+      return set;
+    }
+
+    function renderShopping(rows) {
+      const host = el('shop-list');
+      const opened = openKeys(host);
+      el('shop-count').textContent = String(rows.length);
+      if (!rows.length) {
+        host.innerHTML = '<div class="empty">No carts shopping right now.</div>';
+        return;
+      }
+      host.innerHTML = rows.map((r) => {
+        const items = Array.isArray(r.items) ? r.items : [];
+        const n = items.length;
+        const key = String(r.cart_id || r.user_id || '');
+        const isOpen = opened.has(key);
+        return `<details class="shop-card" data-key="${esc(key)}"${isOpen ? ' open' : ''}>
+          <summary>
+            <div class="shop-meta">
+              <div class="shop-title">${esc(r.email || 'Signed-in shopper')}</div>
+              <div class="shop-sub">Cart ${esc(r.cart_id || '—')} · ${n} item${n === 1 ? '' : 's'}</div>
+            </div>
+            <div class="shop-right">${esc(fmtMoney(r.subtotal))}</div>
+          </summary>
+          <div class="item-list">${itemRows(items)}</div>
+        </details>`;
+      }).join('');
+    }
+
+    function renderRequests(rows) {
+      const host = el('req-list');
+      const opened = openKeys(host);
+      const known = knownKeys(host);
+      el('req-count').textContent = String(rows.length);
+      if (!rows.length) {
+        host.innerHTML = '<div class="empty">No checkout requests waiting.</div>';
+        return;
+      }
+      host.innerHTML = rows.map((r) => {
+        const items = Array.isArray(r.items) ? r.items : [];
+        const n = items.length;
+        const good = r.status === 'items_good';
+        const kicker = good ? 'Items good · ready to approve' : 'Checkout requested';
+        const isOpen = !known.size || !known.has(r.id) || opened.has(r.id);
+        return `<details class="req-card${good ? ' is-good' : ''}" data-key="${esc(r.id)}"${isOpen ? ' open' : ''}>
+          <summary>
+            <div class="req-top">
+              <div>
+                <div class="req-kicker">${esc(kicker)}</div>
+                <div class="req-title">${esc(r.email || 'Unknown email')}</div>
+                <div class="req-sub">Cart ${esc(r.cart_id || '—')} · ${n} item${n === 1 ? '' : 's'}</div>
+              </div>
+              <div>
+                <div class="req-total">${esc(fmtMoney(r.subtotal))}</div>
+                <div class="req-wait">${esc(fmtAgo(r.created_at))}</div>
+              </div>
+            </div>
+          </summary>
+          <div class="item-list">${itemRows(items)}</div>
+          <div class="req-actions">
+            <button type="button" class="btn btn-deny" data-act="denied" data-id="${esc(r.id)}">Item not scanned</button>
+            <button type="button" class="btn btn-good" data-act="items_good" data-id="${esc(r.id)}" ${good ? 'disabled' : ''}>Items good</button>
+            <button type="button" class="btn btn-approve" data-act="approved" data-id="${esc(r.id)}" ${good ? '' : 'disabled'}>Approve</button>
+          </div>
+        </details>`;
+      }).join('');
+    }
+
+    async function loadAll() {
+      if (loading) return;
+      loading = true;
+      const status = el('status');
+      try {
+        try { await window.sb.rpc('expire_stale_checkout_requests'); } catch (_) { }
+        const since = new Date(Date.now() - LIVE_MS).toISOString();
+        const [reqRes, sessRes] = await Promise.all([
+          window.sb
+            .from('checkout_requests')
+            .select('id, cart_id, user_id, email, status, items, subtotal, created_at, reviewed_by')
+            .in('status', ['pending', 'items_good'])
+            .order('created_at', { ascending: true }),
+          window.sb
+            .from('active_sessions')
+            .select('user_id, cart_id, email, subtotal, items, last_seen')
+            .gte('last_seen', since)
+            .order('last_seen', { ascending: false }),
+        ]);
+        if (reqRes.error) throw reqRes.error;
+        if (sessRes.error) throw sessRes.error;
+
+        const requests = Array.isArray(reqRes.data) ? reqRes.data : [];
+        const openCarts = new Set(requests.map((r) => String(r.cart_id || '')));
+        const shopping = [];
+        const seenCart = new Set();
+        for (const s of (sessRes.data || [])) {
+          const cid = String(s.cart_id || '');
+          if (!cid || openCarts.has(cid) || seenCart.has(cid)) continue;
+          seenCart.add(cid);
+          shopping.push(s);
+        }
+
+        renderRequests(requests);
+        renderShopping(shopping);
+        status.textContent = requests.length
+          ? requests.length + ' waiting'
+          : 'Queue clear';
+      } catch (e) {
+        console.error(e);
+        status.textContent = 'Error: ' + (e.message || e);
+      } finally {
+        loading = false;
+      }
+    }
+
+    async function setStatus(id, next) {
+      if (!id || busyId) return;
+      busyId = id;
+      try {
+        const { error } = await window.sb.rpc('set_checkout_request_status', {
+          p_request_id: id,
+          p_status: next,
+        });
+        if (error) throw error;
+        await loadAll();
+      } catch (e) {
+        alert(e.message || 'Could not update checkout request');
+        await loadAll();
+      } finally {
+        busyId = null;
+      }
+    }
+
+    async function boot() {
+      const access = await window.ncAdminAccess.requireAdminPage('approve-checkout');
+      if (!access) return;
+
+      el('refresh').addEventListener('click', loadAll);
+      el('req-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        e.preventDefault();
+        setStatus(btn.getAttribute('data-id'), btn.getAttribute('data-act'));
+      });
+
+      await loadAll();
+
+      if (window.sb) {
+        channel = window.sb.channel('admin-approve-checkout')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'checkout_requests' }, () => { scheduleLoad(); })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'active_sessions' }, () => { scheduleLoad(); })
+          .subscribe();
+      }
+      pollTimer = setInterval(loadAll, 5000);
+    }
+
+    boot();
+  </script>
+</body>
+
+</html>

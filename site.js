@@ -789,6 +789,18 @@ function getCartSubtotal() {
   return Number(subtotal || 0);
 }
 
+function compactCartItems(items) {
+  const src = Array.isArray(items) ? items : [];
+  return src.slice(0, 80).map((it) => ({
+    id: it && it.id != null ? String(it.id) : null,
+    name: String((it && it.name) || 'Item'),
+    qty: Number(it && it.qty) || 1,
+    price: Number(it && it.price) || 0,
+    weighted: !!(it && it.weighted),
+    unit: (it && it.unit) ? String(it.unit) : null,
+  }));
+}
+
 // Heartbeat: upsert session row with latest subtotal and last_seen.
 // Do NOT touch force_sign_out here — admin / expire_stale_kiosk_sessions set it,
 // and clearing it on every beat would race those force-outs away.
@@ -834,6 +846,8 @@ async function upsertActiveSession(subtotal) {
         subtotal: Number(subtotal || 0),
         last_seen: new Date().toISOString(),
         user_agent: ua,
+        cart_id: CART_ID || null,
+        items: compactCartItems(loadCart()),
       });
   } catch (_) { }
 }
@@ -866,6 +880,176 @@ function scheduleHeartbeat(subtotal) {
     __hbScheduled = false;
     try { await upsertActiveSession(__hbLastSubtotal); } catch (_) { }
   }, 300);
+}
+
+const CHECKOUT_APPROVAL_WINDOW_MS = 2 * 60 * 1000;
+let __checkoutWait = null;
+
+async function cancelOpenCheckoutRequest(requestId) {
+  if (!requestId || !window.sb) return;
+  try { await window.sb.rpc('cancel_checkout_request', { p_request_id: requestId }); } catch (_) { }
+}
+
+async function hasRecentCheckoutApproval() {
+  try {
+    if (!window.sb || !CART_ID) return false;
+    const { data: sess } = await window.sb.auth.getSession();
+    const uid = sess?.session?.user?.id;
+    if (!uid) return false;
+    try { await window.sb.rpc('expire_stale_checkout_requests'); } catch (_) { }
+    const since = new Date(Date.now() - CHECKOUT_APPROVAL_WINDOW_MS).toISOString();
+    const { data, error } = await window.sb
+      .from('checkout_requests')
+      .select('id')
+      .eq('cart_id', CART_ID)
+      .eq('user_id', uid)
+      .eq('status', 'approved')
+      .gte('resolved_at', since)
+      .order('resolved_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  } catch (_) {
+    return false;
+  }
+}
+
+function closeCheckoutWaitModal() {
+  const wait = __checkoutWait;
+  if (!wait) return;
+  __checkoutWait = null;
+  if (wait.pollTimer) { try { clearInterval(wait.pollTimer); } catch (_) { } }
+  if (wait.expireTimer) { try { clearTimeout(wait.expireTimer); } catch (_) { } }
+  if (wait.channel && window.sb) {
+    try { window.sb.removeChannel(wait.channel); } catch (_) { }
+  }
+  try { if (wait.overlay && wait.overlay.parentNode) wait.overlay.parentNode.removeChild(wait.overlay); } catch (_) { }
+}
+
+function showCheckoutWaitModal({ onCancel }) {
+  ensureModalRoot();
+  const root = document.querySelector('#modal-root');
+  if (!root) return { overlay: null, setHint: () => {} };
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay checkout-wait-overlay';
+  overlay.innerHTML = `
+    <div class="modal checkout-wait-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-wait-title">
+      <div class="checkout-wait-pulse" aria-hidden="true"></div>
+      <div class="modal-header" id="checkout-wait-title">Wait for admin approval</div>
+      <p class="checkout-wait-copy">An associate is checking the items in your cart.</p>
+      <p class="checkout-wait-hint">This usually takes a moment.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary checkout-wait-cancel">Cancel</button>
+      </div>
+    </div>`;
+  root.appendChild(overlay);
+  const hintEl = overlay.querySelector('.checkout-wait-hint');
+  const cancelBtn = overlay.querySelector('.checkout-wait-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', () => { try { onCancel && onCancel(); } catch (_) { } });
+  return {
+    overlay,
+    setHint(text) { if (hintEl) hintEl.textContent = text || ''; },
+  };
+}
+
+async function waitForCheckoutApproval() {
+  if (__checkoutWait) return __checkoutWait.promise;
+
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
+  let settled = false;
+  let requestId = null;
+
+  const finish = (outcome) => {
+    if (settled) return;
+    settled = true;
+    closeCheckoutWaitModal();
+    resolve(outcome);
+  };
+
+  const cancelSelf = async () => {
+    const id = requestId;
+    await cancelOpenCheckoutRequest(id);
+    finish('cancelled');
+  };
+
+  const ui = showCheckoutWaitModal({ onCancel: cancelSelf });
+
+  __checkoutWait = {
+    promise,
+    overlay: ui.overlay,
+    channel: null,
+    pollTimer: null,
+    expireTimer: null,
+    get requestId() { return requestId; },
+    cancel: cancelSelf,
+  };
+
+  const applyStatus = (status) => {
+    if (!status || settled) return;
+    if (status === 'approved') return finish('approved');
+    if (status === 'denied') return finish('denied');
+    if (status === 'cancelled') return finish('cancelled');
+    if (status === 'expired') return finish('expired');
+    if (status === 'items_good') ui.setHint('Items look good. Waiting for final approve…');
+  };
+
+  try {
+    if (!window.sb) throw new Error('Auth not ready');
+    if (!CART_ID) throw new Error('Missing cart id');
+    const items = compactCartItems(loadCart());
+    if (!items.length) throw new Error('Your cart is empty');
+    const { data: sess } = await window.sb.auth.getSession();
+    const email = sess?.session?.user?.email || null;
+    const { data: row, error } = await window.sb.rpc('open_checkout_request', {
+      p_cart_id: CART_ID,
+      p_items: items,
+      p_subtotal: getCartSubtotal(),
+      p_email: email,
+    });
+    if (error) throw error;
+    const rec = Array.isArray(row) ? row[0] : row;
+    requestId = rec && rec.id;
+    if (!requestId) throw new Error('Could not start checkout request');
+    applyStatus(rec.status);
+
+    const channel = window.sb.channel('checkout-wait-' + requestId)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'checkout_requests',
+        filter: 'id=eq.' + requestId,
+      }, (payload) => {
+        applyStatus(payload?.new && payload.new.status);
+      })
+      .subscribe();
+    if (__checkoutWait) __checkoutWait.channel = channel;
+
+    const poll = async () => {
+      if (settled || !requestId) return;
+      try {
+        const { data } = await window.sb
+          .from('checkout_requests')
+          .select('status')
+          .eq('id', requestId)
+          .maybeSingle();
+        applyStatus(data && data.status);
+      } catch (_) { }
+    };
+    if (__checkoutWait) {
+      __checkoutWait.pollTimer = setInterval(poll, 3000);
+      __checkoutWait.expireTimer = setTimeout(() => {
+        if (!settled) finish('expired');
+      }, 10 * 60 * 1000);
+    }
+    poll();
+  } catch (e) {
+    finish('error');
+    try { console.warn('Checkout approval request failed', e); } catch (_) { }
+  }
+
+  return promise;
 }
 
 // Set up a realtime watcher that listens for admin-triggered force sign-out
@@ -1662,6 +1846,11 @@ document.addEventListener('DOMContentLoaded', () => {
           window.sb.auth.onAuthStateChange((event, session) => {
             // Delink this cart from the user on sign-out
             if (event === 'SIGNED_OUT' && CART_ID && window.sb) {
+              try {
+                const waitId = __checkoutWait && __checkoutWait.requestId;
+                if (waitId) cancelOpenCheckoutRequest(waitId);
+              } catch (_) { }
+              try { closeCheckoutWaitModal(); } catch (_) { }
               try { window.sb.from('carts').update({ user_id: null }).eq('cart_id', CART_ID).then(() => {}).catch(() => {}); } catch (_) {}
             }
 
@@ -1761,25 +1950,53 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (_) { }
 
       const onCheckoutPage = location.pathname.includes('checkout.html');
-      // Redirect into dedicated checkout page if not already there
-      if (!onCheckoutPage) {
-        // Transition animation: Fade out
-        document.body.classList.add('page-transition-fade-out');
-        setTimeout(() => {
-          window.location.href = 'checkout.html';
-        }, 500);
+      if (onCheckoutPage) {
+        try {
+          if (typeof window.__refreshQrCheckout === 'function') {
+            await window.__refreshQrCheckout();
+          } else {
+            await startCheckout();
+          }
+        } catch (err) {
+          console.error('Checkout failed', err);
+          try { showHintToast('Checkout failed'); } catch (_) { }
+        }
         return;
       }
-      // On checkout page: refresh QR flow if available, else fallback to direct hosted redirect
+
+      e.preventDefault();
+      if (!CART_ID) {
+        try { showHintToast('This cart is not set up. Ask an associate for help.'); } catch (_) { }
+        return;
+      }
+      if (checkoutBtn.disabled) return;
+      checkoutBtn.disabled = true;
       try {
-        if (typeof window.__refreshQrCheckout === 'function') {
-          await window.__refreshQrCheckout();
-        } else {
-          await startCheckout();
+        const outcome = await waitForCheckoutApproval();
+        if (outcome === 'approved') {
+          document.body.classList.add('page-transition-fade-out');
+          setTimeout(() => {
+            window.location.href = withCart('checkout.html');
+          }, 400);
+          return;
         }
-      } catch (e) {
-        console.error('Checkout failed', e);
-        try { showHintToast('Checkout failed'); } catch (_) { }
+        if (outcome === 'denied') {
+          try { showHintToast('An item was not scanned. Scan it, then checkout again.'); } catch (_) { }
+          document.body.classList.add('page-transition-fade-out');
+          setTimeout(() => {
+            window.location.href = withCart('index.html');
+          }, 700);
+          return;
+        }
+        if (outcome === 'expired') {
+          try { showHintToast('Approval timed out. Press Checkout to ask again.'); } catch (_) { }
+          return;
+        }
+        if (outcome === 'error') {
+          try { showHintToast('Could not reach an associate. Try again.'); } catch (_) { }
+        }
+      } finally {
+        checkoutBtn.disabled = false;
       }
     });
   }
@@ -2287,6 +2504,12 @@ async function startCheckout(options = {}) {
 document.addEventListener('DOMContentLoaded', async () => {
   const isCheckout = /(^|\/)checkout\.html(\?|$)/.test(location.pathname) || document.body.classList.contains('checkout');
   if (!isCheckout) return;
+
+  const allowed = await hasRecentCheckoutApproval();
+  if (!allowed) {
+    window.location.replace(typeof withCart === 'function' ? withCart('index.html') : 'index.html');
+    return;
+  }
 
   // Render the cart summary immediately
   renderCart();
