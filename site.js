@@ -1,12 +1,22 @@
 // --- API helpers ---
 const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+function cleanCartId(raw) {
+  let id = String(raw == null ? '' : raw).trim();
+  if (!id) return '';
+  try { id = decodeURIComponent(id); } catch (_) { }
+  id = id.split(/[/?#]/)[0];
+  if (/\.(html?|php)$/i.test(id)) return '';
+  const m = id.match(/^[A-Za-z0-9._-]{1,64}/);
+  return m ? m[0] : '';
+}
 const CART_ID = (function () {
   // cart-id.js owns this when it is loaded; the rest is a fallback for pages that
   // do not include it. localStorage is checked so the id survives a browser restart.
-  if (typeof window.ncCartId === 'function') return window.ncCartId();
+  if (typeof window.ncCartId === 'function') return cleanCartId(window.ncCartId());
   var id = new URLSearchParams(window.location.search).get('cart') || '';
   if (!id) { try { id = localStorage.getItem('nc_cart_id') || ''; } catch (_) {} }
   if (!id) { try { id = sessionStorage.getItem('nc_cart_id') || ''; } catch (_) {} }
+  id = cleanCartId(id);
   if (id) {
     try { localStorage.setItem('nc_cart_id', id); } catch (_) {}
     try { sessionStorage.setItem('nc_cart_id', id); } catch (_) {}
@@ -798,6 +808,8 @@ function compactCartItems(items) {
     price: Number(it && it.price) || 0,
     weighted: !!(it && it.weighted),
     unit: (it && it.unit) ? String(it.unit) : null,
+    image: (it && it.image) ? String(it.image) : null,
+    imageKey: (it && it.imageKey) ? String(it.imageKey) : null,
   }));
 }
 

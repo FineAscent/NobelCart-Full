@@ -8,301 +8,557 @@
   <script src="../phone-gate.js"></script>
   <link rel="stylesheet" href="styles.css" />
   <style>
+    :root {
+      --ink: #2d2a26;
+      --muted: #6b6a67;
+      --line: #e7e7e7;
+      --paper: #f3f3f3;
+      --card: #ffffff;
+      --accent: #8b7355;
+      --good: #2f7a52;
+      --good-soft: #e7f3ec;
+      --warn: #9b3b32;
+      --warn-soft: #fdecea;
+      --bg: #FDFBF9;
+    }
+
     body.refunds-standalone {
-      background: #f3f3f3;
+      background: var(--bg);
       min-height: 100vh;
+      overflow: auto;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     .admin-wrap {
-      max-width: 980px;
+      max-width: 820px;
       width: 100%;
-      padding: 24px 16px 48px;
+      padding: 20px 20px 48px;
       margin: 0 auto;
     }
 
-    .admin-title {
-      font-size: 28px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 8px;
+    .topbar {
       display: flex;
       align-items: center;
-      gap: 12px;
-    }
-
-    .hint {
-      font-size: 13px;
-      color: #6b7280;
-      margin: 0 0 16px;
-    }
-
-    .session-toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
+      gap: 10px;
       margin-bottom: 18px;
-      flex-wrap: wrap;
     }
 
     .btn {
-      border: 1px solid #d1d5db;
-      background: #f3f3f3;
-      border-radius: 8px;
-      padding: 6px 10px;
+      border: 1px solid rgba(0, 0, 0, 0.10);
+      background: #e7e7e7;
+      border-radius: 12px;
+      padding: 8px 14px;
       cursor: pointer;
+      font-size: 14px;
+      color: var(--ink);
+    }
+
+    .btn:hover { background: #dedede; }
+    .btn:disabled { opacity: 0.45; cursor: default; }
+
+    .btn-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      min-height: 40px;
+      border-radius: 24px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      background: #e7e7e7;
+      color: #333;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .btn-back:hover { background: rgba(0, 0, 0, 0.1); }
+
+    .status {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 4px;
+      color: var(--ink);
+    }
+
+    .page-sub {
+      margin: 0 0 18px;
+      color: var(--muted);
       font-size: 14px;
     }
 
-    .btn:hover { background: #f9fafb; }
-    .btn:disabled { opacity: 0.5; cursor: default; }
-
-    .muted { color: #6b7280; }
-
-    .section {
-      margin-bottom: 28px;
+    .fold {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
 
-    .section-head {
+    .fold > summary {
+      list-style: none;
+      cursor: pointer;
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin: 0 0 10px;
+      padding: 16px 18px;
     }
 
-    .section-head h2 {
-      margin: 0;
+    .fold > summary::-webkit-details-marker { display: none; }
+
+    .fold-kicker {
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .fold.priority > summary .fold-kicker { color: var(--accent); }
+
+    .fold-title {
       font-size: 18px;
-      font-weight: 700;
-      color: #111827;
+      font-weight: 750;
+      margin-top: 2px;
     }
 
     .count-pill {
-      display: inline-block;
-      min-width: 1.6em;
+      min-width: 1.7em;
       text-align: center;
-      padding: 1px 8px;
+      padding: 4px 10px;
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      background: #e5e7eb;
-      color: #374151;
+      font-size: 13px;
+      font-weight: 750;
+      background: #efeae3;
+      color: var(--ink);
     }
+
+    .fold.priority .count-pill {
+      background: #efe6d8;
+      color: #6a5338;
+    }
+
+    .fold-body { padding: 0 12px 12px; }
 
     .empty {
       padding: 16px;
-      color: #6b7280;
+      color: var(--muted);
       font-size: 14px;
-      background: #ececec;
+      background: var(--paper);
       border-radius: 12px;
     }
 
-    .shop-card {
-      background: #ececec;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      margin-bottom: 8px;
-      overflow: hidden;
-    }
-
-    .shop-card summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 12px 14px;
+    .cart-row {
       display: flex;
-      justify-content: space-between;
+      align-items: center;
       gap: 12px;
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      color: inherit;
+      font: inherit;
+    }
+
+    .cart-row:hover { background: #ececec; }
+
+    .cart-row.live { cursor: default; }
+
+    .thumbs {
+      display: flex;
       align-items: center;
     }
 
-    .shop-card summary::-webkit-details-marker { display: none; }
-
-    .shop-card summary:hover { background: #e7e7e7; }
-
-    .shop-meta {
-      min-width: 0;
+    .thumb, .thumb-more {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: #e7e1d6;
+      border: 2px solid #fff;
+      margin-left: -8px;
     }
 
-    .shop-title {
-      font-weight: 650;
-      color: #111827;
+    .thumbs .thumb:first-child, .thumbs .thumb-more:first-child { margin-left: 0; }
+
+    .thumb-ph {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 750;
+      color: #7a6a56;
+    }
+
+    .thumb-more {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 750;
+      color: var(--muted);
+    }
+
+    .cart-meta { min-width: 0; flex: 1; }
+    .cart-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cart-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .cart-total { font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .cart-chevron { color: #b6aea3; font-size: 18px; }
+
+    .live-items {
+      display: none;
+      padding: 0 4px 8px 52px;
+    }
+
+    .cart-row.live.open + .live-items { display: block; }
+
+    .mini-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #efeae3;
+      font-size: 13px;
+    }
+
+    .mini-item:last-child { border-bottom: 0; }
+    .mini-item img, .mini-item .thumb-ph { width: 32px; height: 32px; border-radius: 8px; }
+    .mini-name { flex: 1; font-weight: 650; }
+    .mini-line { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* Review */
+    #view-review { display: none; }
+    body.reviewing #view-floor { display: none; }
+    body.reviewing #view-review { display: block; }
+
+    .review-head { margin-bottom: 22px; }
+    .cart-id-pill {
+      display: flex;
+      width: max-content;
+      align-items: center;
+      margin: 16px 0 10px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: #efe6d8;
+      color: #6a5338;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .review-name { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 6px; color: var(--ink); }
+    .review-sub { color: var(--muted); font-size: 15px; margin: 0; }
+
+    .block { margin-bottom: 22px; }
+    .block h2 { margin: 0; font-size: 20px; }
+    .block p.lede { margin: 4px 0 12px; color: var(--muted); font-size: 14px; }
+
+    .look-card, .rest-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .look-row {
+      display: grid;
+      grid-template-columns: 64px 1fr auto auto;
+      gap: 14px;
+      align-items: center;
+      min-height: 76px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      width: 100%;
+      background: none;
+      border-left: none;
+      border-right: none;
+      border-top: none;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .look-row:last-child { border-bottom: 0; }
+    .look-row:hover { background: #f7f7f7; }
+
+    .look-row img, .look-row .thumb-ph {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      object-fit: cover;
+    }
+
+    .look-name { font-weight: 750; font-size: 16px; }
+    .look-qty { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .look-price { font-weight: 750; font-variant-numeric: tabular-nums; }
+
+    .seen {
+      width: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .seen-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid #d3ccc2;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    .look-row.is-seen .seen { color: var(--good); }
+    .look-row.is-seen .seen-dot {
+      border-color: var(--good);
+      background: var(--good);
+      box-shadow: inset 0 0 0 6px var(--good), inset 0 0 0 8px #fff;
+    }
+
+    .rest-strip {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 14px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .rest-tile {
+      flex: 0 0 92px;
+      background: var(--paper);
+      border-radius: 14px;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .rest-tile img, .rest-tile .thumb-ph {
+      width: 76px;
+      height: 76px;
+      border-radius: 10px;
+      object-fit: cover;
+      margin: 0 auto 6px;
+    }
+
+    .rest-tile .n { font-size: 12px; font-weight: 700; line-height: 1.25; }
+    .rest-tile .q { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .rest-check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .rest-check input { display: none; }
+    .rest-check .box {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 2px solid #d3ccc2;
+      background: #fff;
+      flex: 0 0 auto;
+    }
+
+    .rest-check.is-on .box {
+      border-color: var(--good);
+      background: var(--good);
+      box-shadow: inset 0 0 0 4px var(--good), inset 0 0 0 6px #fff;
+    }
+
+    .rest-check span { font-size: 14px; font-weight: 650; }
+
+    .ask-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding: 14px 16px;
+      background: var(--paper);
+      border-radius: 18px;
+    }
+
+    .ask-row p { margin: 0; font-size: 15px; color: var(--ink); font-weight: 600; }
+
+    .pair { display: flex; gap: 10px; }
+
+    .btn-right, .btn-off {
+      min-width: 124px;
+      min-height: 48px;
+      border-radius: 24px;
+      font-weight: 600;
       font-size: 14px;
     }
 
-    .shop-sub {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 2px;
-    }
-
-    .shop-right {
-      text-align: right;
-      white-space: nowrap;
-      font-size: 13px;
-      color: #374151;
-    }
-
-    .item-list {
-      border-top: 1px solid #e5e7eb;
-      padding: 8px 14px 12px;
-      background: #f3f3f3;
-    }
-
-    .item-row {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 10px;
-      padding: 6px 0;
-      font-size: 13px;
-      border-bottom: 1px solid #eee;
-      color: #374151;
-    }
-
-    .item-row:last-child { border-bottom: 0; }
-    .item-name { font-weight: 600; color: #111827; }
-    .item-qty { color: #6b7280; white-space: nowrap; }
-    .item-line { font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-    /* Request queue: deeper, more prominent */
-    .req-card {
-      background: #f7f4ef;
-      border: 1px solid #d9cfc0;
-      border-radius: 16px;
-      margin-bottom: 14px;
-      box-shadow: 0 8px 24px rgba(45, 42, 38, 0.08);
-      overflow: hidden;
-      border-left: 6px solid #8b7355;
-    }
-
-    .req-card.is-good {
-      border-left-color: #3f7d5a;
-      background: #f3f7f4;
-    }
-
-    .req-card summary {
-      list-style: none;
-      cursor: pointer;
-      padding: 16px 18px 14px;
-    }
-
-    .req-card summary::-webkit-details-marker { display: none; }
-
-    .req-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
-    }
-
-    .req-kicker {
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 700;
-      color: #8b7355;
-      margin-bottom: 4px;
-    }
-
-    .req-card.is-good .req-kicker { color: #3f7d5a; }
-
-    .req-title {
-      font-size: 18px;
-      font-weight: 750;
-      color: #1f2937;
-    }
-
-    .req-sub {
-      margin-top: 4px;
-      font-size: 13px;
-      color: #6b6a67;
-    }
-
-    .req-total {
-      font-size: 20px;
-      font-weight: 750;
-      color: #1f2937;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .req-wait {
-      font-size: 12px;
-      color: #6b7280;
-      margin-top: 2px;
-      text-align: right;
-    }
-
-    .req-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 0 18px 16px;
-    }
-
-    .btn-deny {
-      background: #fee2e2;
-      border-color: #fecaca;
-      color: #991b1b;
-    }
-
-    .btn-deny:hover { background: #fecaca; }
-
-    .btn-good {
-      background: #e8f1ec;
+    .btn-right {
+      background: var(--good-soft);
       border-color: #c5ddd0;
       color: #215c3a;
     }
 
-    .btn-good:hover { background: #d7eadf; }
-
-    .btn-approve {
-      background: #1f2937;
-      border-color: #111827;
+    .btn-right.is-on {
+      background: var(--good);
+      border-color: var(--good);
       color: #fff;
-      font-weight: 650;
     }
 
-    .btn-approve:hover { background: #111827; }
-
-    .req-card .item-list {
-      background: #fbf8f4;
-      border-top: 1px solid #e6dccf;
-      padding: 10px 18px 14px;
+    .btn-off {
+      background: var(--warn-soft);
+      border-color: #f4c7c2;
+      color: var(--warn);
     }
 
-    .req-card.is-good .item-list {
-      background: #f6faf7;
-      border-top-color: #d5e6dc;
+    .complete-wrap {
+      margin-top: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .btn-complete {
+      appearance: none;
+      width: 100%;
+      max-width: 360px;
+      min-height: 52px;
+      padding: 14px 24px;
+      border-radius: 25px;
+      background: #8b7355;
+      color: #fff;
+      border: none;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .btn-complete:not(:disabled):hover { background: #7a6449; }
+
+    .btn-complete:disabled {
+      background: #e7e7e7;
+      color: #8a837a;
+      opacity: 1;
+      cursor: default;
+    }
+
+    .complete-hint {
+      text-align: center;
+      margin: 10px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+      max-width: 360px;
+    }
+
+    @media (min-width: 900px) {
+      .admin-wrap { max-width: 880px; padding: 24px 32px 56px; }
+      .btn-complete { max-width: 380px; min-height: 56px; }
     }
   </style>
 </head>
 
 <body class="refunds-standalone">
   <div class="admin-wrap">
-    <div class="admin-title">
-      <a class="btn" href="index.html">Admin</a>
-      <span>Approve Checkout</span>
-    </div>
-    <p class="hint">Still-shopping carts are live. Requested carts are frozen until you deny, mark items good, then approve pay.</p>
-
-    <div class="session-toolbar">
-      <button id="refresh" class="btn" type="button">Refresh</button>
-      <label class="muted">Live updates on</label>
-      <span class="muted" id="status">—</span>
-    </div>
-
-    <section class="section" id="section-requests">
-      <div class="section-head">
-        <h2>Needs approval <span class="count-pill" id="req-count">0</span></h2>
+    <div id="view-floor">
+      <div class="topbar">
+        <a class="btn" href="index.html">Admin</a>
+        <span class="status" id="status">—</span>
+        <button id="refresh" class="btn" type="button">Refresh</button>
       </div>
-      <div id="req-list"></div>
-    </section>
+      <h1 class="page-title">Floor</h1>
+      <p class="page-sub">Confirm items before a cart can pay.</p>
 
-    <section class="section" id="section-shopping">
-      <div class="section-head">
-        <h2>Still shopping <span class="count-pill" id="shop-count">0</span></h2>
+      <details class="fold priority" id="fold-requests" open>
+        <summary>
+          <div>
+            <div class="fold-kicker">Needs you</div>
+            <div class="fold-title">Waiting carts</div>
+          </div>
+          <span class="count-pill" id="req-count">0</span>
+        </summary>
+        <div class="fold-body" id="req-list"></div>
+      </details>
+
+      <details class="fold" id="fold-shopping" open>
+        <summary>
+          <div>
+            <div class="fold-kicker">In store</div>
+            <div class="fold-title">Shopping now</div>
+          </div>
+          <span class="count-pill" id="shop-count">0</span>
+        </summary>
+        <div class="fold-body" id="shop-list"></div>
+      </details>
+    </div>
+
+    <div id="view-review">
+      <div class="review-head">
+        <button type="button" class="btn-back" id="review-back">← Floor</button>
+        <div class="cart-id-pill" id="review-title">Cart</div>
+        <h1 class="review-name" id="review-name"></h1>
+        <p class="review-sub" id="review-sub"></p>
       </div>
-      <div id="shop-list"></div>
-    </section>
+
+      <section class="block">
+        <h2>Check these first</h2>
+        <p class="lede">Most expensive items. Tap Seen when you find each one.</p>
+        <div class="look-card" id="look-list"></div>
+      </section>
+
+      <section class="block" id="rest-block">
+        <h2>Everything else</h2>
+        <p class="lede" id="rest-lede">Other items in this cart.</p>
+        <div class="rest-card">
+          <div class="rest-strip" id="rest-strip"></div>
+          <label class="rest-check" id="rest-check">
+            <input type="checkbox" id="rest-check-input" />
+            <span class="box" aria-hidden="true"></span>
+            <span>Looks correct</span>
+          </label>
+        </div>
+      </section>
+
+      <div class="ask-row">
+        <p>Do these look right?</p>
+        <div class="pair">
+          <button type="button" class="btn btn-right" id="btn-looks-right" disabled>Looks right</button>
+          <button type="button" class="btn btn-off" id="btn-looks-off">Looks off</button>
+        </div>
+      </div>
+
+      <div class="complete-wrap">
+        <button type="button" class="btn-complete" id="btn-complete" disabled>
+          <span id="complete-lock">Locked · </span>
+          <span>Approve checkout</span>
+        </button>
+        <p class="complete-hint" id="complete-hint">Mark the expensive items Seen, then check the rest.</p>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -310,6 +566,8 @@
   <script src="admin-access.js"></script>
   <script>
     const LIVE_MS = 45 * 1000;
+    const REST_SHOW = 7;
+    const HIGH_COUNT = 3;
     const el = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -321,68 +579,121 @@
       catch (_) { return '$' + v.toFixed(2); }
     };
 
+    function cleanCartId(raw) {
+      let id = String(raw == null ? '' : raw).trim();
+      if (!id) return '';
+      try { id = decodeURIComponent(id); } catch (_) { }
+      id = id.split(/[/?#]/)[0];
+      if (/\.(html?|php)$/i.test(id)) return '';
+      const m = id.match(/^[A-Za-z0-9._-]{1,64}/);
+      return m ? m[0] : '';
+    }
+
+    function formatCartLabel(raw) {
+      const id = cleanCartId(raw);
+      if (!id) return 'Cart';
+      const numbered = id.match(/^cart[-_]?0*(\d+)$/i);
+      if (numbered) return 'Cart ' + numbered[1];
+      if (/^cart[-_]/i.test(id)) return 'Cart ' + id.replace(/^cart[-_]/i, '');
+      return 'Cart ' + id;
+    }
+
     const fmtAgo = (iso) => {
-      if (!iso) return '—';
+      if (!iso) return 'just now';
       const ms = Date.now() - new Date(iso).getTime();
       if (!Number.isFinite(ms) || ms < 0) return 'just now';
       const s = Math.floor(ms / 1000);
       if (s < 60) return s + 's waiting';
       const m = Math.floor(s / 60);
-      if (m < 60) return m + 'm waiting';
-      return Math.floor(m / 60) + 'h waiting';
+      return m < 60 ? (m + 'm waiting') : (Math.floor(m / 60) + 'h waiting');
     };
 
-    const itemRows = (items) => {
-      const list = Array.isArray(items) ? items : [];
-      if (!list.length) return '<div class="muted" style="padding:8px 0;">No items</div>';
-      return list.map((it) => {
-        const qty = Number(it.qty) || 1;
-        const price = Number(it.price) || 0;
-        const line = qty * price;
-        const unit = it.unit ? String(it.unit) : '';
-        const qtyLabel = it.weighted
-          ? (qty.toFixed(3) + (unit ? ' ' + unit : ''))
-          : ('× ' + qty);
-        return `<div class="item-row">
-          <span class="item-name">${esc(it.name || 'Item')}</span>
-          <span class="item-qty">${esc(qtyLabel)}</span>
-          <span class="item-line">${esc(fmtMoney(line))}</span>
-        </div>`;
-      }).join('');
+    const lineTotal = (it) => (Number(it.price) || 0) * (Number(it.qty) || 1);
+
+    const qtyLabel = (it) => {
+      const qty = Number(it.qty) || 1;
+      const unit = it.unit ? String(it.unit) : '';
+      if (it.weighted) return qty.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') + (unit ? ' ' + unit : '');
+      return qty === 1 ? '1' : String(qty);
     };
+
+    const itemKey = (it, i) => String(it.id || it.name || 'item') + ':' + i;
+
+    const initial = (name) => esc(String(name || '?').trim().charAt(0).toUpperCase() || '?');
+
+    function thumbHtml(it, cls) {
+      const src = it && it.image;
+      if (src) return `<img class="${cls}" src="${esc(src)}" alt="">`;
+      return `<div class="${cls} thumb-ph">${initial(it && it.name)}</div>`;
+    }
+
+    function splitItems(items) {
+      const list = (Array.isArray(items) ? items : []).slice();
+      list.sort((a, b) => lineTotal(b) - lineTotal(a));
+      return {
+        high: list.slice(0, HIGH_COUNT),
+        rest: list.slice(HIGH_COUNT),
+        restShow: list.slice(HIGH_COUNT, HIGH_COUNT + REST_SHOW),
+        extra: Math.max(0, list.length - HIGH_COUNT - REST_SHOW),
+        all: list,
+      };
+    }
+
+    function thumbsHtml(items) {
+      const list = Array.isArray(items) ? items : [];
+      const show = list.slice(0, 4);
+      const extra = list.length - show.length;
+      return `<div class="thumbs">
+        ${show.map((it) => thumbHtml(it, 'thumb')).join('')}
+        ${extra > 0 ? `<div class="thumb-more">+${extra}</div>` : ''}
+      </div>`;
+    }
 
     let pollTimer = null;
-    let channel = null;
-    let busyId = null;
     let loadTimer = null;
     let loading = false;
+    let busy = false;
+    let lastRequests = [];
+    let lastShopping = [];
+    let namesByUser = {};
+    let reviewId = null;
+    let review = null;
+
+    function shopperName(row) {
+      const uid = row && row.user_id;
+      const mapped = uid && namesByUser[uid];
+      const named = String(mapped || row.display_name || '').trim();
+      if (named) return named;
+      const email = String((row && row.email) || '');
+      const local = email.split('@')[0];
+      return local || 'Shopper';
+    }
+
+    async function loadNames(rows) {
+      const ids = Array.from(new Set((rows || []).map((r) => r && r.user_id).filter(Boolean)));
+      if (!ids.length || !window.sb) return;
+      try {
+        const { data, error } = await window.sb
+          .from('profiles')
+          .select('id, display_name, email')
+          .in('id', ids);
+        if (error) throw error;
+        for (const p of (data || [])) {
+          namesByUser[p.id] = String(p.display_name || '').trim();
+        }
+        for (const r of rows) {
+          if (r && r.user_id) r.display_name = namesByUser[r.user_id] || '';
+        }
+      } catch (_) { }
+    }
 
     function scheduleLoad() {
       if (loadTimer) clearTimeout(loadTimer);
       loadTimer = setTimeout(loadAll, 250);
     }
 
-    function openKeys(host) {
-      const set = new Set();
-      if (!host) return set;
-      host.querySelectorAll('details[data-key]').forEach((d) => {
-        if (d.open) set.add(d.getAttribute('data-key'));
-      });
-      return set;
-    }
-
-    function knownKeys(host) {
-      const set = new Set();
-      if (!host) return set;
-      host.querySelectorAll('details[data-key]').forEach((d) => {
-        set.add(d.getAttribute('data-key'));
-      });
-      return set;
-    }
-
     function renderShopping(rows) {
       const host = el('shop-list');
-      const opened = openKeys(host);
       el('shop-count').textContent = String(rows.length);
       if (!rows.length) {
         host.innerHTML = '<div class="empty">No carts shopping right now.</div>';
@@ -391,26 +702,29 @@
       host.innerHTML = rows.map((r) => {
         const items = Array.isArray(r.items) ? r.items : [];
         const n = items.length;
-        const key = String(r.cart_id || r.user_id || '');
-        const isOpen = opened.has(key);
-        return `<details class="shop-card" data-key="${esc(key)}"${isOpen ? ' open' : ''}>
-          <summary>
-            <div class="shop-meta">
-              <div class="shop-title">${esc(r.email || 'Signed-in shopper')}</div>
-              <div class="shop-sub">Cart ${esc(r.cart_id || '—')} · ${n} item${n === 1 ? '' : 's'}</div>
+        const cid = String(r.cart_id || '');
+        const mini = items.map((it) => `<div class="mini-item">
+          ${thumbHtml(it, 'thumb')}
+          <span class="mini-name">${esc(it.name || 'Item')}</span>
+          <span class="mini-line">${esc(qtyLabel(it))} · ${esc(fmtMoney(lineTotal(it)))}</span>
+        </div>`).join('');
+        return `<button type="button" class="cart-row live" data-live="${esc(cid)}">
+            ${thumbsHtml(items)}
+            <div class="cart-meta">
+              <div class="cart-name">${esc(shopperName(r))}</div>
+              <div class="cart-sub">${esc(formatCartLabel(cid))} · ${n} item${n === 1 ? '' : 's'}</div>
             </div>
-            <div class="shop-right">${esc(fmtMoney(r.subtotal))}</div>
-          </summary>
-          <div class="item-list">${itemRows(items)}</div>
-        </details>`;
+            <div class="cart-total">${esc(fmtMoney(r.subtotal))}</div>
+          </button>
+          <div class="live-items">${mini || '<div class="muted">No items yet</div>'}</div>`;
       }).join('');
     }
 
     function renderRequests(rows) {
       const host = el('req-list');
-      const opened = openKeys(host);
-      const known = knownKeys(host);
       el('req-count').textContent = String(rows.length);
+      const fold = el('fold-requests');
+      if (fold && rows.length) fold.open = true;
       if (!rows.length) {
         host.innerHTML = '<div class="empty">No checkout requests waiting.</div>';
         return;
@@ -418,31 +732,158 @@
       host.innerHTML = rows.map((r) => {
         const items = Array.isArray(r.items) ? r.items : [];
         const n = items.length;
-        const good = r.status === 'items_good';
-        const kicker = good ? 'Items good · ready to approve' : 'Checkout requested';
-        const isOpen = !known.size || !known.has(r.id) || opened.has(r.id);
-        return `<details class="req-card${good ? ' is-good' : ''}" data-key="${esc(r.id)}"${isOpen ? ' open' : ''}>
-          <summary>
-            <div class="req-top">
-              <div>
-                <div class="req-kicker">${esc(kicker)}</div>
-                <div class="req-title">${esc(r.email || 'Unknown email')}</div>
-                <div class="req-sub">Cart ${esc(r.cart_id || '—')} · ${n} item${n === 1 ? '' : 's'}</div>
-              </div>
-              <div>
-                <div class="req-total">${esc(fmtMoney(r.subtotal))}</div>
-                <div class="req-wait">${esc(fmtAgo(r.created_at))}</div>
-              </div>
-            </div>
-          </summary>
-          <div class="item-list">${itemRows(items)}</div>
-          <div class="req-actions">
-            <button type="button" class="btn btn-deny" data-act="denied" data-id="${esc(r.id)}">Item not scanned</button>
-            <button type="button" class="btn btn-good" data-act="items_good" data-id="${esc(r.id)}" ${good ? 'disabled' : ''}>Items good</button>
-            <button type="button" class="btn btn-approve" data-act="approved" data-id="${esc(r.id)}" ${good ? '' : 'disabled'}>Approve</button>
+        return `<button type="button" class="cart-row" data-open="${esc(r.id)}">
+          ${thumbsHtml(items)}
+          <div class="cart-meta">
+            <div class="cart-name">${esc(shopperName(r))}</div>
+            <div class="cart-sub">${esc(formatCartLabel(r.cart_id))} · ${n} item${n === 1 ? '' : 's'} · ${esc(fmtAgo(r.created_at))}</div>
           </div>
-        </details>`;
+          <div class="cart-total">${esc(fmtMoney(r.subtotal))}</div>
+          <span class="cart-chevron">›</span>
+        </button>`;
       }).join('');
+    }
+
+    function syncReviewControls() {
+      if (!review) return;
+      const parts = splitItems(review.items);
+      const allSeen = parts.high.every((_, i) => review.seen.has(i));
+      const restOk = parts.rest.length === 0 || review.restChecked;
+      const canLooksRight = allSeen && restOk;
+      const rightBtn = el('btn-looks-right');
+      const complete = el('btn-complete');
+      const lock = el('complete-lock');
+      const hint = el('complete-hint');
+      const restCheck = el('rest-check');
+
+      const askP = document.querySelector('.ask-row p');
+      if (askP) {
+        askP.textContent = parts.rest.length
+          ? 'Does the rest look right?'
+          : 'Do these look right?';
+      }
+      restCheck.classList.toggle('is-on', review.restChecked);
+      el('rest-check-input').checked = review.restChecked;
+      el('rest-block').style.display = parts.rest.length ? '' : 'none';
+
+      rightBtn.disabled = !canLooksRight;
+      if (!canLooksRight) review.looksRight = false;
+      rightBtn.classList.toggle('is-on', review.looksRight);
+
+      complete.disabled = !review.looksRight;
+      lock.style.display = review.looksRight ? 'none' : 'inline';
+      hint.textContent = review.looksRight
+        ? 'Ready to send this cart to pay.'
+        : (canLooksRight
+          ? 'Tap Looks right, then approve.'
+          : 'Mark each expensive item Seen, then check the rest.');
+    }
+
+    function paintReview() {
+      if (!review) return;
+      const parts = splitItems(review.items);
+      const n = (review.items || []).length;
+      el('review-title').textContent = formatCartLabel(review.cart_id);
+      el('review-name').textContent = shopperName(review);
+      const bits = [
+        n + ' item' + (n === 1 ? '' : 's'),
+        fmtMoney(review.subtotal),
+      ];
+      if (review.email) bits.push(review.email);
+      el('review-sub').textContent = bits.join(' · ');
+
+      el('look-list').innerHTML = parts.high.map((it, i) => {
+        const seen = review.seen.has(i);
+        return `<button type="button" class="look-row${seen ? ' is-seen' : ''}" data-seen="${i}">
+          ${thumbHtml(it, 'thumb')}
+          <div>
+            <div class="look-name">${esc(it.name || 'Item')}</div>
+            <div class="look-qty">${esc(qtyLabel(it))}</div>
+          </div>
+          <div class="look-price">${esc(fmtMoney(lineTotal(it)))}</div>
+          <div class="seen"><span class="seen-dot"></span>Seen</div>
+        </button>`;
+      }).join('') || '<div class="empty">No items in this cart.</div>';
+
+      el('rest-lede').textContent = parts.rest.length
+        ? (parts.rest.length + ' other item' + (parts.rest.length === 1 ? '' : 's')
+          + (parts.extra ? (' · showing ' + parts.restShow.length) : ''))
+        : 'No other items.';
+
+      let strip = parts.restShow.map((it) => `<div class="rest-tile">
+        ${thumbHtml(it, 'thumb')}
+        <div class="n">${esc(it.name || 'Item')}</div>
+        <div class="q">${esc(qtyLabel(it))}</div>
+      </div>`).join('');
+      if (parts.extra) {
+        strip += `<div class="rest-tile"><div class="thumb-ph thumb">+${parts.extra}</div><div class="n">more</div><div class="q">in cart</div></div>`;
+      }
+      el('rest-strip').innerHTML = strip;
+      syncReviewControls();
+    }
+
+    function openReview(id) {
+      const row = lastRequests.find((r) => r.id === id);
+      if (!row) return;
+      reviewId = id;
+      review = {
+        ...row,
+        seen: new Set(),
+        restChecked: splitItems(row.items).rest.length === 0,
+        looksRight: false,
+      };
+      document.body.classList.add('reviewing');
+      paintReview();
+      resolveReviewImages(row);
+    }
+
+    function closeReview() {
+      reviewId = null;
+      review = null;
+      document.body.classList.remove('reviewing');
+    }
+
+    async function resolveReviewImages(row) {
+      const items = Array.isArray(row.items) ? row.items : [];
+      const base = (window.APP_CONFIG && window.APP_CONFIG.API_BASE) || '';
+      let changed = false;
+      for (const it of items) {
+        if (it.image) continue;
+        const key = it.imageKey;
+        if (key && base) {
+          try {
+            const res = await fetch(base + '/image-url', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.url) { it.image = data.url; changed = true; continue; }
+            }
+          } catch (_) { }
+        }
+        if (it.id && base) {
+          try {
+            const res = await fetch(base + '/products/' + encodeURIComponent(it.id));
+            if (!res.ok) continue;
+            const p = await res.json();
+            const imgKey = Array.isArray(p.imageKeys) && p.imageKeys[0] ? p.imageKeys[0] : p.image_url;
+            if (imgKey) {
+              const u = await fetch(base + '/image-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: imgKey }),
+              });
+              if (u.ok) {
+                const data = await u.json();
+                if (data && data.url) { it.image = data.url; changed = true; }
+              }
+            }
+          } catch (_) { }
+        }
+      }
+      if (changed && review && review.id === row.id) paintReview();
     }
 
     async function loadAll() {
@@ -467,21 +908,36 @@
         if (reqRes.error) throw reqRes.error;
         if (sessRes.error) throw sessRes.error;
 
-        const requests = Array.isArray(reqRes.data) ? reqRes.data : [];
-        const openCarts = new Set(requests.map((r) => String(r.cart_id || '')));
-        const shopping = [];
+        lastRequests = Array.isArray(reqRes.data) ? reqRes.data : [];
+        const openCarts = new Set(lastRequests.map((r) => String(r.cart_id || '')));
+        lastShopping = [];
         const seenCart = new Set();
         for (const s of (sessRes.data || [])) {
           const cid = String(s.cart_id || '');
           if (!cid || openCarts.has(cid) || seenCart.has(cid)) continue;
           seenCart.add(cid);
-          shopping.push(s);
+          lastShopping.push(s);
         }
 
-        renderRequests(requests);
-        renderShopping(shopping);
-        status.textContent = requests.length
-          ? requests.length + ' waiting'
+        await loadNames(lastRequests.concat(lastShopping));
+        if (review && review.user_id) {
+          review.display_name = namesByUser[review.user_id] || review.display_name;
+        }
+
+        if (!reviewId) {
+          renderRequests(lastRequests);
+          renderShopping(lastShopping);
+        } else if (!lastRequests.some((r) => r.id === reviewId)) {
+          closeReview();
+          renderRequests(lastRequests);
+          renderShopping(lastShopping);
+        } else if (review) {
+          el('review-name').textContent = shopperName(review);
+          el('review-title').textContent = formatCartLabel(review.cart_id);
+        }
+
+        status.textContent = lastRequests.length
+          ? lastRequests.length + ' waiting'
           : 'Queue clear';
       } catch (e) {
         console.error(e);
@@ -492,20 +948,20 @@
     }
 
     async function setStatus(id, next) {
-      if (!id || busyId) return;
-      busyId = id;
+      if (!id || busy) return false;
+      busy = true;
       try {
         const { error } = await window.sb.rpc('set_checkout_request_status', {
           p_request_id: id,
           p_status: next,
         });
         if (error) throw error;
-        await loadAll();
+        return true;
       } catch (e) {
         alert(e.message || 'Could not update checkout request');
-        await loadAll();
+        return false;
       } finally {
-        busyId = null;
+        busy = false;
       }
     }
 
@@ -514,17 +970,73 @@
       if (!access) return;
 
       el('refresh').addEventListener('click', loadAll);
+      el('review-back').addEventListener('click', () => {
+        closeReview();
+        renderRequests(lastRequests);
+        renderShopping(lastShopping);
+      });
+
       el('req-list').addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-act]');
+        const btn = e.target.closest('[data-open]');
         if (!btn) return;
+        openReview(btn.getAttribute('data-open'));
+      });
+
+      el('shop-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('.cart-row.live');
+        if (!btn) return;
+        btn.classList.toggle('open');
+      });
+
+      el('look-list').addEventListener('click', (e) => {
+        const row = e.target.closest('[data-seen]');
+        if (!row || !review) return;
+        const i = Number(row.getAttribute('data-seen'));
+        if (review.seen.has(i)) review.seen.delete(i);
+        else review.seen.add(i);
+        paintReview();
+      });
+
+      el('rest-check').addEventListener('click', (e) => {
         e.preventDefault();
-        setStatus(btn.getAttribute('data-id'), btn.getAttribute('data-act'));
+        if (!review) return;
+        review.restChecked = !review.restChecked;
+        paintReview();
+      });
+
+      el('btn-looks-off').addEventListener('click', async () => {
+        if (!review) return;
+        const id = review.id;
+        const ok = await setStatus(id, 'denied');
+        if (!ok) return;
+        closeReview();
+        await loadAll();
+      });
+
+      el('btn-looks-right').addEventListener('click', () => {
+        if (!review || el('btn-looks-right').disabled) return;
+        review.looksRight = true;
+        syncReviewControls();
+      });
+
+      el('btn-complete').addEventListener('click', async () => {
+        if (!review || !review.looksRight) return;
+        const id = review.id;
+        const row = lastRequests.find((r) => r.id === id);
+        if (!row || row.status !== 'items_good') {
+          const okGood = await setStatus(id, 'items_good');
+          if (!okGood) return;
+        }
+        const ok = await setStatus(id, 'approved');
+        if (!ok) return;
+        closeReview();
+        await loadAll();
       });
 
       await loadAll();
 
       if (window.sb) {
-        channel = window.sb.channel('admin-approve-checkout')
+        window.sb.channel('admin-approve-checkout')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'checkout_requests' }, () => { scheduleLoad(); })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'active_sessions' }, () => { scheduleLoad(); })
           .subscribe();

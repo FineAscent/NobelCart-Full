@@ -10,14 +10,27 @@
 (function () {
   var KEY = 'nc_cart_id';
 
+  function cleanCartId(raw) {
+    var id = String(raw == null ? '' : raw).trim();
+    if (!id) return '';
+    try { id = decodeURIComponent(id); } catch (_) { }
+    id = id.split(/[/?#]/)[0];
+    if (/\.(html?|php)$/i.test(id)) return '';
+    var m = id.match(/^[A-Za-z0-9._-]{1,64}/);
+    return m ? m[0] : '';
+  }
+
   function readStored() {
-    try {
-      var v = window.localStorage.getItem(KEY);
-      if (v) return v;
-    } catch (_) { }
+    var raw = '';
+    try { raw = window.localStorage.getItem(KEY) || ''; } catch (_) { }
     // Earlier builds only wrote sessionStorage; keep reading it so an in-progress
     // session is not dropped on the deploy that introduces this file.
-    try { return window.sessionStorage.getItem(KEY) || ''; } catch (_) { return ''; }
+    if (!raw) {
+      try { raw = window.sessionStorage.getItem(KEY) || ''; } catch (_) { }
+    }
+    var id = cleanCartId(raw);
+    if (id && id !== raw) store(id);
+    return id;
   }
 
   function store(id) {
@@ -30,6 +43,8 @@
     var fromUrl = null;
     try { fromUrl = new URLSearchParams(window.location.search).get('cart'); } catch (_) { }
     if (fromUrl) {
+      fromUrl = cleanCartId(fromUrl);
+      if (!fromUrl) return readStored();
       store(fromUrl);
       return fromUrl;
     }
