@@ -444,16 +444,141 @@ async function fetchProductsByIds(ids = []) {
   return results;
 }
 
+const IMAGE_URL_REFRESH_MS = 40 * 1000;
+const IMAGE_URL_CACHE_BUFFER_MS = 8 * 1000;
+const __imageUrlCache = new Map(); // key -> { url, expiresAt }
+let __imageRefreshTimer = null;
+
+function imageKeyFromUrl(url) {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  try {
+    const u = new URL(url);
+    if (!/amazonaws\.com/i.test(u.hostname)) return null;
+    const path = decodeURIComponent(u.pathname.replace(/^\//, ''));
+    return path || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function presignedUrlExpiryMs(url) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const secs = Number(u.searchParams.get('X-Amz-Expires'));
+    const stamp = u.searchParams.get('X-Amz-Date');
+    if (!secs || !stamp) return null;
+    const start = Date.parse(
+      stamp.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z')
+    );
+    if (!Number.isFinite(start)) return null;
+    return start + secs * 1000;
+  } catch (_) {
+    return null;
+  }
+}
+
+function isSignedUrlFresh(url) {
+  const expiresAt = presignedUrlExpiryMs(url);
+  if (!expiresAt) return true;
+  return expiresAt > Date.now() + IMAGE_URL_CACHE_BUFFER_MS;
+}
+
+function rememberImageUrl(key, url) {
+  if (!key || !url) return url;
+  const expiresAt = presignedUrlExpiryMs(url);
+  __imageUrlCache.set(String(key), {
+    url,
+    expiresAt: expiresAt
+      ? expiresAt - IMAGE_URL_CACHE_BUFFER_MS
+      : Date.now() + IMAGE_URL_REFRESH_MS,
+  });
+  return url;
+}
+
 async function getImageUrlForKey(key) {
   if (!key) return null;
+  const cacheKey = String(key);
+  const hit = __imageUrlCache.get(cacheKey);
+  if (hit && hit.expiresAt > Date.now()) return hit.url;
   try {
-    const data = await apiFetch('/image-url', { method: 'POST', body: { key } });
-    return data && data.url ? data.url : null;
+    const data = await apiFetch('/image-url', { method: 'POST', body: { key: cacheKey } });
+    const url = data && data.url ? data.url : null;
+    return url ? rememberImageUrl(cacheKey, url) : null;
   } catch (e) {
     console.warn('image-url failed for key', key, e);
     return null;
   }
 }
+
+function getItemImageKey(it) {
+  if (!it) return null;
+  if (it.imageKey) return String(it.imageKey);
+  return imageKeyFromUrl(it.image);
+}
+
+async function refreshCartImages({ rerender = true } = {}) {
+  const items = loadCart();
+  if (!items.length) return;
+  let dirty = false;
+  await Promise.all(items.map(async (it) => {
+    const key = getItemImageKey(it);
+    if (!key) return;
+    if (it.image && isSignedUrlFresh(it.image) && it.imageKey) return;
+    const url = await getImageUrlForKey(key);
+    if (!url) return;
+    if (!it.imageKey) {
+      it.imageKey = key;
+      dirty = true;
+    }
+    if (it.image !== url) {
+      it.image = url;
+      dirty = true;
+    }
+  }));
+  if (dirty) {
+    saveCart(items);
+    if (rerender) renderCart();
+  }
+}
+
+async function refreshProductCardImages(root) {
+  const scope = root && root.querySelectorAll ? root : document;
+  const cards = Array.from(scope.querySelectorAll('.product-card'));
+  await Promise.all(cards.map(async (card) => {
+    let key = card.getAttribute('data-image-key');
+    const current = card.getAttribute('data-image');
+    if (!key && current) key = imageKeyFromUrl(current);
+    if (!key) return;
+    if (current && isSignedUrlFresh(current) && card.getAttribute('data-image-key')) return;
+    const url = await getImageUrlForKey(key);
+    if (!url) return;
+    const imgDiv = card.querySelector('.product-image');
+    if (imgDiv) {
+      imgDiv.style.backgroundImage = `url('${url}')`;
+      imgDiv.style.backgroundSize = 'cover';
+      imgDiv.style.backgroundPosition = 'center';
+    }
+    card.setAttribute('data-image', url);
+    card.setAttribute('data-image-key', key);
+  }));
+}
+
+function startImageRefreshLoop() {
+  if (__imageRefreshTimer) return;
+  const tick = () => {
+    if (document.visibilityState === 'hidden') return;
+    refreshCartImages({ rerender: true }).catch(() => { });
+    refreshProductCardImages().catch(() => { });
+  };
+  __imageRefreshTimer = setInterval(tick, IMAGE_URL_REFRESH_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tick();
+  });
+  tick();
+}
+
+window.getImageUrlForKey = getImageUrlForKey;
 
 // 2. Function to get a single product by ID (User provided snippet adapted)
 async function getProduct(id) {
@@ -667,7 +792,13 @@ async function renderProductsToGrid(gridEl, items) {
       // image_url may be a full URL OR an external key that the API can sign
       if (/^https?:\/\//i.test(p.image_url)) {
         url = p.image_url;
-        // Don't treat public URLs as refreshable keys unless needed, but we can store them
+        const fromUrl = imageKeyFromUrl(p.image_url);
+        if (fromUrl) {
+          finalImageKey = fromUrl;
+          if (!isSignedUrlFresh(p.image_url)) {
+            try { url = await getImageUrlForKey(fromUrl); } catch { }
+          }
+        }
       } else {
         try { url = await getImageUrlForKey(p.image_url); } catch { }
         finalImageKey = p.image_url;
@@ -681,6 +812,8 @@ async function renderProductsToGrid(gridEl, items) {
           // Expect p.image_url like: 'cabinet-uploads/<uid>/file.jpg' or full URL
           if (/^https?:\/\//i.test(p.image_url)) {
             url = p.image_url;
+            const fromUrl = imageKeyFromUrl(p.image_url);
+            if (fromUrl) finalImageKey = fromUrl;
           } else {
             const path = p.image_url.replace(/^cabinet-uploads\//, '');
             const { data, error } = await window.sb.storage
@@ -716,6 +849,8 @@ async function renderProductsToGrid(gridEl, items) {
     // add/override location-tag with areaLocation if present
     ensureLocationTag(card, p.areaLocation);
   }));
+
+  try { await refreshProductCardImages(gridEl); } catch (_) { }
 
   // Self-heal: Update cart items if we found images OR keys for them
   if (resolvedImages.size > 0 || resolvedKeys.size > 0) {
@@ -1583,6 +1718,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const isAdminPath = /(^|\/)admin\//.test(location.pathname);
   if (!isAdminPath) {
     try { renderCart(); } catch (_) { }
+    try { refreshCartImages({ rerender: true }); } catch (_) { }
+    try { startImageRefreshLoop(); } catch (_) { }
     // Initialize force sign-out realtime watcher and send an initial heartbeat
     try { ensureForceSignoutWatcher(); } catch (_) { }
     try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
