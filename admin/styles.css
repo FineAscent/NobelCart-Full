@@ -327,6 +327,8 @@ body.index .header {
     border-radius: 0;
     /* let card radius clip corners */
     display: block;
+    position: relative;
+    overflow: hidden;
 }
 
 .product-info {
@@ -358,16 +360,26 @@ body.index .header {
 /* Location tag on top-right corner of each product card */
 .location-tag {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 24px;
-    height: 24px;
-    background: #e7e7e7;
-    color: #333;
-    font-size: 11px;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    min-width: 34px;
+    padding: 6px 11px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #6a5338;
+    font-size: 12px;
     font-weight: 700;
-    border-radius: 50%;
-    display: flex;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(139, 115, 85, 0.22);
+    box-shadow: 0 2px 10px rgba(45, 42, 38, 0.14);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
 }
 
 /* Animations for Category Page */

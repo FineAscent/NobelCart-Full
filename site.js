@@ -589,6 +589,20 @@ async function fetchUserCheckoutHistory({ limit = 100, offset = 0 } = {}) {
   }
 }
 
+function ensureLocationTag(card, area) {
+  const label = String(area || card.getAttribute('data-area') || '').trim();
+  if (!label) return;
+  let tag = card.querySelector('.location-tag');
+  if (!tag) {
+    tag = document.createElement('span');
+    tag.className = 'location-tag';
+    const imgDiv = card.querySelector('.product-image');
+    (imgDiv || card).appendChild(tag);
+  }
+  tag.textContent = label;
+  tag.setAttribute('aria-label', 'Item location ' + label);
+}
+
 function productCardHTML(p) {
   const price = (p.price != null) ? `$${Number(p.price).toFixed(2)}` : '';
   const unit = p.priceUnit ? `/${p.priceUnit}` : '';
@@ -700,16 +714,7 @@ async function renderProductsToGrid(gridEl, items) {
       }
     }
     // add/override location-tag with areaLocation if present
-    const area = p.areaLocation;
-    if (area) {
-      let tag = card.querySelector('.location-tag');
-      if (!tag) {
-        tag = document.createElement('div');
-        tag.className = 'location-tag';
-        card.appendChild(tag);
-      }
-      tag.textContent = area;
-    }
+    ensureLocationTag(card, p.areaLocation);
   }));
 
   // Self-heal: Update cart items if we found images OR keys for them
@@ -948,9 +953,9 @@ function showCheckoutWaitModal({ onCancel }) {
   overlay.innerHTML = `
     <div class="modal checkout-wait-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-wait-title">
       <div class="checkout-wait-pulse" aria-hidden="true"></div>
-      <div class="modal-header" id="checkout-wait-title">Wait for admin approval</div>
-      <p class="checkout-wait-copy">An associate is checking the items in your cart.</p>
-      <p class="checkout-wait-hint">This usually takes a moment.</p>
+      <div class="modal-header" id="checkout-wait-title">An associate will be with you shortly</div>
+      <p class="checkout-wait-copy">We're making sure everything is good to go.</p>
+      <p class="checkout-wait-hint">This usually takes just a moment.</p>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary checkout-wait-cancel">Cancel</button>
       </div>
@@ -1004,7 +1009,7 @@ async function waitForCheckoutApproval() {
     if (status === 'denied') return finish('denied');
     if (status === 'cancelled') return finish('cancelled');
     if (status === 'expired') return finish('expired');
-    if (status === 'items_good') ui.setHint('Items look good. Waiting for final approve…');
+    if (status === 'items_good') ui.setHint('Almost there — just a final check.');
   };
 
   try {
@@ -2129,16 +2134,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     setupBack();
 
-    // Add location tag to each product card (placeholder "A1")
+    // Add location tag to each product card
     const productCards = document.querySelectorAll('.products-grid .product-card');
     productCards.forEach((card) => {
-      if (!card.querySelector('.location-tag')) {
-        const tag = document.createElement('div');
-        tag.className = 'location-tag';
-        const area = card.getAttribute('data-area');
-        tag.textContent = area && area.length ? area : 'A1';
-        card.appendChild(tag);
-      }
+      ensureLocationTag(card);
     });
 
     // Cabinet data load (prefer Supabase if available)
