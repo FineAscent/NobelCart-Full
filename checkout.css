@@ -303,6 +303,169 @@ body.checkout .container {
     -webkit-user-drag: none;
 }
 
+.checkout-how-to {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: #1b7991;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    padding: 4px 8px;
+    margin-top: 2px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.checkout-how-to:hover {
+    color: #17667b;
+}
+
+/* Phone checkout guide (same frame language as sign-in) */
+.phone-guide-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.64);
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 16px 24px;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+}
+
+.phone-guide-overlay[hidden] {
+    display: none !important;
+}
+
+.phone-guide-overlay.is-open {
+    opacity: 1;
+}
+
+.phone-guide-overlay.is-leaving {
+    opacity: 0;
+    transition-delay: 0.12s;
+    transition-duration: 0.45s;
+}
+
+.phone-guide-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.phone-guide-overlay.is-open .phone-guide-card {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition-delay: 0.1s;
+}
+
+.phone-guide-overlay.is-leaving .phone-guide-card {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    transition-delay: 0s;
+    transition-duration: 0.35s;
+}
+
+.phone-guide-title {
+    margin: 0;
+    color: #f4f4f5;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-align: center;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+}
+
+.phone-guide-device {
+    height: min(60vh, 560px);
+    aspect-ratio: 1260 / 2552;
+    border-radius: 22px;
+    overflow: hidden;
+    background: #0b0b0d;
+    box-shadow:
+        0 0 0 2px #1c1c1e,
+        0 0 0 4px #3a3a3c,
+        0 18px 44px rgba(0, 0, 0, 0.42);
+}
+
+.phone-guide-device video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    border-radius: inherit;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+.phone-guide-device.is-in video {
+    opacity: 1;
+    transition-delay: 0s;
+}
+
+.phone-guide-device.is-in.is-intro video {
+    transition-delay: 0.4s;
+}
+
+.phone-guide-device.is-out video,
+.phone-guide-device.is-in.is-loop-out video {
+    opacity: 0;
+    transition-delay: 0s;
+    transition-duration: 0.4s;
+}
+
+.phone-guide-device.is-out video {
+    transition-delay: 0.2s;
+    transition-duration: 0.5s;
+}
+
+.phone-guide-got-it {
+    appearance: none;
+    border: none;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 12px 32px;
+    min-width: 140px;
+    min-height: 44px;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.phone-guide-got-it:active {
+    transform: translateY(1px);
+}
+
+@media (max-height: 640px) {
+    .phone-guide-device {
+        height: min(60vh, 400px);
+        border-radius: 18px;
+    }
+
+    .phone-guide-title {
+        font-size: 16px;
+    }
+
+    .phone-guide-got-it {
+        padding: 10px 24px;
+        font-size: 15px;
+        min-width: 120px;
+        min-height: 40px;
+    }
+}
+
 .qr-link {
     color: #8b7355;
     font-weight: 600;

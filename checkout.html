@@ -8,7 +8,7 @@
   <title>Checkout</title>
   <script src="phone-gate.js"></script>
   <link rel="stylesheet" href="styles.css?v=19" />
-  <link rel="stylesheet" href="checkout.css" />
+  <link rel="stylesheet" href="checkout.css?v=2" />
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 
@@ -57,6 +57,17 @@
     </div>
   </div>
 
+  <div id="phone-checkout-guide" class="phone-guide-overlay" hidden role="dialog"
+    aria-modal="true" aria-labelledby="phone-checkout-guide-title">
+    <div class="phone-guide-card">
+      <p id="phone-checkout-guide-title" class="phone-guide-title">How to checkout</p>
+      <div class="phone-guide-device">
+        <video id="phone-checkout-guide-video" playsinline muted preload="auto"></video>
+      </div>
+      <button type="button" id="phone-checkout-guide-got-it" class="phone-guide-got-it">Got it</button>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="error-reporter.js"></script>
@@ -98,7 +109,7 @@
       }
     })();
   </script>
-  <script src="site.js?v=21"></script>
+  <script src="site.js?v=22"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const backBtn = document.getElementById('checkout-back-btn');
@@ -110,6 +121,145 @@
           }, 500);
         });
       }
+
+      const GUIDE_FADE_OUT_MS = 700;
+      const LOOP_FADE_OUT_MS = 400;
+      const LOOP_HOLD_MS = 200;
+      const GUIDE_SPEED = 1.25;
+      const GUIDE_INTRO_SRC = 'Images/qr-checkout-normal.mp4';
+      const GUIDE_LOOP_SRC = 'Images/qr-checkout-short.mp4';
+
+      const guideOverlay = document.getElementById('phone-checkout-guide');
+      const guideDevice = guideOverlay && guideOverlay.querySelector('.phone-guide-device');
+      const guideVideo = document.getElementById('phone-checkout-guide-video');
+      const guideGotIt = document.getElementById('phone-checkout-guide-got-it');
+      let guideHideTimer = null;
+      let guideLoopTimer = null;
+      let guideLeaving = false;
+      let guidePhase = 'intro'; // 'intro' | 'loop'
+
+      function clearGuideLoopTimer() {
+        if (guideLoopTimer) { clearTimeout(guideLoopTimer); guideLoopTimer = null; }
+      }
+
+      function playGuideVideo(src) {
+        if (!guideVideo) return;
+        const applyPlay = () => {
+          try { guideVideo.playbackRate = GUIDE_SPEED; } catch (_) {}
+          const play = guideVideo.play();
+          if (play && typeof play.catch === 'function') play.catch(function () {});
+        };
+        if (guideVideo.getAttribute('src') !== src) {
+          guideVideo.setAttribute('src', src);
+          guideVideo.load();
+          const onReady = () => {
+            guideVideo.removeEventListener('loadeddata', onReady);
+            try { guideVideo.currentTime = 0; } catch (_) {}
+            applyPlay();
+          };
+          guideVideo.addEventListener('loadeddata', onReady);
+        } else {
+          try { guideVideo.currentTime = 0; } catch (_) {}
+          applyPlay();
+        }
+      }
+
+      function hideCheckoutGuide() {
+        if (!guideOverlay || guideOverlay.hidden || guideLeaving) return;
+        guideLeaving = true;
+        clearGuideLoopTimer();
+        if (guideHideTimer) { clearTimeout(guideHideTimer); guideHideTimer = null; }
+        if (guideDevice) {
+          guideDevice.classList.remove('is-in', 'is-intro', 'is-loop-out');
+          guideDevice.classList.add('is-out');
+        }
+        guideOverlay.classList.remove('is-open');
+        guideOverlay.classList.add('is-leaving');
+        guideHideTimer = setTimeout(function () {
+          guideHideTimer = null;
+          try { if (guideVideo) guideVideo.pause(); } catch (_) {}
+          if (guideDevice) guideDevice.classList.remove('is-out', 'is-loop-out', 'is-intro');
+          guideOverlay.classList.remove('is-leaving', 'is-open');
+          guideOverlay.hidden = true;
+          guideLeaving = false;
+          guidePhase = 'intro';
+        }, GUIDE_FADE_OUT_MS);
+      }
+
+      function switchToLoopClip() {
+        if (guideLeaving || !guideVideo || !guideDevice) return;
+        if (!guideDevice.classList.contains('is-in')) return;
+        guideDevice.classList.remove('is-intro');
+        guideDevice.classList.add('is-loop-out');
+        clearGuideLoopTimer();
+        guideLoopTimer = setTimeout(function () {
+          if (guideLeaving) return;
+          guidePhase = 'loop';
+          playGuideVideo(GUIDE_LOOP_SRC);
+          guideLoopTimer = setTimeout(function () {
+            guideLoopTimer = null;
+            if (guideLeaving) return;
+            guideDevice.classList.remove('is-loop-out');
+          }, LOOP_HOLD_MS);
+        }, LOOP_FADE_OUT_MS);
+      }
+
+      function replayLoopClip() {
+        if (guideLeaving || !guideVideo || !guideDevice) return;
+        if (!guideDevice.classList.contains('is-in')) return;
+        guideDevice.classList.remove('is-intro');
+        guideDevice.classList.add('is-loop-out');
+        clearGuideLoopTimer();
+        guideLoopTimer = setTimeout(function () {
+          if (guideLeaving) return;
+          try { guideVideo.currentTime = 0; } catch (_) {}
+          try { guideVideo.playbackRate = GUIDE_SPEED; } catch (_) {}
+          const play = guideVideo.play();
+          if (play && typeof play.catch === 'function') play.catch(function () {});
+          guideLoopTimer = setTimeout(function () {
+            guideLoopTimer = null;
+            if (guideLeaving) return;
+            guideDevice.classList.remove('is-loop-out');
+          }, LOOP_HOLD_MS);
+        }, LOOP_FADE_OUT_MS);
+      }
+
+      function onGuideEnded() {
+        if (guideLeaving) return;
+        if (guidePhase === 'intro') switchToLoopClip();
+        else replayLoopClip();
+      }
+
+      function showCheckoutGuide() {
+        if (!guideOverlay) return;
+        clearGuideLoopTimer();
+        if (guideHideTimer) { clearTimeout(guideHideTimer); guideHideTimer = null; }
+        guideLeaving = false;
+        guidePhase = 'intro';
+        guideOverlay.classList.remove('is-leaving', 'is-open');
+        if (guideDevice) guideDevice.classList.remove('is-in', 'is-out', 'is-intro', 'is-loop-out');
+        guideOverlay.hidden = false;
+        void guideOverlay.offsetWidth;
+        guideOverlay.classList.add('is-open');
+        if (guideDevice) guideDevice.classList.add('is-in', 'is-intro');
+        playGuideVideo(GUIDE_INTRO_SRC);
+        try { if (guideGotIt) guideGotIt.focus(); } catch (_) {}
+      }
+
+      if (guideVideo) {
+        guideVideo.addEventListener('ended', onGuideEnded);
+      }
+      if (guideGotIt) {
+        guideGotIt.addEventListener('click', hideCheckoutGuide);
+      }
+
+      document.addEventListener('click', (e) => {
+        const btn = e.target && e.target.closest && e.target.closest('#checkout-how-to');
+        if (btn) {
+          e.preventDefault();
+          showCheckoutGuide();
+        }
+      });
     });
   </script>
 </body>

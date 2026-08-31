@@ -2736,9 +2736,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(url);
     qrHolder.appendChild(img);
 
+    const howToBtn = document.createElement('button');
+    howToBtn.type = 'button';
+    howToBtn.id = 'checkout-how-to';
+    howToBtn.className = 'checkout-how-to';
+    howToBtn.textContent = 'How to Checkout';
+
     wrapper.appendChild(title);
     wrapper.appendChild(qrHolder);
     wrapper.appendChild(statusEl);
+    wrapper.appendChild(howToBtn);
     mountEl.appendChild(wrapper);
 
     linkEl.href = url;
