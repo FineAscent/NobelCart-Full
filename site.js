@@ -1246,6 +1246,40 @@ async function ensureForceSignoutWatcher() {
   } catch (_) { }
 }
 
+// If another shopper claims this physical cart, sign this device out.
+let __cartOccupancyWatcherInited = false;
+async function ensureCartOccupancyWatcher() {
+  if (__cartOccupancyWatcherInited || !CART_ID) return;
+  try {
+    if (!window.sb) return;
+    const { data } = await window.sb.auth.getSession();
+    const user = data?.session?.user;
+    if (!user) return;
+    const myUid = user.id;
+    window.sb.channel('cart_occ_' + CART_ID)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'carts',
+        filter: 'cart_id=eq.' + CART_ID,
+      }, async (payload) => {
+        try {
+          const nextUid = payload?.new?.user_id;
+          if (!nextUid || nextUid === myUid) return;
+          try { await clearActiveSession(); } catch (_) { }
+          try { localStorage.removeItem(CART_KEY); } catch (_) { }
+          try { sessionStorage.clear(); } catch (_) { }
+          try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
+          if (!location.pathname.includes('signin.html')) {
+            window.location.href = withCart('signin.html');
+          }
+        } catch (_) { }
+      })
+      .subscribe();
+    __cartOccupancyWatcherInited = true;
+  } catch (_) { }
+}
+
 function formatMoney(n) {
   const v = Number(n || 0);
   return `$${v.toFixed(2)}`;
@@ -1722,6 +1756,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try { startImageRefreshLoop(); } catch (_) { }
     // Initialize force sign-out realtime watcher and send an initial heartbeat
     try { ensureForceSignoutWatcher(); } catch (_) { }
+    try { ensureCartOccupancyWatcher(); } catch (_) { }
     try { upsertActiveSession(getCartSubtotal()); } catch (_) { }
     // Periodic heartbeat (~2s) so the mobile app can detect Active / signed-out within ~5s
     try {

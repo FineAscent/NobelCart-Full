@@ -823,7 +823,7 @@
         // Link this cart to the signed-in user
         const cartId = window.ncCartId ? window.ncCartId() : urlParams.get('cart');
         if (cartId && data?.user?.id) {
-          try { await window.sb.from('carts').update({ user_id: data.user.id }).eq('cart_id', cartId); } catch (_) {}
+          try { await window.sb.rpc('claim_cart_user', { p_cart_id: cartId, p_user_id: data.user.id }); } catch (_) {}
         }
 
         try { showLoadingOverlay('', { logo: true }); } catch (_) { }
@@ -903,7 +903,9 @@
       let pollInterval = null;
       let qrBusy = false;
       let qrStopped = true;
-      const QR_TTL_MS = 6 * 60 * 1000;
+      let activeSessionId = null;
+      let sessionExpiresAt = null;
+      let approvalHandled = false;
       const QR_RENEW_MS = 5 * 60 * 1000;
 
       function setStatus(msg, isError) {
@@ -914,9 +916,16 @@
       function cleanup() {
         qrStopped = true;
         qrBusy = false;
+        activeSessionId = null;
+        sessionExpiresAt = null;
         if (channel) { try { window.sb && window.sb.removeChannel(channel); } catch (_) {} channel = null; }
         if (expireTimer) { clearTimeout(expireTimer); expireTimer = null; }
         if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      }
+
+      function onQrApproved(tokenHash) {
+        if (!tokenHash || approvalHandled || qrStopped) return;
+        handleApproved(tokenHash);
       }
 
       let paneSwapTimer = null;
@@ -931,6 +940,7 @@
 
       function showForm() {
         cleanup();
+        approvalHandled = false;
         if (paneSwapTimer) { clearTimeout(paneSwapTimer); paneSwapTimer = null; }
         if (fieldsTimer) { clearTimeout(fieldsTimer); fieldsTimer = null; }
         if (btnTimer) { clearTimeout(btnTimer); btnTimer = null; }
@@ -978,6 +988,8 @@
       }
 
       async function handleApproved(tokenHash) {
+        if (!tokenHash || approvalHandled) return;
+        approvalHandled = true;
         cleanup();
         setStatus('Scan detected — signing you in…');
         if (qrDot) qrDot.style.animation = 'none';
@@ -1001,6 +1013,7 @@
           if (!agreed) {
             try { await window.sb.auth.signOut(); } catch (_) {}
             setStatus('You must accept the Privacy Policy to continue.', true);
+            approvalHandled = false;
             return;
           }
 
@@ -1008,14 +1021,18 @@
 
           try {
             const uid = data?.user?.id;
-            if (uid) await window.sb.from('carts').update({ user_id: uid }).eq('cart_id', cartId);
+            if (uid) await window.sb.rpc('claim_cart_user', { p_cart_id: cartId, p_user_id: uid });
           } catch (_) {}
 
           try { showLoadingOverlay('', { logo: true }); } catch (_) {}
           setTimeout(() => { window.location.href = 'index.html?cart=' + encodeURIComponent(cartId); }, 4000);
         } catch (e) {
+          approvalHandled = false;
           setStatus('Sign-in failed: ' + (e.message || 'Unknown error'), true);
           if (qrDot) qrDot.style.animation = 'none';
+          if (qrPanel && qrPanel.style.display === 'block') {
+            try { await startQrSession(); } catch (_) {}
+          }
         }
       }
 
@@ -1073,34 +1090,54 @@
         if (!channel) {
           channel = window.sb.channel('qr-' + cartId)
             .on('broadcast', { event: 'approved' }, (payload) => {
-              const th = payload?.payload?.token_hash;
-              if (th) handleApproved(th);
+              onQrApproved(payload?.payload?.token_hash);
+            })
+            .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'cart_qr_sessions',
+              filter: 'cart_id=eq.' + cartId,
+            }, (payload) => {
+              const row = payload && payload.new;
+              if (row && row.status === 'approved' && row.token_hash) {
+                onQrApproved(row.token_hash);
+              }
             });
           channel.subscribe();
         }
         if (pollInterval) return;
-        let alreadyHandled = false;
         pollInterval = setInterval(async () => {
-          if (alreadyHandled || qrStopped) return;
+          if (approvalHandled || qrStopped) return;
+          if (!activeSessionId) return;
           try {
-            const { data } = await window.sb
+            if (sessionExpiresAt && Date.now() > new Date(sessionExpiresAt).getTime() + 5000) {
+              if (qrPanel && qrPanel.style.display === 'block' && !qrBusy) {
+                await startQrSession();
+              }
+              return;
+            }
+            let { data } = await window.sb
               .from('cart_qr_sessions')
               .select('status, token_hash')
-              .eq('cart_id', cartId)
-              .eq('status', 'approved')
-              .not('token_hash', 'is', null)
-              .gt('expires_at', new Date().toISOString())
-              .order('created_at', { ascending: false })
-              .limit(1)
+              .eq('id', activeSessionId)
               .maybeSingle();
-            if (data && data.token_hash) {
-              alreadyHandled = true;
-              clearInterval(pollInterval);
-              pollInterval = null;
-              handleApproved(data.token_hash);
+            if (!data || data.status !== 'approved' || !data.token_hash) {
+              const fallback = await window.sb
+                .from('cart_qr_sessions')
+                .select('status, token_hash')
+                .eq('cart_id', cartId)
+                .eq('status', 'approved')
+                .not('token_hash', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              data = fallback.data;
+            }
+            if (data && data.status === 'approved' && data.token_hash) {
+              onQrApproved(data.token_hash);
             }
           } catch (_) {}
-        }, 3000);
+        }, 2000);
       }
 
       function scheduleQrRenew(delayMs) {
@@ -1112,7 +1149,7 @@
 
       async function startQrSession() {
         if (!window.sb) { setStatus('Auth not ready', true); return; }
-        if (qrBusy) return;
+        if (qrBusy || approvalHandled) return;
         if (qrPanel && qrPanel.style.display !== 'block') return;
         qrBusy = true;
         qrStopped = false;
@@ -1123,21 +1160,25 @@
           setStatus('Waiting for scan…');
           if (qrDot) qrDot.style.animation = 'qrPulse 1.4s ease-in-out infinite';
 
-          const expiresAt = new Date(Date.now() + QR_TTL_MS).toISOString();
-          const { error: insertErr } = await window.sb
-            .from('cart_qr_sessions')
-            .insert({ cart_id: cartId, status: 'pending', expires_at: expiresAt })
-            .select('id')
-            .single();
-          if (insertErr) throw insertErr;
+          const { data: rows, error: rpcErr } = await window.sb.rpc('start_cart_qr_session', {
+            p_cart_id: cartId,
+          });
+          if (rpcErr) throw rpcErr;
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          if (!row || !row.id) throw new Error('Could not start QR session');
+          activeSessionId = row.id;
+          sessionExpiresAt = row.expires_at;
 
           ensureQrImage();
           startWatching();
-          scheduleQrRenew(QR_RENEW_MS);
+          const renewMs = sessionExpiresAt
+            ? Math.max(60000, new Date(sessionExpiresAt).getTime() - Date.now() - 30000)
+            : QR_RENEW_MS;
+          scheduleQrRenew(renewMs);
         } catch (e) {
           setStatus('Error: ' + (e.message || 'Failed to start'), true);
           if (qrDot) qrDot.style.animation = 'none';
-          if (!qrStopped) scheduleQrRenew(15000);
+          if (!qrStopped && !approvalHandled) scheduleQrRenew(15000);
         } finally {
           qrBusy = false;
         }
@@ -1230,6 +1271,7 @@
         if (paneSwapTimer) { clearTimeout(paneSwapTimer); paneSwapTimer = null; }
         if (fieldsTimer) { clearTimeout(fieldsTimer); fieldsTimer = null; }
         if (btnTimer) { clearTimeout(btnTimer); btnTimer = null; }
+        approvalHandled = false;
         if (btnTop) btnTop.classList.remove('is-hidden-btn');
         if (form) {
           form.style.display = 'none';

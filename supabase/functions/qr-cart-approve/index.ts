@@ -105,14 +105,24 @@ serve(async (req: any) => {
     }
 
     const token_hash = linkData.properties.hashed_token;
+    const approvedExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    // Approve the most recent pending session for this cart
+    // Drop other pending sessions so only this approval is valid for the kiosk.
+    await admin
+      .from("cart_qr_sessions")
+      .update({ status: "expired" })
+      .eq("cart_id", cart_id)
+      .eq("status", "pending")
+      .neq("id", session.id);
+
+    // Approve the pending session and extend expiry so the kiosk can still read it.
     const { error: updateErr } = await admin
       .from("cart_qr_sessions")
       .update({
         status: "approved",
         user_id: user.id,
         token_hash,
+        expires_at: approvedExpiresAt,
       })
       .eq("id", session.id);
 
