@@ -18,10 +18,9 @@
         <h1 id="signin-title" class="auth-title">Welcome back</h1>
         <p class="auth-subtitle">Sign in to continue</p>
 
-        <!-- Phone sign-in option at top -->
+        <!-- Phone sign-in option at top; becomes "Sign in with email" while QR is open -->
         <div style="text-align: center; margin-bottom: 12px;">
-          <button type="button" id="qr-signin-btn-top" class="auth-button shine-button"
-            style="background: #1b7991; color: #f2f2f2; font-size: 14px; padding: 12px 16px;">
+          <button type="button" id="qr-signin-btn-top" class="auth-button qr-app-btn">
             Sign in with App
           </button>
         </div>
@@ -66,16 +65,15 @@
 
         <!-- App QR Sign-in Panel (shown instead of form when user taps "Sign in with App") -->
         <div id="qr-app-panel" style="display:none; text-align:center; padding:4px 0;">
-          <div id="qr-app-canvas" style="display:flex; justify-content:center; margin-bottom:10px;"></div>
-          <p style="font-size:13px; color:#555; margin:0 0 10px 0;">Open NobelCart app and scan to sign in</p>
-          <div id="qr-app-status" style="font-size:13px; color:#888; display:flex; align-items:center; justify-content:center; gap:8px; min-height:20px;">
+          <div id="qr-app-canvas">
+            <div class="qr-app-placeholder" aria-hidden="true"></div>
+          </div>
+          <p class="qr-app-copy" style="font-size:13px; color:#555; margin:0 0 10px 0;">Open NobelCart app and scan to sign in</p>
+          <div id="qr-app-status" class="qr-app-copy" style="font-size:13px; color:#888; display:flex; align-items:center; justify-content:center; gap:8px; min-height:20px;">
             <span id="qr-app-dot" style="width:8px;height:8px;border-radius:50%;background:#1b7991;display:inline-block;animation:qrPulse 1.4s ease-in-out infinite;"></span>
             <span id="qr-app-msg">Waiting for scan…</span>
           </div>
-          <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
-            <button type="button" id="qr-app-refresh" style="padding:9px 18px;border-radius:10px;border:1px solid #000;background:#000;color:#fff;font-size:13px;cursor:pointer;">Refresh QR</button>
-            <button type="button" id="qr-app-back" style="padding:9px 18px;border-radius:10px;border:1px solid #ccc;background:none;color:#888;font-size:13px;cursor:pointer;">Use email</button>
-          </div>
+          <p id="qr-app-ttl" class="qr-app-copy" style="font-size:12px; color:#888; margin:8px 0 0 0;">This QR changes every 5 minutes</p>
         </div>
         <style>@keyframes qrPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.3;transform:scale(0.8);}}</style>
 
@@ -129,6 +127,300 @@
           rgba(97, 203, 244, 0.4),
           transparent);
       animation: shine 3s ease-in-out infinite;
+    }
+
+    .qr-app-btn {
+      margin-top: 0;
+      background-color: #1b7991;
+      background-image: none;
+      color: #f2f2f2;
+      animation: none;
+      border: 1px solid transparent;
+      transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease,
+        opacity 0.45s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .qr-app-btn.is-hidden-btn {
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: none;
+    }
+
+    .qr-app-btn:hover {
+      background-color: #17667b;
+      background-image: none;
+    }
+
+    .qr-app-btn.is-email-back {
+      background-color: #fff;
+      background-image: none;
+      color: #1a1a1a;
+      border: 1px solid rgba(0, 0, 0, 0.14);
+    }
+
+    .qr-app-btn.is-email-back:hover {
+      background-color: #f4f4f4;
+    }
+
+    body.signin .auth-card {
+      position: relative;
+    }
+
+    #signin-form .auth-field,
+    #signin-form .auth-button,
+    #signin-form .auth-links,
+    #signin-form .auth-error {
+      transition: opacity 0.45s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #signin-form.is-await-fields .auth-field,
+    #signin-form.is-await-fields .auth-button,
+    #signin-form.is-await-fields .auth-links,
+    #signin-form.is-await-fields .auth-error {
+      opacity: 0;
+      transform: translateY(14px);
+      pointer-events: none;
+    }
+
+    #signin-form:not(.is-await-fields) .password-field {
+      transition-delay: 0.08s;
+    }
+
+    #signin-form:not(.is-await-fields) .auth-button {
+      transition-delay: 0.14s;
+    }
+
+    #signin-form:not(.is-await-fields) .auth-links {
+      transition-delay: 0.18s;
+    }
+
+    #qr-app-panel {
+      transition: opacity 0.38s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #qr-app-panel.is-out {
+      position: absolute;
+      left: 0;
+      right: 0;
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+      pointer-events: none;
+    }
+
+    #qr-app-canvas {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 10px;
+      min-height: 292px;
+    }
+
+    .qr-app-placeholder {
+      position: absolute;
+      width: 292px;
+      height: 292px;
+      border-radius: 12px;
+      background: #ececea;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.96);
+      transition: opacity 0.45s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #qr-app-canvas.is-waiting .qr-app-placeholder {
+      opacity: 1;
+      transform: scale(1);
+      animation: qrPhPulse 1.6s ease-in-out infinite;
+    }
+
+    #qr-app-canvas.is-ready .qr-app-placeholder {
+      opacity: 0;
+      transform: scale(1);
+      animation: none;
+    }
+
+    @keyframes qrPhPulse {
+      0%, 100% { background-color: #e6e6e4; }
+      50% { background-color: #f3f3f1; }
+    }
+
+    .qr-app-frame {
+      position: relative;
+      z-index: 1;
+      background: #f3f3f3;
+      padding: 16px;
+      display: inline-block;
+      border-radius: 12px;
+      opacity: 0;
+      transform: scale(0.94) translateY(10px);
+      transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .qr-app-frame.is-in {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    .qr-app-frame img {
+      display: block;
+    }
+
+    .qr-app-copy {
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.4s ease 0.12s, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.12s;
+    }
+
+    #qr-app-panel.is-waiting .qr-app-copy,
+    #qr-app-panel.is-ready .qr-app-copy {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .phone-guide-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.64);
+      z-index: 10050;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px 24px;
+      opacity: 0;
+      transition: opacity 0.45s ease;
+    }
+
+    .phone-guide-overlay[hidden] {
+      display: none !important;
+    }
+
+    .phone-guide-overlay.is-open {
+      opacity: 1;
+    }
+
+    .phone-guide-overlay.is-leaving {
+      opacity: 0;
+      transition-delay: 0.12s;
+      transition-duration: 0.45s;
+    }
+
+    .phone-guide-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      opacity: 0;
+      transform: translateY(12px) scale(0.96);
+      transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .phone-guide-overlay.is-open .phone-guide-card {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      transition-delay: 0.1s;
+    }
+
+    .phone-guide-overlay.is-leaving .phone-guide-card {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+      transition-delay: 0s;
+      transition-duration: 0.35s;
+    }
+
+    .phone-guide-title {
+      margin: 0;
+      color: #f4f4f5;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      text-align: center;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    /* 1260×2552 source, framed like a phone over the QR panel */
+    .phone-guide-device {
+      height: min(60vh, 560px);
+      aspect-ratio: 1260 / 2552;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #0b0b0d;
+      box-shadow:
+        0 0 0 2px #1c1c1e,
+        0 0 0 4px #3a3a3c,
+        0 18px 44px rgba(0, 0, 0, 0.42);
+    }
+
+    .phone-guide-device video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      border-radius: inherit;
+      pointer-events: none;
+      -webkit-user-drag: none;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+    }
+
+    .phone-guide-device.is-in video {
+      opacity: 1;
+      transition-delay: 0s;
+    }
+
+    .phone-guide-device.is-in.is-intro video {
+      transition-delay: 0.4s;
+    }
+
+    .phone-guide-device.is-out video,
+    .phone-guide-device.is-in.is-loop-out video {
+      opacity: 0;
+      transition-delay: 0s;
+      transition-duration: 0.4s;
+    }
+
+    .phone-guide-device.is-out video {
+      transition-delay: 0.2s;
+      transition-duration: 0.5s;
+    }
+
+    .phone-guide-got-it {
+      appearance: none;
+      border: none;
+      background: #fff;
+      color: #1a1a1a;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      padding: 12px 32px;
+      min-width: 140px;
+      min-height: 44px;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+    }
+
+    .phone-guide-got-it:active {
+      transform: translateY(1px);
+    }
+
+    @media (max-height: 640px) {
+      .phone-guide-device {
+        height: min(60vh, 400px);
+        border-radius: 18px;
+      }
+
+      .phone-guide-title {
+        font-size: 16px;
+      }
+
+      .phone-guide-got-it {
+        padding: 10px 24px;
+        font-size: 15px;
+        min-width: 120px;
+        min-height: 40px;
+      }
     }
 
     /* OTP Overlay Styles
@@ -239,6 +531,19 @@
   <!-- Splash Screen Markup -->
   <div id="splash-overlay" style="display: none;">
     <img id="splash-logo" src="noble.png" alt="Noble Cart">
+  </div>
+
+  <!-- Phone sign-in guide: loops over the QR panel until Got it. -->
+  <div id="phone-signin-guide" class="phone-guide-overlay" hidden role="dialog"
+    aria-modal="true" aria-labelledby="phone-signin-guide-title">
+    <div class="phone-guide-card">
+      <p id="phone-signin-guide-title" class="phone-guide-title">Scan with the NobelCart app</p>
+      <div class="phone-guide-device">
+        <video id="phone-signin-guide-video" src="Images/Guide-signin-phone.mp4"
+          muted playsinline preload="auto" aria-hidden="true"></video>
+      </div>
+      <button type="button" id="phone-signin-guide-got-it" class="phone-guide-got-it">Got it</button>
+    </div>
   </div>
 
   <!-- Splash Logic -->
@@ -592,12 +897,14 @@
       const qrCanvas = document.getElementById('qr-app-canvas');
       const qrMsg = document.getElementById('qr-app-msg');
       const qrDot = document.getElementById('qr-app-dot');
-      const backBtn = document.getElementById('qr-app-back');
-      const refreshBtn = document.getElementById('qr-app-refresh');
 
       let channel = null;
       let expireTimer = null;
       let pollInterval = null;
+      let qrBusy = false;
+      let qrStopped = true;
+      const QR_TTL_MS = 6 * 60 * 1000;
+      const QR_RENEW_MS = 5 * 60 * 1000;
 
       function setStatus(msg, isError) {
         if (qrMsg) qrMsg.textContent = msg;
@@ -605,15 +912,69 @@
       }
 
       function cleanup() {
+        qrStopped = true;
+        qrBusy = false;
         if (channel) { try { window.sb && window.sb.removeChannel(channel); } catch (_) {} channel = null; }
         if (expireTimer) { clearTimeout(expireTimer); expireTimer = null; }
         if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
       }
 
+      let paneSwapTimer = null;
+      let fieldsTimer = null;
+      let btnTimer = null;
+
+      function setTopBtnEmailMode(on) {
+        if (!btnTop) return;
+        btnTop.textContent = on ? 'Sign in with email' : 'Sign in with App';
+        btnTop.classList.toggle('is-email-back', !!on);
+      }
+
       function showForm() {
         cleanup();
-        if (qrPanel) qrPanel.style.display = 'none';
-        if (form) form.style.display = 'block';
+        if (paneSwapTimer) { clearTimeout(paneSwapTimer); paneSwapTimer = null; }
+        if (fieldsTimer) { clearTimeout(fieldsTimer); fieldsTimer = null; }
+        if (btnTimer) { clearTimeout(btnTimer); btnTimer = null; }
+
+        const qrVisible = qrPanel && qrPanel.style.display === 'block'
+          && !qrPanel.classList.contains('is-out');
+        if (!qrVisible) {
+          setTopBtnEmailMode(false);
+          if (btnTop) btnTop.classList.remove('is-hidden-btn');
+          if (form) {
+            form.style.display = 'block';
+            form.classList.remove('is-enter', 'is-await-fields');
+          }
+          if (qrPanel) {
+            qrPanel.style.display = 'none';
+            qrPanel.classList.remove('is-out', 'is-ready', 'is-waiting');
+          }
+          return;
+        }
+
+        if (btnTop) btnTop.classList.add('is-hidden-btn');
+        setTopBtnEmailMode(false);
+        btnTimer = setTimeout(function () {
+          btnTimer = null;
+          if (btnTop) btnTop.classList.remove('is-hidden-btn');
+        }, 1400);
+
+        qrPanel.classList.remove('is-ready', 'is-waiting');
+        qrPanel.classList.add('is-out');
+        if (form) {
+          form.classList.remove('is-enter');
+          form.classList.add('is-await-fields');
+          form.style.display = 'block';
+          fieldsTimer = setTimeout(function () {
+            fieldsTimer = null;
+            form.classList.remove('is-await-fields');
+          }, 1300);
+        }
+        paneSwapTimer = setTimeout(function () {
+          paneSwapTimer = null;
+          qrPanel.style.display = 'none';
+          qrPanel.classList.remove('is-out', 'is-ready', 'is-waiting');
+          clearQrFrame();
+        }, 400);
       }
 
       async function handleApproved(tokenHash) {
@@ -658,101 +1019,239 @@
         }
       }
 
-      async function startQrSession() {
-        if (!window.sb) { setStatus('Auth not ready', true); return; }
+      function revealQrFrame(wrap) {
+        if (!wrap || wrap.classList.contains('is-in')) return;
+        requestAnimationFrame(function () {
+          wrap.classList.add('is-in');
+          if (qrCanvas) {
+            qrCanvas.classList.add('is-ready');
+            qrCanvas.classList.remove('is-waiting');
+          }
+          if (qrPanel) {
+            qrPanel.classList.add('is-ready');
+            qrPanel.classList.remove('is-waiting');
+          }
+        });
+      }
 
-        setStatus('Waiting for scan…');
-        if (qrDot) qrDot.style.animation = 'qrPulse 1.4s ease-in-out infinite';
+      function showQrPlaceholder() {
+        if (qrPanel) {
+          qrPanel.classList.remove('is-ready');
+          qrPanel.classList.add('is-waiting');
+        }
+        if (!qrCanvas) return;
+        qrCanvas.classList.remove('is-ready');
+        void qrCanvas.offsetWidth;
+        qrCanvas.classList.add('is-waiting');
+      }
 
-        // Remove any previous refresh button
-        const oldRefBtn = qrPanel && qrPanel.querySelector('.qr-refresh-btn');
-        if (oldRefBtn) oldRefBtn.remove();
+      function clearQrFrame() {
+        if (!qrCanvas) return;
+        Array.prototype.forEach.call(qrCanvas.querySelectorAll('.qr-app-frame'), function (el) {
+          el.remove();
+        });
+        qrCanvas.classList.remove('is-waiting', 'is-ready');
+      }
 
-        try {
-          const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      function ensureQrImage() {
+        if (!qrCanvas || qrCanvas.querySelector('img')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'qr-app-frame';
+        const img = document.createElement('img');
+        img.alt = 'QR code';
+        img.width = 260;
+        img.height = 260;
+        img.onload = function () { revealQrFrame(wrap); };
+        wrap.appendChild(img);
+        qrCanvas.appendChild(wrap);
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=520x520&qzone=4&data=' + encodeURIComponent(cartId);
+        if (img.complete) revealQrFrame(wrap);
+      }
 
-          const { data: sessionRow, error: insertErr } = await window.sb
-            .from('cart_qr_sessions')
-            .insert({ cart_id: cartId, status: 'pending', expires_at: expiresAt })
-            .select('id')
-            .single();
-
-          if (insertErr) throw insertErr;
-          const sessionId = sessionRow.id;
-
-          qrCanvas.innerHTML = '';
-          const wrap = document.createElement('div');
-          wrap.style.cssText = 'background: #f3f3f3; padding:16px; display:inline-block; border-radius:8px;';
-          const img = document.createElement('img');
-          img.alt = 'QR code';
-          img.width = 260;
-          img.height = 260;
-          img.style.display = 'block';
-          img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=520x520&qzone=4&data=' + encodeURIComponent(cartId);
-          wrap.appendChild(img);
-          qrCanvas.appendChild(wrap);
-
+      function startWatching() {
+        if (!window.sb) return;
+        if (!channel) {
           channel = window.sb.channel('qr-' + cartId)
             .on('broadcast', { event: 'approved' }, (payload) => {
               const th = payload?.payload?.token_hash;
               if (th) handleApproved(th);
             });
-          await channel.subscribe();
-
-          // Polling fallback: every 3 s check DB for ANY approved session for this cart
-          // (catches cases where the app updated a different row than the one we created)
-          let alreadyHandled = false;
-          pollInterval = setInterval(async () => {
-            if (alreadyHandled) return;
-            try {
-              const { data } = await window.sb
-                .from('cart_qr_sessions')
-                .select('status, token_hash')
-                .eq('cart_id', cartId)
-                .eq('status', 'approved')
-                .not('token_hash', 'is', null)
-                .gt('expires_at', new Date().toISOString())
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-              if (data && data.token_hash) {
-                alreadyHandled = true;
-                clearInterval(pollInterval);
-                handleApproved(data.token_hash);
-              }
-            } catch (_) {}
-          }, 3000);
-
-          expireTimer = setTimeout(() => {
-            cleanup();
-            setStatus('QR expired — tap to refresh', true);
-            if (qrDot) qrDot.style.animation = 'none';
-            if (backBtn) {
-              const refBtn = document.createElement('button');
-              refBtn.type = 'button';
-              refBtn.className = 'qr-refresh-btn';
-              refBtn.textContent = 'Refresh QR';
-              refBtn.style.cssText = 'margin-top:10px;padding:10px 20px;border-radius:12px;border:1px solid #000;background:#000;color:#fff;font-size:14px;cursor:pointer;display:block;width:100%;';
-              refBtn.onclick = startQrSession;
-              backBtn.parentNode.insertBefore(refBtn, backBtn);
+          channel.subscribe();
+        }
+        if (pollInterval) return;
+        let alreadyHandled = false;
+        pollInterval = setInterval(async () => {
+          if (alreadyHandled || qrStopped) return;
+          try {
+            const { data } = await window.sb
+              .from('cart_qr_sessions')
+              .select('status, token_hash')
+              .eq('cart_id', cartId)
+              .eq('status', 'approved')
+              .not('token_hash', 'is', null)
+              .gt('expires_at', new Date().toISOString())
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (data && data.token_hash) {
+              alreadyHandled = true;
+              clearInterval(pollInterval);
+              pollInterval = null;
+              handleApproved(data.token_hash);
             }
-          }, 5 * 60 * 1000);
+          } catch (_) {}
+        }, 3000);
+      }
 
+      function scheduleQrRenew(delayMs) {
+        if (expireTimer) { clearTimeout(expireTimer); expireTimer = null; }
+        expireTimer = setTimeout(function () {
+          startQrSession();
+        }, delayMs);
+      }
+
+      async function startQrSession() {
+        if (!window.sb) { setStatus('Auth not ready', true); return; }
+        if (qrBusy) return;
+        if (qrPanel && qrPanel.style.display !== 'block') return;
+        qrBusy = true;
+        qrStopped = false;
+        try {
+          if (!qrCanvas || !qrCanvas.querySelector('.qr-app-frame.is-in')) {
+            showQrPlaceholder();
+          }
+          setStatus('Waiting for scan…');
+          if (qrDot) qrDot.style.animation = 'qrPulse 1.4s ease-in-out infinite';
+
+          const expiresAt = new Date(Date.now() + QR_TTL_MS).toISOString();
+          const { error: insertErr } = await window.sb
+            .from('cart_qr_sessions')
+            .insert({ cart_id: cartId, status: 'pending', expires_at: expiresAt })
+            .select('id')
+            .single();
+          if (insertErr) throw insertErr;
+
+          ensureQrImage();
+          startWatching();
+          scheduleQrRenew(QR_RENEW_MS);
         } catch (e) {
           setStatus('Error: ' + (e.message || 'Failed to start'), true);
           if (qrDot) qrDot.style.animation = 'none';
+          if (!qrStopped) scheduleQrRenew(15000);
+        } finally {
+          qrBusy = false;
         }
       }
 
-      function showQrPanel() {
-        if (form) form.style.display = 'none';
-        if (qrPanel) qrPanel.style.display = 'block';
-        startQrSession();
+      const GUIDE_FADE_OUT_MS = 700; // 200ms delay + 500ms fade
+      const LOOP_FADE_OUT_MS = 400;
+      const LOOP_HOLD_MS = 200;
+      const guideOverlay = document.getElementById('phone-signin-guide');
+      const guideDevice = guideOverlay && guideOverlay.querySelector('.phone-guide-device');
+      const guideVideo = document.getElementById('phone-signin-guide-video');
+      const guideGotIt = document.getElementById('phone-signin-guide-got-it');
+      let guideHideTimer = null;
+      let guideLoopTimer = null;
+      let guideLeaving = false;
+
+      function clearGuideLoopTimer() {
+        if (guideLoopTimer) { clearTimeout(guideLoopTimer); guideLoopTimer = null; }
       }
 
-      btnTop.addEventListener('click', showQrPanel);
-      if (backBtn) backBtn.addEventListener('click', showForm);
-      if (refreshBtn) refreshBtn.addEventListener('click', () => { cleanup(); startQrSession(); });
+      function hidePhoneGuide() {
+        if (!guideOverlay || guideOverlay.hidden || guideLeaving) return;
+        guideLeaving = true;
+        clearGuideLoopTimer();
+        if (guideHideTimer) { clearTimeout(guideHideTimer); guideHideTimer = null; }
+        if (guideDevice) {
+          guideDevice.classList.remove('is-in', 'is-intro', 'is-loop-out');
+          guideDevice.classList.add('is-out');
+        }
+        guideOverlay.classList.remove('is-open');
+        guideOverlay.classList.add('is-leaving');
+        startQrSession();
+        guideHideTimer = setTimeout(function () {
+          guideHideTimer = null;
+          try { if (guideVideo) guideVideo.pause(); } catch (_) { }
+          if (guideDevice) guideDevice.classList.remove('is-out', 'is-loop-out', 'is-intro');
+          guideOverlay.classList.remove('is-leaving', 'is-open');
+          guideOverlay.hidden = true;
+          guideLeaving = false;
+        }, GUIDE_FADE_OUT_MS);
+      }
+
+      function replayGuideLoop() {
+        if (guideLeaving || !guideVideo || !guideDevice) return;
+        if (!guideDevice.classList.contains('is-in')) return;
+        guideDevice.classList.remove('is-intro');
+        guideDevice.classList.add('is-loop-out');
+        clearGuideLoopTimer();
+        guideLoopTimer = setTimeout(function () {
+          if (guideLeaving) return;
+          try { guideVideo.currentTime = 0; } catch (_) { }
+          const play = guideVideo.play();
+          if (play && typeof play.catch === 'function') play.catch(function () { });
+          guideLoopTimer = setTimeout(function () {
+            guideLoopTimer = null;
+            if (guideLeaving) return;
+            guideDevice.classList.remove('is-loop-out');
+          }, LOOP_HOLD_MS);
+        }, LOOP_FADE_OUT_MS);
+      }
+
+      function showPhoneGuide() {
+        if (!guideOverlay) return;
+        clearGuideLoopTimer();
+        if (guideHideTimer) { clearTimeout(guideHideTimer); guideHideTimer = null; }
+        guideLeaving = false;
+        guideOverlay.classList.remove('is-leaving', 'is-open');
+        if (guideDevice) guideDevice.classList.remove('is-in', 'is-out', 'is-intro', 'is-loop-out');
+        guideOverlay.hidden = false;
+        void guideOverlay.offsetWidth;
+        guideOverlay.classList.add('is-open');
+        if (guideDevice) guideDevice.classList.add('is-in', 'is-intro');
+        if (guideVideo) {
+          try { guideVideo.currentTime = 0; } catch (_) { }
+          const play = guideVideo.play();
+          if (play && typeof play.catch === 'function') play.catch(function () { });
+        }
+        try { if (guideGotIt) guideGotIt.focus(); } catch (_) { }
+      }
+
+      if (guideVideo) {
+        guideVideo.addEventListener('ended', replayGuideLoop);
+      }
+
+      if (guideGotIt) {
+        guideGotIt.addEventListener('click', hidePhoneGuide);
+      }
+
+      function showQrPanel() {
+        if (paneSwapTimer) { clearTimeout(paneSwapTimer); paneSwapTimer = null; }
+        if (fieldsTimer) { clearTimeout(fieldsTimer); fieldsTimer = null; }
+        if (btnTimer) { clearTimeout(btnTimer); btnTimer = null; }
+        if (btnTop) btnTop.classList.remove('is-hidden-btn');
+        if (form) {
+          form.style.display = 'none';
+          form.classList.remove('is-enter', 'is-await-fields');
+        }
+        if (qrPanel) {
+          qrPanel.style.display = 'block';
+          qrPanel.classList.remove('is-ready', 'is-waiting', 'is-out');
+        }
+        clearQrFrame();
+        setTopBtnEmailMode(true);
+        showPhoneGuide();
+      }
+
+      function isQrOpen() {
+        return qrPanel && qrPanel.style.display === 'block' && !qrPanel.classList.contains('is-out');
+      }
+
+      btnTop.addEventListener('click', function () {
+        if (isQrOpen()) showForm();
+        else showQrPanel();
+      });
     })();
   </script>
   <script src="site.js"></script>
