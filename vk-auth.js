@@ -4,6 +4,100 @@
   let vkEl = null;
   let input = null;
   let active = false;
+  /** Ordered focus chain: Done advances; last field submits the form. */
+  let fieldOrder = [];
+
+  function updateDoneLabel() {
+    if (!vkEl || !input) return;
+    const doneBtn = vkEl.querySelector('.vk-key--done');
+    if (!doneBtn) return;
+    if (input.id === 'otp-input') {
+      doneBtn.textContent = 'Verify';
+      return;
+    }
+    const idx = fieldOrder.indexOf(input);
+    const isLast = idx < 0 || idx >= fieldOrder.length - 1;
+    if (document.body.classList.contains('create-account')) {
+      doneBtn.textContent = isLast ? 'Create' : 'Done';
+      return;
+    }
+    // Keep "Done" for next-field (what shoppers tap); last field signs in.
+    doneBtn.textContent = isLast ? 'Sign In' : 'Done';
+  }
+
+  function revealForFocus(el) {
+    if (!el) return;
+    const body = document.body;
+    const focusClasses = [
+      'focus-email', 'focus-password', 'focus-name', 'focus-phone', 'focus-dob',
+    ];
+    body.classList.remove(...focusClasses);
+    const field = el.dataset && el.dataset.field;
+    if (field) body.classList.add('focus-' + field);
+    body.classList.add('keyboard-visible');
+  }
+
+  function advanceOrSubmit() {
+    const current = input;
+    if (!current) {
+      hide();
+      return;
+    }
+    try {
+      current.dispatchEvent(new CustomEvent('vk:done', { bubbles: true }));
+    } catch (_) { }
+
+    if (current.id === 'otp-input') {
+      const btn = document.getElementById('otp-verify-btn');
+      if (btn) btn.click();
+      return;
+    }
+
+    // Create-account carousel owns Done / Create progression.
+    if (typeof window.ncSignupSteps?.handleVkDone === 'function') {
+      try {
+        if (window.ncSignupSteps.handleVkDone(current)) return;
+      } catch (_) { }
+    }
+    if (typeof window.__signupSteps?.handleVkDone === 'function') {
+      try {
+        if (window.__signupSteps.handleVkDone(current)) return;
+      } catch (_) { }
+    }
+    // Sign-in: block email → password until identifier is a real email or +1 phone.
+    if (typeof window.ncSigninGate?.handleVkDone === 'function') {
+      try {
+        if (window.ncSigninGate.handleVkDone(current)) return;
+      } catch (_) { }
+    }
+
+    const idx = fieldOrder.indexOf(current);
+    const next = idx >= 0 ? fieldOrder[idx + 1] : null;
+    if (next) {
+      // Spotlight CSS collapses the inactive field; reveal it before focus
+      // so WebKit/kiosk browsers actually move caret into password.
+      revealForFocus(next);
+      input = next;
+      updateDoneLabel();
+      // Defer focus until after layout applies the focus-* class change.
+      setTimeout(() => {
+        try { next.focus({ preventScroll: false }); } catch (_) {
+          try { next.focus(); } catch (__) { }
+        }
+        show(next);
+      }, 0);
+      return;
+    }
+
+    hide();
+    try { current.blur(); } catch (_) { }
+    const form = current.form || current.closest('form');
+    if (!form) return;
+    try {
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    } catch (_) { }
+  }
 
   // Press feedback: the cabinet hardware has no haptics, so a highlighted key
   // plus a preview bubble is the only way a shopper can spot a mistap.
@@ -127,6 +221,17 @@
       row4.appendChild(key('Done', { done: true, code: 'DONE', special: true }));
     }
 
+    vkEl.__setNumbersMode = (on) => {
+      const next = !!on;
+      if (isNumbersMode === next) {
+        updateDoneLabel();
+        return;
+      }
+      isNumbersMode = next;
+      renderRows();
+      updateDoneLabel();
+    };
+
     // Initial render
     renderRows();
 
@@ -152,17 +257,12 @@
         isNumbersMode = !isNumbersMode;
         renderRows();
         feedback.clear();
+        updateDoneLabel();
         if (input) { try { input.focus(); } catch (_) { } }
         return;
       }
       if (code === 'DONE') {
-        try {
-          const ev = new CustomEvent('vk:done', { bubbles: true });
-          (input || document).dispatchEvent(ev);
-        } catch (_) { }
-        hide();
-        // blur the input to finalize
-        try { input.blur(); } catch (_) { }
+        advanceOrSubmit();
         return;
       }
       if (code === 'SPACE') { insert(' '); return; }
@@ -170,9 +270,19 @@
       insert(btn.textContent.length >= 1 ? btn.textContent : '');
     }
 
+    // Touch devices often synthesize a click/mousedown after touchstart.
+    // Without this, Done advances to password then immediately submits.
+    let lastTouchAt = 0;
+
     function startPress(e) {
       // Prevent focus loss from input when clicking keyboard
       if (e.cancelable) e.preventDefault();
+
+      if (e.type === 'touchstart') {
+        lastTouchAt = Date.now();
+      } else if (e.type === 'mousedown' && Date.now() - lastTouchAt < 700) {
+        return;
+      }
 
       const btn = e.target.closest('.vk-key');
       if (!btn) return;
@@ -210,6 +320,10 @@
 
   function insert(text) {
     if (!input) return;
+    if (input.dataset.field === 'dob' || input.id === 'create-dob') {
+      text = String(text || '').replace(/\D/g, '');
+      if (!text) return;
+    }
     const start = input.selectionStart ?? input.value.length;
     const end = input.selectionEnd ?? input.value.length;
     const val = input.value || '';
@@ -247,34 +361,56 @@
     vkEl.style.display = 'block';
     active = true;
     window.__vkActive = true;
+    const wantNumbers = !!(
+      targetInput?.dataset?.vkMode === 'numbers' ||
+      targetInput?.dataset?.field === 'dob' ||
+      targetInput?.dataset?.field === 'phone' ||
+      targetInput?.dataset?.field === 'otp' ||
+      targetInput?.id === 'create-dob' ||
+      targetInput?.id === 'create-phone' ||
+      targetInput?.id === 'otp-input'
+    );
+    if (typeof vkEl.__setNumbersMode === 'function') {
+      vkEl.__setNumbersMode(wantNumbers);
+    } else {
+      updateDoneLabel();
+    }
+    ensureVisible(targetInput);
+    try {
+      document.dispatchEvent(new CustomEvent('vk:visibility', { detail: { visible: true } }));
+    } catch (_) { }
   }
 
-  function hide() {
+  function hide(force) {
+    if (!force && document.body.classList.contains('otp-open')) return;
     if (!vkEl) return;
     if (vkEl.__vkFeedback) vkEl.__vkFeedback.clear();
     vkEl.style.display = 'none';
     active = false;
     window.__vkActive = false;
+    try {
+      document.dispatchEvent(new CustomEvent('vk:visibility', { detail: { visible: false } }));
+    } catch (_) { }
   }
 
   function init() {
-    // Try signin page fields
-    let email = document.getElementById('email');
-    let password = document.getElementById('password');
+    // Page-specific chains (only elements that exist on this page are kept)
+    fieldOrder = [
+      document.getElementById('email'),
+      document.getElementById('password'),
+      document.getElementById('create-name'),
+      document.getElementById('create-dob'),
+      document.getElementById('create-phone'),
+      document.getElementById('create-email'),
+      document.getElementById('create-password'),
+      document.getElementById('checkout-first-name'),
+      document.getElementById('checkout-last-name'),
+      document.getElementById('checkout-full-name'),
+    ].filter(Boolean);
 
-    // Try create-account page fields
-    if (!email) email = document.getElementById('create-email');
-    if (!password) password = document.getElementById('create-password');
-    let createName = document.getElementById('create-name');
-
-    // Try checkout page fields
-    let cfName = document.getElementById('checkout-first-name');
-    let clName = document.getElementById('checkout-last-name');
-
-    // Also support checkout-full-name if present
-    let cFullName = document.getElementById('checkout-full-name');
-
-    const targets = [email, password, createName, cfName, clName, cFullName].filter(Boolean);
+    const targets = fieldOrder.slice();
+    const otpInputEl = document.getElementById('otp-input');
+    if (otpInputEl && !targets.includes(otpInputEl)) targets.push(otpInputEl);
     if (targets.length === 0) return;
 
     function bind(el) {
@@ -283,22 +419,43 @@
       el.addEventListener('blur', () => {
         // Small delay to allow focus to move to another input or for click to register
         setTimeout(() => {
-          const newFocus = document.activeElement;
+          // Keep VK up on OTP until the user verifies (or leaves via Change my email).
+          if (document.body.classList.contains('otp-open')) {
+            const otp = document.getElementById('otp-input');
+            if (otp) {
+              try { otp.focus({ preventScroll: true }); } catch (_) {
+                try { otp.focus(); } catch (__) {}
+              }
+              show(otp);
+            }
+            return;
+          }
+          let newFocus = document.activeElement;
+          // Closed-shadow sign-in hosts report as the host, not the inner input.
+          const hosts = window.ncAuthHosts || {};
+          if (newFocus && (newFocus === hosts.email || newFocus === hosts.password)) {
+            return;
+          }
+          if (window.ncAuthInputs) {
+            if (newFocus === window.ncAuthInputs.email || newFocus === window.ncAuthInputs.password) {
+              return;
+            }
+          }
           // If the new focused element is not in our list of targets, close the VK
           if (!targets.includes(newFocus)) {
             hide();
           }
         }, 150);
       });
-      // Also prevent native keyboard on mobile
+      // Also prevent native keyboard on mobile / kiosk
       el.setAttribute('inputmode', 'none');
     }
 
     targets.forEach(bind);
 
-    // Hide VK when pressing Escape
+    // Hide VK when pressing Escape (not during OTP verify)
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && active) hide();
+      if (e.key === 'Escape' && active && !document.body.classList.contains('otp-open')) hide();
     });
 
     window.addEventListener('beforeunload', hide);
@@ -306,6 +463,7 @@
 
   function ensureVisible(el) {
     if (!el || !vkEl) return;
+    if (document.body.classList.contains('create-account')) return;
 
     // Wait for VK to render/display
     setTimeout(() => {

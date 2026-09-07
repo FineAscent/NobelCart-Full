@@ -1,0 +1,25 @@
+# Auth endpoints are public (pre-session). Ban/cleanup stay protected.
+
+[functions.auth-signup]
+verify_jwt = false
+
+[functions.auth-verify-otp]
+verify_jwt = false
+
+[functions.auth-update-phone]
+verify_jwt = false
+
+[functions.auth-resend-otp]
+verify_jwt = false
+
+[functions.auth-signin]
+verify_jwt = false
+
+[functions.cleanup-unverified-users]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.stripe-create-session]
+verify_jwt = false

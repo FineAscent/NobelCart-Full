@@ -30,7 +30,6 @@ body.signin.focus-password .email-field {
     margin-bottom: 0;
     opacity: 0;
     overflow: hidden;
-    pointer-events: none;
 }
 
 /* Back button (category view) */

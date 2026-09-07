@@ -10,67 +10,152 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 
-<body class="signin">
+<body class="signin create-account" data-active-step="0">
   <div class="container">
     <div class="auth-wrapper" role="main">
-      <div class="auth-card" aria-labelledby="create-title">
-        <h1 id="create-title" class="auth-title">Create your account</h1>
-        <p class="auth-subtitle">Use your email and a password to get started.</p>
+      <div class="signup-stage" id="signup-stage" data-active-step="0">
+        <div class="signup-center" id="signup-center">
+        <div class="auth-card" aria-labelledby="create-title">
+        <button type="button" id="pill-left" class="signup-pill signup-pill--left" hidden aria-label="Previous step"></button>
+        <button type="button" id="pill-right" class="signup-pill signup-pill--right" hidden aria-label="Go back"></button>
+          <h1 id="create-title" class="auth-title">Create account</h1>
+          <p class="auth-subtitle">We’ll email a code to finish signup.</p>
 
-        <form id="create-form" class="auth-form" novalidate>
-          <div class="auth-field text-field">
-            <label class="auth-label" for="create-name">Full Name</label>
-            <input id="create-name" class="auth-input" type="text" name="full_name" placeholder="Abraham Ali"
-              autocomplete="name" required data-field="name" inputmode="text" autocapitalize="words"
-              autocorrect="off" />
+          <form id="create-form" class="auth-form" novalidate>
+            <div id="step-viewport" class="step-viewport">
+              <div class="auth-field text-field is-active" data-focus="name" data-step="0" data-step-label="First & last name" data-step-prompt="What’s your name?">
+                <label class="auth-label" for="create-name">
+                  <span class="label-idle">First and last name</span>
+                  <span class="label-prompt">What’s your name?</span>
+                </label>
+                <input id="create-name" class="auth-input" type="text" name="full_name" placeholder="Abraham Ali"
+                  autocomplete="name" required data-field="name" inputmode="text" autocapitalize="words"
+                  autocorrect="off" enterkeyhint="next" />
+                <p class="step-hint" id="step-hint-name" hidden></p>
+              </div>
+
+              <div class="auth-field text-field dob-field" data-focus="dob" data-step="1" data-step-label="Date of birth" data-step-prompt="When’s your birthday?">
+                <label class="auth-label">
+                  <span class="label-idle">Date of birth</span>
+                  <span class="label-prompt">When’s your birthday?</span>
+                </label>
+                <input id="create-dob" class="auth-input dob-input-hidden" type="text" name="date_of_birth"
+                  placeholder="MM/DD/YYYY" inputmode="numeric" autocomplete="bday"
+                  required data-field="dob" data-vk-mode="numbers" maxlength="10"
+                  enterkeyhint="next" autocapitalize="off" autocorrect="off" spellcheck="false"
+                  tabindex="-1" aria-hidden="true" />
+                <div class="dob-touch" id="dob-touch">
+                  <div class="dob-segments" role="group" aria-label="Date of birth parts">
+                    <button type="button" class="dob-seg" data-seg="month" id="dob-seg-month" aria-label="Month">
+                      <span class="dob-seg-value" id="dob-seg-month-val">MM</span>
+                      <span class="dob-seg-label">Month</span>
+                    </button>
+                    <span class="dob-seg-slash" aria-hidden="true">/</span>
+                    <button type="button" class="dob-seg" data-seg="day" id="dob-seg-day" aria-label="Day">
+                      <span class="dob-seg-value" id="dob-seg-day-val">DD</span>
+                      <span class="dob-seg-label">Day</span>
+                    </button>
+                    <span class="dob-seg-slash" aria-hidden="true">/</span>
+                    <button type="button" class="dob-seg" data-seg="year" id="dob-seg-year" aria-label="Year">
+                      <span class="dob-seg-value" id="dob-seg-year-val">YYYY</span>
+                      <span class="dob-seg-label">Year</span>
+                    </button>
+                  </div>
+                  <p class="dob-picker-hint" id="dob-picker-hint">Tap a part, then type</p>
+                </div>
+                <p class="auth-field-hint" id="dob-hint"></p>
+                <p class="step-hint" id="step-hint-dob" hidden></p>
+              </div>
+
+              <div class="auth-field phone-field" data-focus="phone" data-step="2" data-step-label="Phone number" data-step-prompt="Enter your phone">
+                <label class="auth-label" for="create-phone">
+                  <span class="label-idle">US Phone</span>
+                  <span class="label-prompt">Enter your phone</span>
+                </label>
+                <input id="create-phone" class="auth-input" type="tel" name="phone" placeholder="(555) 123-4567"
+                  autocomplete="tel" inputmode="tel" required data-field="phone" data-vk-mode="numbers"
+                  enterkeyhint="next" />
+                <p class="auth-field-hint phone-hint--joke" id="phone-hint"></p>
+                <p class="step-hint" id="step-hint-phone" hidden></p>
+              </div>
+
+              <div class="auth-field email-field" data-focus="email" data-step="3" data-step-label="Email" data-step-prompt="What’s your email?">
+                <label class="auth-label" for="create-email">
+                  <span class="label-idle">Email</span>
+                  <span class="label-prompt">What’s your email?</span>
+                </label>
+                <input id="create-email" class="auth-input" type="email" name="email" placeholder="you@example.com"
+                  autocomplete="email" required inputmode="email" data-field="email" enterkeyhint="next" />
+                <div id="email-domain-hints" class="email-domain-hints" hidden aria-label="Email domain suggestions">
+                  <button type="button" class="email-domain-chip" data-domain="gmail.com">gmail.com</button>
+                  <button type="button" class="email-domain-chip" data-domain="outlook.com">outlook.com</button>
+                  <button type="button" class="email-domain-chip" data-domain="yahoo.com">yahoo.com</button>
+                </div>
+                <p class="step-hint" id="step-hint-email" hidden></p>
+              </div>
+
+              <div class="auth-field password-field" data-focus="password" data-step="4" data-step-label="Password" data-step-prompt="Choose a password">
+                <label class="auth-label" for="create-password">
+                  <span class="label-idle">Password</span>
+                  <span class="label-prompt">Choose a password</span>
+                </label>
+                <div class="auth-input-wrap">
+                  <input id="create-password" class="auth-input" type="password" name="password"
+                    placeholder="At least 7 letters or numbers" autocomplete="new-password" required minlength="7"
+                    data-field="password" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                  <button type="button" id="toggle-create-password" class="password-toggle"
+                    aria-label="Show password">Show</button>
+                </div>
+                <p class="auth-field-hint" id="password-hint">At least 7 letters or numbers — no caps needed.</p>
+                <p class="step-hint" id="step-hint-password" hidden></p>
+              </div>
+            </div>
+
+            <button type="submit" id="create-submit" class="auth-button" hidden>Create account</button>
+            <div id="create-error" class="auth-error" style="display:none;"></div>
+          </form>
+
+          <div id="summary-overlay" class="otp-overlay summary-overlay" style="display: none;" aria-hidden="true">
+            <div class="summary-card" role="dialog" aria-labelledby="summary-title">
+              <div id="summary-main">
+                <h2 id="summary-title">Look good?</h2>
+                <p class="summary-sub">Tap ✓ if it’s right, or ✕ to edit.</p>
+                <ul id="summary-list" class="summary-list"></ul>
+                <button type="button" id="summary-confirm" class="auth-button" disabled>Send code</button>
+                <div id="summary-error" class="auth-error" style="display:none;"></div>
+              </div>
+              <div id="summary-loading" class="summary-loading" hidden>
+                <div class="summary-spinner" aria-hidden="true"></div>
+                <p class="summary-loading-title">Sending your code…</p>
+                <p class="summary-loading-sub">This can take a few seconds.</p>
+              </div>
+            </div>
           </div>
 
-          <div class="auth-field email-field">
-            <label class="auth-label" for="create-email">Email</label>
-            <input id="create-email" class="auth-input" type="email" name="email" placeholder="you@example.com"
-              autocomplete="email" required inputmode="email" data-field="email" />
-          </div>
-
-          <!-- Phone Auth Temporarily Disabled
-          <div class="auth-field phone-field">
-            <label class="auth-label" for="create-phone">Phone Number</label>
-            <input id="create-phone" class="auth-input" type="tel" name="phone" placeholder="+1234567890" 
-              autocomplete="tel" inputmode="tel" data-field="phone" />
-          </div>
-          -->
-
-          <div class="auth-field password-field">
-            <label class="auth-label" for="create-password">Password</label>
-            <input id="create-password" class="auth-input" type="password" name="password"
-              placeholder="Choose a password" autocomplete="new-password" required minlength="6"
-              data-field="password" />
-          </div>
-
-          <button type="submit" class="auth-button">Create account</button>
-          <div id="create-error" class="auth-error" style="display:none;"></div>
-          <div class="auth-links" aria-label="Auth links">
-            <a href="signin.html" id="signin-link">Already have an account? Sign in</a>
-          </div>
-        </form>
-
-        <!-- OTP Verification Overlay (Temporarily Disabled)
-        <div id="otp-overlay" class="otp-overlay" style="display: none;">
-          <div class="otp-card">
-            <h2>Verify Phone Number</h2>
-            <p>We sent a 6-digit code to your phone.</p>
-            <input type="text" id="otp-input" placeholder="000000" maxlength="6" inputmode="numeric" />
-            <button id="otp-verify-btn" class="auth-button">Verify Code</button>
-            <button id="otp-cancel-btn" class="text-button">Skip / Later</button>
-            <div id="otp-error" class="auth-error" style="display:none;"></div>
+          <div id="otp-overlay" class="otp-overlay" style="display: none;">
+            <div class="otp-card">
+              <h2>Verify email</h2>
+              <p id="otp-hint">We sent a 6-digit code to your email.</p>
+              <input type="text" id="otp-input" class="auth-input" placeholder="000000" maxlength="6"
+                inputmode="numeric" autocomplete="one-time-code" enterkeyhint="done"
+                data-field="otp" data-vk-mode="numbers" />
+              <button type="button" id="otp-verify-btn" class="auth-button">Verify Code</button>
+              <button type="button" id="otp-resend-btn" class="text-button">Resend code</button>
+              <button type="button" id="otp-wrong-btn" class="text-button">Change my email</button>
+              <div id="otp-error" class="auth-error" style="display:none;"></div>
+            </div>
           </div>
         </div>
-        -->
+
+        <div class="auth-links signup-back-wrap" aria-label="Helpful links">
+          <a href="signin.html" id="signin-link">Back to sign in</a>
+        </div>
+        </div>
       </div>
     </div>
   </div>
 
   <style>
-    /*
     .otp-overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -79,6 +164,7 @@
       align-items: center;
       justify-content: center;
       z-index: 9999;
+      box-sizing: border-box;
     }
     .otp-card {
       background: #f3f3f3;
@@ -87,6 +173,7 @@
       width: 90%;
       max-width: 400px;
       text-align: center;
+      box-sizing: border-box;
     }
     .otp-card h2 { margin-top: 0; color: #333; }
     .otp-card p { color: #666; margin-bottom: 20px; }
@@ -95,10 +182,48 @@
       letter-spacing: 4px;
       text-align: center;
       width: 100%;
-      padding: 10px;
-      margin-bottom: 20px;
+      padding: 12px;
+      margin: 0 0 16px;
       border: 2px solid #ddd;
       border-radius: 12px;
+      box-sizing: border-box;
+      background: #fff;
+    }
+    body.create-account.otp-open.keyboard-visible .otp-overlay {
+      height: var(--signup-safe-h, 56vh);
+      max-height: var(--signup-safe-h, 56vh);
+      padding: 10px 14px;
+      align-items: center;
+      justify-content: center;
+    }
+    body.create-account.otp-open.keyboard-visible .otp-card {
+      padding: 16px 18px 14px;
+      max-width: 360px;
+      width: 100%;
+      border-radius: 18px;
+    }
+    body.create-account.otp-open.keyboard-visible .otp-card h2 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    body.create-account.otp-open.keyboard-visible .otp-card p {
+      font-size: 12px;
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+    body.create-account.otp-open.keyboard-visible #otp-input {
+      font-size: 22px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    body.create-account.otp-open.keyboard-visible .otp-card .auth-button {
+      margin-top: 0;
+      padding: 12px 16px;
+      font-size: 15px;
+    }
+    body.create-account.otp-open.keyboard-visible .text-button {
+      margin-top: 6px;
+      font-size: 12px;
     }
     .text-button {
       background: none;
@@ -107,33 +232,929 @@
       margin-top: 10px;
       cursor: pointer;
       text-decoration: underline;
+      display: block;
+      width: 100%;
     }
-    */
+
+    .summary-overlay {
+      z-index: 10001;
+    }
+    .summary-card {
+      background: #f0eeec;
+      border: 1px solid rgba(45, 42, 38, 0.08);
+      border-radius: 20px;
+      padding: 20px 18px 16px;
+      width: min(92%, 420px);
+      max-height: min(92vh, 560px);
+      overflow: auto;
+      text-align: center;
+      box-sizing: border-box;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+    }
+    .summary-card h2 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      color: #2d2a26;
+    }
+    .summary-sub {
+      margin: 0 0 14px;
+      font-size: 13px;
+      color: #6b655c;
+    }
+    .summary-list {
+      list-style: none;
+      margin: 0 0 14px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .summary-row {
+      display: grid;
+      grid-template-columns: 48px 1fr 48px;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid rgba(45, 42, 38, 0.08);
+      border-radius: 14px;
+      padding: 8px 8px;
+      text-align: center;
+      transition: border-color 160ms ease, background-color 160ms ease;
+    }
+    .summary-row.is-ok {
+      border-color: rgba(22, 101, 52, 0.35);
+      background: #f4faf6;
+    }
+    .summary-row-body {
+      min-width: 0;
+      padding: 2px 4px;
+      text-align: center;
+    }
+    .summary-row-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 650;
+      color: #6b655c;
+      margin-bottom: 2px;
+      text-align: center;
+    }
+    .summary-row-value {
+      display: block;
+      font-size: 14px;
+      font-weight: 650;
+      color: #2d2a26;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+    .summary-act {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(45, 42, 38, 0.1);
+      background: #f7f5f3;
+      color: #5c574f;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      appearance: none;
+    }
+    .summary-act--bad {
+      color: #9a3412;
+      font-size: 24px;
+    }
+    .summary-act--bad:active {
+      background: #fde8e0;
+    }
+    .summary-act--good {
+      color: #166534;
+    }
+    .summary-act--good:active,
+    .summary-row.is-ok .summary-act--good {
+      background: #dcfce7;
+      border-color: rgba(22, 101, 52, 0.25);
+    }
+    #summary-confirm[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .summary-loading {
+      padding: 36px 12px 28px;
+      text-align: center;
+    }
+    .summary-loading[hidden] { display: none !important; }
+    .summary-spinner {
+      width: 36px;
+      height: 36px;
+      margin: 0 auto 14px;
+      border-radius: 50%;
+      border: 3px solid rgba(139, 115, 85, 0.22);
+      border-top-color: #8b7355;
+      animation: summary-spin 0.8s linear infinite;
+    }
+    @keyframes summary-spin {
+      to { transform: rotate(360deg); }
+    }
+    .summary-loading-title {
+      margin: 0 0 6px;
+      font-size: 17px;
+      font-weight: 700;
+      color: #2d2a26;
+    }
+    .summary-loading-sub {
+      margin: 0;
+      font-size: 13px;
+      color: #6b655c;
+    }
+    .summary-card.is-loading #summary-main { display: none; }
+    .summary-card.is-loading #summary-loading { display: block; }
+
+    @media (max-height: 640px) {
+      .summary-card {
+        padding: 14px 14px 12px;
+        max-height: 94vh;
+      }
+      .summary-card h2 { font-size: 18px; }
+      .summary-sub { font-size: 12px; margin-bottom: 10px; }
+      .summary-row { padding: 6px 6px; gap: 6px; }
+      .summary-row-value { font-size: 13px; }
+      .summary-act { width: 40px; height: 40px; border-radius: 10px; font-size: 20px; }
+      .summary-act--bad { font-size: 22px; }
+      #summary-confirm { padding: 12px 14px; font-size: 15px; margin-top: 0; }
+    }
+
+    .auth-field-hint {
+      margin: 4px 0 0;
+      font-size: 0.8rem;
+      color: #6b7280;
+      line-height: 1.25;
+      min-height: 0;
+    }
+    .auth-field-hint:empty { display: none; }
+    .auth-field-hint.dob-hint--age { color: #166534; font-weight: 600; }
+    .auth-field-hint.dob-hint--bday { color: #9a3412; font-weight: 700; }
+
+    /* Touch-friendly DOB: big MM / DD / YYYY + tap grids */
+    .dob-field { position: relative; }
+    .dob-input-hidden {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .dob-touch {
+      margin-top: 8px;
+      width: 100%;
+    }
+    .dob-segments {
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
+    .dob-seg {
+      appearance: none;
+      -webkit-appearance: none;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 64px;
+      padding: 8px 6px;
+      border: 1px solid rgba(45, 42, 38, 0.08);
+      border-radius: 14px;
+      background: #e8e6e3;
+      color: #2d2a26;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: none;
+      opacity: 0.72;
+      transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+    }
+    .dob-seg.is-active {
+      border-color: rgba(45, 42, 38, 0.14);
+      background: #ffffff;
+      box-shadow: 0 1px 6px rgba(45, 42, 38, 0.08);
+      opacity: 1;
+    }
+    .dob-seg.is-filled:not(.is-active) {
+      opacity: 0.85;
+      background: #efece9;
+    }
+    .dob-seg-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+      color: #9a948a;
+      font-variant-numeric: tabular-nums;
+    }
+    .dob-seg.is-filled .dob-seg-value { color: #5c574f; }
+    .dob-seg.is-active .dob-seg-value { color: #9a948a; }
+    .dob-seg.is-active.is-filled .dob-seg-value { color: #2d2a26; }
+    .dob-seg-label {
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #9a948a;
+      line-height: 1.1;
+    }
+    .dob-seg.is-active .dob-seg-label {
+      color: #8b7355;
+    }
+    .dob-seg-slash {
+      align-self: center;
+      font-size: 20px;
+      font-weight: 600;
+      color: #b0a89c;
+      padding: 0 1px;
+      line-height: 1;
+    }
+    .dob-picker-hint {
+      margin: 8px 0 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: #8b7355;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .dob-picker-hint[hidden] { display: none !important; }
+
+    body.create-account.keyboard-visible .dob-seg {
+      min-height: 56px;
+    }
+    body.create-account.keyboard-visible .dob-seg-value {
+      font-size: 20px;
+    }
+    #password-hint {
+      color: #6b655c;
+      font-weight: 500;
+    }
+    #phone-hint.phone-hint--joke {
+      color: #8b7355;
+      font-weight: 600;
+    }
+    body.create-account .auth-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      margin-top: 8px;
+    }
+    body.create-account .auth-input-wrap .auth-input {
+      margin-top: 0;
+      padding-right: 72px;
+      width: 100%;
+      flex: 1 1 auto;
+    }
+    body.create-account .password-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      height: 36px;
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 650;
+      line-height: 1;
+      color: #6b655c;
+    }
+    body.create-account .password-toggle:active {
+      transform: translateY(-50%) scale(0.96);
+    }
+
+    .email-domain-hints {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .email-domain-hints[hidden] { display: none !important; }
+    .email-domain-chip {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid rgba(45, 42, 38, 0.1);
+      background: #ffffff;
+      color: #5c574f;
+      font-size: 12px;
+      font-weight: 650;
+      padding: 8px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 1px 3px rgba(45, 42, 38, 0.05);
+    }
+    .email-domain-chip:active {
+      background: #f3f1ef;
+      color: #3a372f;
+    }
+    .email-domain-chip[hidden] { display: none !important; }
+
+    .step-hint {
+      margin: 6px 0 0;
+      font-size: 0.8rem;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+    .step-hint[hidden] { display: none !important; }
+
+    body.create-account .auth-wrapper {
+      min-height: 100vh;
+      min-height: 100dvh;
+      height: 100vh;
+      height: 100dvh;
+      padding: 0 16px;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .signup-center {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+      overflow: visible;
+    }
+
+    .signup-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      overflow: visible;
+    }
+
+    body.create-account .auth-card {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 440px;
+      /* Matte center panel — flat, no sheen / no floating shadow */
+      background: #f0eeec;
+      border: 1px solid rgba(0, 0, 0, 0.07);
+      border-radius: 20px;
+      padding: 26px 24px 43px;
+      gap: 12px;
+      margin: 0;
+      overflow: visible;
+      box-shadow: none;
+      filter: none;
+      transform: none;
+      transition: none;
+    }
+    body.create-account .auth-title {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: #2d2a26;
+      letter-spacing: 0;
+      transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    body.create-account .auth-title.is-title-out {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    body.create-account .auth-title.is-title-in {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    body.create-account .auth-subtitle {
+      font-size: 12px;
+      margin-bottom: 8px;
+      line-height: 1.35;
+      color: #6b6a67;
+    }
+    body.create-account .auth-form {
+      gap: 10px;
+      width: 100%;
+      align-items: stretch;
+    }
+    body.create-account .auth-label {
+      font-size: 13px;
+      color: #3a372f;
+      font-weight: 600;
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+    body.create-account .label-prompt { display: none; }
+    body.create-account .label-idle { display: inline; }
+    body.create-account .auth-input {
+      padding: 14px 14px;
+      font-size: 17px;
+      min-height: 52px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 12px;
+      background: #eae8e6;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      margin-top: 8px;
+      color: #333;
+      box-shadow: none;
+      outline: none;
+      transition: border-color 160ms ease, background-color 160ms ease;
+    }
+    body.create-account .auth-input:hover,
+    body.create-account .auth-input:active,
+    body.create-account .auth-input:focus {
+      /* No wired focus ring / glow on tap */
+      border-color: rgba(0, 0, 0, 0.16);
+      background: #e7e5e3;
+      box-shadow: none;
+      outline: none;
+    }
+    body.create-account .auth-button {
+      margin-top: 12px;
+      padding: 16px 18px;
+      font-size: 17px;
+      font-weight: 700;
+      min-height: 0;
+      border-radius: 14px;
+      background-color: #8b7355;
+      color: #fff;
+      border: none;
+      width: 100%;
+      box-shadow: none;
+    }
+    body.create-account .auth-button:active {
+      box-shadow: none;
+      transform: none;
+    }
+    body.create-account .auth-links {
+      margin-top: 4px;
+      font-size: 13px;
+      text-align: center;
+    }
+    body.create-account .signup-back-wrap {
+      margin-top: 12px;
+    }
+    body.create-account.keyboard-visible .signup-back-wrap {
+      margin-top: 10px;
+    }
+
+    .step-viewport {
+      position: relative;
+      width: 100%;
+      min-height: 96px;
+      overflow: hidden;
+    }
+
+    body.create-account .auth-field {
+      margin: 0;
+      max-height: none;
+      width: 100%;
+      max-width: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(24px);
+      transition: opacity 220ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    body.create-account .auth-field.is-active {
+      position: relative;
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+    body.create-account .auth-field.is-exit-right { opacity: 0; transform: translateX(36px); }
+    body.create-account .auth-field.is-exit-left { opacity: 0; transform: translateX(-36px); }
+    body.create-account .auth-field.is-enter-from-right { transform: translateX(36px); }
+    body.create-account .auth-field.is-enter-from-left { transform: translateX(-36px); }
+    body.create-account .auth-field.is-shake { animation: step-shake 420ms ease; }
+    @keyframes step-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-5px); }
+      80% { transform: translateX(5px); }
+    }
+
+    body.create-account #create-submit[hidden] { display: none !important; }
+    body.create-account[data-active-step="4"] #create-submit { display: block !important; }
+
+    .signup-pill {
+      position: absolute;
+      z-index: 3;
+      width: max-content;
+      max-width: none;
+      min-height: 52px;
+      padding: 10px 10px 10px 12px;
+      border: 1px solid rgba(74, 90, 78, 0.22);
+      border-radius: 16px;
+      background: #ffffff;
+      color: #3a372f;
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.2;
+      text-align: left;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition:
+        background-color 160ms ease,
+        color 160ms ease,
+        transform 280ms ease,
+        opacity 280ms ease,
+        box-shadow 160ms ease,
+        visibility 280ms ease;
+      -webkit-tap-highlight-color: transparent;
+      top: 50%;
+      margin: 0;
+      box-shadow: 0 2px 10px rgba(45, 42, 38, 0.06);
+    }
+    .signup-pill.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .signup-pill[hidden] { display: none !important; }
+    .signup-pill:active,
+    .signup-pill:focus {
+      outline: none;
+      background: #f3f5f3;
+      color: #2d2a26;
+      box-shadow: 0 3px 12px rgba(74, 90, 78, 0.1);
+    }
+    /* Left above / right below the center card midline */
+    .signup-pill--left {
+      right: calc(100% + 16px);
+      left: auto;
+      bottom: auto;
+      transform: translateY(calc(-50% - 40px)) scale(0.96);
+    }
+    .signup-pill--left.is-visible {
+      transform: translateY(calc(-50% - 40px)) scale(1);
+    }
+    .signup-pill--left:active {
+      background: #f3f5f3;
+    }
+    .signup-pill--right {
+      left: calc(100% + 16px);
+      right: auto;
+      bottom: auto;
+      transform: translateY(calc(-50% + 40px)) scale(0.96);
+    }
+    .signup-pill--right.is-visible {
+      transform: translateY(calc(-50% + 40px)) scale(1);
+    }
+    .signup-pill--right:active {
+      background: #f3f5f3;
+    }
+    .signup-pill .pill-check {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #5a6b5e;
+      color: #f4f5f3;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .signup-pill .pill-copy {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      white-space: nowrap;
+    }
+    .signup-pill .pill-label {
+      position: relative;
+      z-index: 1;
+      display: block;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #2d2a26;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    .signup-pill .pill-hint {
+      font-size: 10px;
+      font-weight: 600;
+      color: #8b7355;
+      white-space: nowrap;
+      line-height: 1.15;
+    }
+
+    /* Keyboard open: same card size — title + subtitle + prompt + input, centered above VK */
+    body.create-account.keyboard-visible {
+      overflow: hidden;
+    }
+    body.create-account.keyboard-visible.signin .auth-wrapper,
+    body.create-account.keyboard-visible .auth-wrapper {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    body.create-account.signin.keyboard-visible .auth-card {
+      transform: none !important;
+    }
+    body.create-account.keyboard-visible .auth-error,
+    body.create-account.keyboard-visible .step-hint,
+    body.create-account.keyboard-visible #create-submit {
+      display: none !important;
+    }
+    body.create-account.keyboard-visible .auth-field-hint {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    body.create-account.keyboard-visible .auth-field-hint:empty {
+      display: none;
+    }
+    body.create-account.keyboard-visible .label-idle { display: none; }
+    body.create-account.keyboard-visible .label-prompt {
+      display: block;
+    }
+    body.create-account.keyboard-visible .auth-title {
+      display: block;
+      font-size: 22px;
+      margin: 0;
+    }
+    body.create-account.keyboard-visible .auth-subtitle {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    body.create-account.keyboard-visible .auth-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3a372f;
+      margin: 0;
+      text-align: left;
+    }
+    body.create-account.keyboard-visible .container {
+      height: var(--signup-safe-h, 100vh);
+      max-height: var(--signup-safe-h, 100vh);
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    body.create-account.keyboard-visible .auth-wrapper {
+      flex: 0 0 auto;
+      height: auto;
+      min-height: 0;
+      max-height: none;
+      width: 100%;
+      padding: 0 16px;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+      box-sizing: border-box;
+    }
+    body.create-account.keyboard-visible .signup-stage,
+    body.create-account.keyboard-visible .signup-center {
+      height: auto;
+      width: 100%;
+      max-width: 440px;
+      padding: 0;
+      margin: 0 auto;
+    }
+    body.create-account.signin.keyboard-visible .auth-card,
+    body.create-account.keyboard-visible .auth-card {
+      padding: 26px 24px 38px;
+      max-width: 440px;
+      gap: 12px;
+      background: #f0eeec;
+      border: 1px solid rgba(0, 0, 0, 0.07);
+      border-radius: 20px;
+      box-shadow: none;
+      transform: none;
+    }
+    body.create-account.keyboard-visible .step-viewport {
+      min-height: 96px;
+    }
+    body.create-account.keyboard-visible .auth-form {
+      gap: 10px;
+    }
+    body.create-account.keyboard-visible .auth-input {
+      margin-top: 8px;
+      min-height: 52px;
+      padding: 14px 14px;
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: #333;
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      text-align: left;
+      box-shadow: none;
+    }
+    body.create-account.keyboard-visible .auth-input-wrap .auth-input {
+      margin-top: 0;
+    }
+    body.create-account.keyboard-visible .auth-input:hover,
+    body.create-account.keyboard-visible .auth-input:active,
+    body.create-account.keyboard-visible .auth-input:focus {
+      background: #ffffff;
+      border-color: rgba(0, 0, 0, 0.16);
+      box-shadow: none;
+    }
+    body.create-account.keyboard-visible .auth-input::placeholder {
+      color: rgba(45, 42, 38, 0.38);
+      font-weight: 400;
+    }
+    body.create-account.keyboard-visible .signup-pill {
+      min-height: 48px;
+      width: max-content;
+      max-width: none;
+      padding: 8px 8px 8px 10px;
+      font-size: 11px;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid rgba(74, 90, 78, 0.22);
+      color: #3a372f;
+      box-shadow: 0 3px 12px rgba(45, 42, 38, 0.07);
+    }
+    body.create-account.keyboard-visible .signup-pill .pill-check {
+      width: 20px;
+      height: 20px;
+      font-size: 11px;
+    }
+    body.create-account.keyboard-visible .signup-pill .pill-label {
+      font-size: 11px;
+    }
+    body.create-account.keyboard-visible .signup-pill .pill-hint {
+      font-size: 9.5px;
+    }
+    body.create-account.keyboard-visible .signup-pill--left {
+      right: calc(100% + 18px);
+      transform: translateY(calc(-50% - 48px)) scale(0.96);
+    }
+    body.create-account.keyboard-visible .signup-pill--left.is-visible {
+      transform: translateY(calc(-50% - 48px)) scale(1);
+    }
+    body.create-account.keyboard-visible .signup-pill--right {
+      left: calc(100% + 18px);
+      transform: translateY(calc(-50% + 48px)) scale(0.96);
+    }
+    body.create-account.keyboard-visible .signup-pill--right.is-visible {
+      transform: translateY(calc(-50% + 48px)) scale(1);
+    }
+
+    @media (max-height: 640px) {
+      body.create-account .auth-wrapper { padding: 12px 10px; }
+      body.create-account .auth-card { padding: 22px 20px 34px; }
+      body.create-account .auth-title { font-size: 19px; }
+      body.create-account .auth-input {
+        padding: 12px 12px;
+        min-height: 50px;
+        font-size: 16px;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .signup-pill {
+        width: max-content;
+        max-width: none;
+        font-size: 11px;
+        min-height: 46px;
+        gap: 8px;
+        padding: 8px 8px 8px 10px;
+      }
+      .signup-pill .pill-check {
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+      }
+      .signup-pill .pill-label { font-size: 10.5px; }
+      .signup-pill .pill-hint { font-size: 9px; }
+      .signup-pill--left {
+        right: calc(100% + 12px);
+        transform: translateY(calc(-50% - 32px)) scale(0.96);
+      }
+      .signup-pill--left.is-visible {
+        transform: translateY(calc(-50% - 32px)) scale(1);
+      }
+      .signup-pill--right {
+        left: calc(100% + 12px);
+        transform: translateY(calc(-50% + 32px)) scale(0.96);
+      }
+      .signup-pill--right.is-visible {
+        transform: translateY(calc(-50% + 32px)) scale(1);
+      }
+      body.create-account.keyboard-visible .signup-pill--left {
+        right: calc(100% + 14px);
+        transform: translateY(calc(-50% - 36px)) scale(0.96);
+      }
+      body.create-account.keyboard-visible .signup-pill--left.is-visible {
+        transform: translateY(calc(-50% - 36px)) scale(1);
+      }
+      body.create-account.keyboard-visible .signup-pill--right {
+        left: calc(100% + 14px);
+        transform: translateY(calc(-50% + 36px)) scale(0.96);
+      }
+      body.create-account.keyboard-visible .signup-pill--right.is-visible {
+        transform: translateY(calc(-50% + 36px)) scale(1);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body.create-account .auth-field {
+        transition: none;
+      }
+      body.create-account .auth-title {
+        transition: none;
+      }
+      body.create-account .auth-field.is-shake {
+        animation: none;
+      }
+      .signup-pill {
+        transition: none;
+      }
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="error-reporter.js"></script>
   <script src="site.js"></script>
-  <script src="vk-auth.js"></script>
+  <script src="vk-auth.js?v=9"></script>
   <script src="policy-gate.js"></script>
   <script>
-    // Keep the cart id on the way back to sign-in.
     ncLinkWithCart(document.getElementById('signin-link'), 'signin.html');
   </script>
   <script>
-    // Elevate auth card when focusing inputs and spotlight focused field
     (function () {
+      const btn = document.getElementById('toggle-create-password');
+      const input = document.getElementById('create-password');
+      if (!btn || !input) return;
+      btn.addEventListener('click', function () {
+        if (input.type === 'password') {
+          input.type = 'text';
+          btn.textContent = 'Hide';
+          btn.setAttribute('aria-label', 'Hide password');
+        } else {
+          input.type = 'password';
+          btn.textContent = 'Show';
+          btn.setAttribute('aria-label', 'Show password');
+        }
+        try { input.focus({ preventScroll: true }); } catch (_) {
+          try { input.focus(); } catch (__) {}
+        }
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      window.ncFocusBoot = true;
       const body = document.body;
-      const inputs = Array.from(document.querySelectorAll('.auth-input'));
+      const inputs = Array.from(document.querySelectorAll('#create-form .auth-input'));
       if (!inputs.length) return;
 
-      const focusClasses = ['focus-email', 'focus-password', 'focus-name'];
+      const focusClasses = ['focus-email', 'focus-password', 'focus-name', 'focus-phone', 'focus-dob'];
       const setFocusState = (field) => {
         body.classList.remove(...focusClasses);
-        if (field) {
-          body.classList.add(`focus-${field}`);
-        }
+        if (field) body.classList.add(`focus-${field}`);
       };
 
       const handleBlur = () => {
@@ -143,8 +1164,11 @@
           if (next) {
             setFocusState(next.dataset.field);
             body.classList.add('keyboard-visible');
-          } else {
-            body.classList.remove('keyboard-visible', ...focusClasses);
+          } else if (!document.getElementById('vk-auth') || document.getElementById('vk-auth').style.display === 'none') {
+            // Keep keyboard-visible while VK is up; otherwise clear
+            if (!window.__vkActive) {
+              body.classList.remove('keyboard-visible', ...focusClasses);
+            }
           }
         }, 140);
       };
@@ -158,172 +1182,7 @@
       });
     })();
   </script>
-  <script>
-    (function () {
-      const form = document.getElementById('create-form');
-      const nameEl = document.getElementById('create-name');
-      const emailEl = document.getElementById('create-email');
-      // const phoneEl = document.getElementById('create-phone');
-      const pwEl = document.getElementById('create-password');
-      const errEl = document.getElementById('create-error');
-
-      // const otpOverlay = document.getElementById('otp-overlay');
-      // const otpInput = document.getElementById('otp-input');
-      // const otpVerifyBtn = document.getElementById('otp-verify-btn');
-      // const otpCancelBtn = document.getElementById('otp-cancel-btn');
-      // const otpError = document.getElementById('otp-error');
-
-      // let currentPhone = '';
-
-      const showError = (msg) => {
-        if (errEl) {
-          errEl.textContent = msg || 'Something went wrong.';
-          errEl.style.display = 'block';
-        }
-      };
-
-      form?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (errEl) errEl.style.display = 'none';
-        const fullName = (nameEl?.value || '').trim();
-        const email = (emailEl?.value || '').trim();
-        const password = (pwEl?.value || '').trim();
-        // currentPhone = (phoneEl?.value || '').trim();
-
-        if (!fullName) {
-          showError('Please enter your name.');
-          return;
-        }
-        if (!email || !password) {
-          showError('Please enter email and password.');
-          return;
-        }
-
-        try {
-          if (!window.sb) throw new Error('Auth not ready');
-          if (!window.ncPolicy) throw new Error('Privacy policy unavailable. Please try again.');
-
-          // 1. Create User with Email/Password + Metadata
-          const { data, error } = await window.sb.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                full_name: fullName,
-                // phone: currentPhone // Store phone in metadata as backup
-              }
-            }
-          });
-
-          if (error) {
-            if (/already regist|already exist|user exists/i.test(error.message || '')) {
-              showError('An account with this email already exists. Please sign in instead.');
-              return;
-            }
-            throw error;
-          }
-
-          // When email confirmations are on, Supabase hides an existing address by
-          // returning success with no identities rather than an error.
-          if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) {
-            showError('An account with this email already exists. Please sign in instead.');
-            return;
-          }
-
-          /* PHONE VERIFICATION DISABLED
-          // 2. If phone number provided, trigger SMS Verification
-          if (currentPhone) {
-             // Basic formatting check (ensure + prefix if needed, or leave to Supabase)
-             if (!currentPhone.startsWith('+') && /^\d{10,}$/.test(currentPhone)) {
-                 // Assume US default if no prefix, or let backend fail? 
-                 // Best practice: Prepend +1 if strictly 10 digits and US-centric, 
-                 // but safer to ask user for country code. We'll pass as-is.
-             }
-             
-             // Trigger OTP
-             const { error: otpError } = await window.sb.auth.signInWithOtp({
-               phone: currentPhone
-             });
-             
-             if (otpError) {
-               console.warn("SMS send failed:", otpError);
-               // If SMS fails (e.g. unconfigured), just proceed to index but warn
-               alert("Account created, but could not send SMS verification (Check Supabase Config). Redirecting...");
-               window.location.href = 'index.html';
-             } else {
-               // Show OTP Modal
-               otpOverlay.style.display = 'flex';
-               otpInput.focus();
-             }
-             return;
-          }
-          */
-
-          // signUp only returns a session when email confirmation is disabled.
-          // Without one the user is not signed in, so don't redirect as if they were,
-          // and don't prompt for the policy: writing it needs their own token. They
-          // are prompted on first sign-in instead.
-          if (!data?.session) {
-            showError('Account created, but it needs email confirmation before you can sign in. Please check your inbox.');
-            return;
-          }
-
-          // 2. Account exists and policy_accepted defaults to false, so this
-          //    prompts, then records the agreement against the new account.
-          const agreed = await window.ncPolicy.requireAccepted(window.sb, data.user.id);
-          if (!agreed) {
-            try { await window.sb.auth.signOut(); } catch (_) { }
-            showError('You must accept the Privacy Policy to use NobleCart. Your account was created — sign in to try again.');
-            return;
-          }
-
-          window.location.href = ncCartId()
-            ? 'index.html?cart=' + encodeURIComponent(ncCartId())
-            : 'index.html';
-        } catch (ex) {
-          const msg = ex?.message || '';
-          if (/rate limit|too many/i.test(msg)) {
-            showError('Too many signups right now. Please try again in a few minutes.');
-          } else if (/confirmation email|sending/i.test(msg)) {
-            showError('We could not send your confirmation email. Please try again shortly.');
-          } else {
-            showError(msg || 'Failed to create account.');
-          }
-        }
-      });
-
-      /* OTP LOGIC DISABLED
-      // OTP Verify Logic
-      otpVerifyBtn?.addEventListener('click', async () => {
-         const token = otpInput.value.trim();
-         if (!token) return;
-         otpError.style.display = 'none';
-
-         try {
-           const { data, error } = await window.sb.auth.verifyOtp({
-             phone: currentPhone,
-             token: token,
-             type: 'sms'
-           });
-           
-           if (error) throw error;
-           
-           // Verification success!
-           window.location.href = 'index.html';
-           
-         } catch (e) {
-           otpError.textContent = e.message || 'Invalid code';
-           otpError.style.display = 'block';
-         }
-      });
-
-      otpCancelBtn?.addEventListener('click', () => {
-         window.location.href = 'index.html';
-      });
-      */
-
-    })();
-  </script>
+  <script src="signup-steps.js?v=30"></script>
 </body>
 
 </html>

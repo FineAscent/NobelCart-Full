@@ -14,9 +14,12 @@
   <div class="container">
     <!-- Fullscreen centered auth layout (no left/right sections) -->
     <div class="auth-wrapper" role="main">
-      <div class="auth-card" aria-labelledby="signin-title">
+      <div class="signin-center" id="signin-center">
+        <button type="button" id="signin-pill-email" class="signup-pill signup-pill--right" hidden
+          aria-label="Tap to edit."></button>
+        <div class="auth-card" aria-labelledby="signin-title">
         <h1 id="signin-title" class="auth-title">Welcome back</h1>
-        <p class="auth-subtitle">Sign in to continue</p>
+        <p class="auth-subtitle">Sign in to continue. New here? You can sign up using the Sign in with App button.</p>
 
         <!-- Phone sign-in option at top; becomes "Sign in with email" while QR is open -->
         <div style="text-align: center; margin-bottom: 12px;">
@@ -25,43 +28,97 @@
           </button>
         </div>
 
-        <form id="signin-form" class="auth-form" novalidate>
+        <!-- div (not form) reduces Mac/Chrome login autofill heuristics; fields keep normal .auth-input sizing -->
+        <div id="signin-form" class="auth-form" role="group" aria-label="Sign in"
+          data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+          <div class="nc-autofill-trap" aria-hidden="true">
+            <input type="text" name="username" autocomplete="username" tabindex="-1" value="" />
+            <input type="password" name="password" autocomplete="current-password" tabindex="-1" value="" />
+          </div>
+
           <div class="auth-field email-field">
-            <label class="auth-label" for="email">Email</label>
-            <!-- Phone Auth Placeholder Changed: placeholder="you@example.com or +1234567890" -->
-            <input id="email" class="auth-input" type="email" name="email" placeholder="you@example.com"
-              autocomplete="email" required data-field="email" inputmode="email" />
+            <label class="auth-label" for="email">Email or phone number</label>
+            <input id="email" class="auth-input" type="text" name="nc_kiosk_id"
+              placeholder="Email or phone" autocomplete="off" required
+              data-field="email" inputmode="text" autocapitalize="none"
+              autocorrect="off" spellcheck="false" enterkeyhint="next"
+              data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" />
           </div>
 
           <div class="auth-field password-field" id="password-section">
             <label class="auth-label" for="password">Password</label>
             <div class="auth-input-wrap">
-              <input id="password" class="auth-input" type="password" name="password" placeholder="••••••••"
-                autocomplete="current-password" required data-field="password" />
+              <input id="password" class="auth-input" type="password" name="nc_kiosk_secret"
+                placeholder="••••••••" autocomplete="new-password" required
+                data-field="password" enterkeyhint="go"
+                data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" />
               <button type="button" id="toggle-password" class="password-toggle"
                 aria-label="Show password">Show</button>
             </div>
-            <script>
-              document.getElementById('toggle-password').addEventListener('click', function () {
-                const input = document.getElementById('password');
-                if (input.type === 'password') {
-                  input.type = 'text';
-                  this.textContent = 'Hide';
-                } else {
-                  input.type = 'password';
-                  this.textContent = 'Show';
-                }
-              });
-            </script>
           </div>
 
-          <button type="submit" class="auth-button">Sign In</button>
+          <button type="button" id="signin-submit" class="auth-button">Sign In</button>
           <div id="auth-error" class="auth-error" style="display:none;"></div>
           <div class="auth-links" aria-label="Helpful links">
-            <!-- Password reset is handled in the phone app, not on this kiosk page. -->
             <a href="create-account.html" id="create-link">Create account</a>
           </div>
-        </form>
+        </div>
+
+        <style>
+          .nc-autofill-trap {
+            position: absolute !important;
+            left: -10000px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+        </style>
+        <script>
+          (function () {
+            const email = document.getElementById('email');
+            const password = document.getElementById('password');
+            const toggle = document.getElementById('toggle-password');
+            if (!email || !password) return;
+
+            toggle?.addEventListener('click', function () {
+              if (password.type === 'password') {
+                password.type = 'text';
+                this.textContent = 'Hide';
+                this.setAttribute('aria-label', 'Hide password');
+              } else {
+                password.type = 'password';
+                this.textContent = 'Show';
+                this.setAttribute('aria-label', 'Show password');
+              }
+              try { password.focus({ preventScroll: true }); } catch (_) {}
+            });
+
+            // Clear any late autofill without changing field layout/behavior.
+            let userTyped = false;
+            const mark = function () { userTyped = true; };
+            email.addEventListener('input', mark);
+            password.addEventListener('input', mark);
+            email.addEventListener('keydown', mark);
+            password.addEventListener('keydown', mark);
+
+            function scrub() {
+              if (userTyped) return;
+              if (document.activeElement !== email && email.value) email.value = '';
+              if (document.activeElement !== password && password.value) password.value = '';
+              document.querySelectorAll('.nc-autofill-trap input').forEach(function (el) {
+                try { el.value = ''; } catch (_) {}
+              });
+            }
+            scrub();
+            let n = 0;
+            const iv = setInterval(function () {
+              scrub();
+              if (++n > 20) clearInterval(iv);
+            }, 150);
+          })();
+        </script>
 
         <!-- App QR Sign-in Panel (shown instead of form when user taps "Sign in with App") -->
         <div id="qr-app-panel" style="display:none; text-align:center; padding:4px 0;">
@@ -77,23 +134,162 @@
         </div>
         <style>@keyframes qrPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.3;transform:scale(0.8);}}</style>
 
-        <!-- OTP Verification Overlay (Temporarily Disabled)
+        <!-- OTP Verification Overlay (for unfinished phone verification) -->
         <div id="otp-overlay" class="otp-overlay" style="display: none;">
           <div class="otp-card">
-            <h2>Verify Phone Number</h2>
-            <p>We sent a 6-digit code to your phone.</p>
-            <input type="text" id="otp-input" placeholder="000000" maxlength="6" inputmode="numeric" />
-            <button id="otp-verify-btn" class="auth-button">Verify Code</button>
-            <button id="otp-cancel-btn" class="text-button">Cancel</button>
+            <h2>Verify email</h2>
+            <p id="otp-hint">Enter the 6-digit code we sent to your email.</p>
+            <input type="text" id="otp-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" enterkeyhint="done" />
+            <button type="button" id="otp-verify-btn" class="auth-button">Verify Code</button>
+            <button type="button" id="otp-resend-btn" class="text-button">Resend code</button>
+            <button type="button" id="otp-cancel-btn" class="text-button">Cancel</button>
             <div id="otp-error" class="auth-error" style="display:none;"></div>
           </div>
         </div>
-        -->
-      </div>
-    </div>
-  </div>
+        </div><!-- /.auth-card -->
+      </div><!-- /.signin-center -->
+    </div><!-- /.auth-wrapper -->
+  </div><!-- /.container -->
 
   <style>
+    .signin-center {
+      position: relative;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+      overflow: visible;
+      margin: 0 auto;
+    }
+    body.signin .signin-center .auth-card {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    /* Same completed-step pills as create-account */
+    body.signin .signup-pill {
+      position: absolute;
+      z-index: 3;
+      width: max-content;
+      max-width: none;
+      min-height: 52px;
+      padding: 10px 10px 10px 12px;
+      border: 1px solid rgba(74, 90, 78, 0.22);
+      border-radius: 16px;
+      background: #ffffff;
+      color: #3a372f;
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.2;
+      text-align: left;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition:
+        background-color 160ms ease,
+        color 160ms ease,
+        transform 280ms ease,
+        opacity 280ms ease,
+        box-shadow 160ms ease,
+        visibility 280ms ease;
+      -webkit-tap-highlight-color: transparent;
+      top: 50%;
+      margin: 0;
+      box-shadow: 0 2px 10px rgba(45, 42, 38, 0.06);
+    }
+    body.signin .signup-pill.is-visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+    body.signin .signup-pill[hidden] { display: none !important; }
+    body.signin .signup-pill:active,
+    body.signin .signup-pill:focus {
+      outline: none;
+      background: #f3f5f3;
+      color: #2d2a26;
+      box-shadow: 0 3px 12px rgba(74, 90, 78, 0.1);
+    }
+    body.signin .signup-pill--right {
+      left: calc(100% + 16px);
+      right: auto;
+      bottom: auto;
+      transform: translateY(calc(-50% + 40px)) scale(0.96);
+    }
+    body.signin .signup-pill--right.is-visible {
+      transform: translateY(calc(-50% + 40px)) scale(1);
+    }
+    body.signin .signup-pill .pill-check {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #5a6b5e;
+      color: #f4f5f3;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    body.signin .signup-pill .pill-copy {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      white-space: nowrap;
+    }
+    body.signin .signup-pill .pill-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #2d2a26;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    body.signin .signup-pill .pill-hint {
+      font-size: 10px;
+      font-weight: 600;
+      color: #8b7355;
+      white-space: nowrap;
+      line-height: 1.15;
+    }
+    body.signin.keyboard-visible .signup-pill {
+      min-height: 48px;
+      padding: 8px 8px 8px 10px;
+    }
+    body.signin.keyboard-visible .signup-pill--right {
+      left: calc(100% + 18px);
+      transform: translateY(calc(-50% + 48px)) scale(0.96);
+    }
+    body.signin.keyboard-visible .signup-pill--right.is-visible {
+      transform: translateY(calc(-50% + 48px)) scale(1);
+    }
+    @media (max-width: 720px) {
+      body.signin .signup-pill--right {
+        left: calc(100% + 12px);
+        transform: translateY(calc(-50% + 32px)) scale(0.96);
+      }
+      body.signin .signup-pill--right.is-visible {
+        transform: translateY(calc(-50% + 32px)) scale(1);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.signin .signup-pill { transition: none; }
+    }
+
     @keyframes shine {
       0% {
         background-position: -200% center;
@@ -423,7 +619,7 @@
       }
     }
 
-    /* OTP Overlay Styles
+    /* OTP Overlay Styles */
     .otp-overlay {
       position: fixed;
       top: 0;
@@ -465,6 +661,7 @@
       margin-bottom: 20px;
       border: 2px solid #ddd;
       border-radius: 12px;
+      box-sizing: border-box;
     }
 
     .text-button {
@@ -474,8 +671,9 @@
       margin-top: 10px;
       cursor: pointer;
       text-decoration: underline;
+      display: block;
+      width: 100%;
     }
-    */
   </style>
 
   <style>
@@ -579,7 +777,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="error-reporter.js"></script>
-  <script src="vk-auth.js"></script>
+  <script src="vk-auth.js?v=12"></script>
   <script src="policy-gate.js"></script>
   <script>
     // Clear stale/invalid local session to avoid 400 token errors and prevent watcher loops
@@ -590,11 +788,17 @@
         // This prevents the site.js watcher from triggering a "force_sign_out" loop
         await window.sb.auth.signOut({ scope: 'local' });
 
-        // Clear storage but preserve splash screen flag
+        // Clear storage but preserve splash + pending signup email prefill
         const splash = sessionStorage.getItem('nc_splash_shown');
+        const signupEmail = sessionStorage.getItem('nc_signup_email');
         try { localStorage.removeItem('nc_cart_v1'); } catch { }
         try { sessionStorage.clear(); } catch { }
         if (splash) sessionStorage.setItem('nc_splash_shown', splash);
+        if (signupEmail) sessionStorage.setItem('nc_signup_email', signupEmail);
+        try {
+          const ls = localStorage.getItem('nc_signup_email');
+          if (ls) sessionStorage.setItem('nc_signup_email', ls);
+        } catch { }
 
       } catch { }
     })();
@@ -603,7 +807,7 @@
     // Elevate auth card when focusing inputs and spotlight focused field
     (function () {
       const body = document.body;
-      const inputs = Array.from(document.querySelectorAll('.auth-input'));
+      const inputs = Array.from(document.querySelectorAll('#signin-form .auth-input'));
       if (!inputs.length) return;
 
       const focusClasses = ['focus-email', 'focus-password'];
@@ -621,6 +825,8 @@
           if (next) {
             setFocusState(next.dataset.field);
             body.classList.add('keyboard-visible');
+          } else if (window.__vkActive) {
+            body.classList.add('keyboard-visible');
           } else {
             body.classList.remove('keyboard-visible', ...focusClasses);
           }
@@ -634,13 +840,6 @@
         });
         input.addEventListener('blur', handleBlur);
       });
-
-      // If page loads with a field already focused (password manager), adjust immediately
-      const active = document.activeElement;
-      if (inputs.includes(active)) {
-        body.classList.add('keyboard-visible');
-        setFocusState(active.dataset.field);
-      }
     })();
   </script>
   <script>
@@ -653,38 +852,72 @@
           ov = document.createElement('div');
           ov.id = 'nc-loading-overlay';
           ov.setAttribute('aria-live', 'polite');
-          ov.style.cssText = 'position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center;z-index:99999;';
+          ov.setAttribute('role', 'status');
+          ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(2px);';
           const inner = document.createElement('div');
-          inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#fff;';
+          inner.className = 'nc-loading-inner';
+          inner.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:14px;font-family:-apple-system,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#fff;padding:24px;';
           if (options.logo) {
             const img = document.createElement('img');
             img.src = 'Images/logo.gif';
             img.alt = 'Loading';
+            img.className = 'nc-loading-logo';
             img.style.cssText = 'max-width:72%;max-height:42vh;height:auto;width:auto;display:block;';
             inner.appendChild(img);
           } else {
             const spinner = document.createElement('div');
-            spinner.style.cssText = 'width:32px;height:32px;border:3px solid #444;border-top-color:#fff;border-radius:50%;animation: ncspin 0.9s linear infinite;';
+            spinner.className = 'nc-loading-spinner';
+            spinner.style.cssText = 'width:36px;height:36px;border:3px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;animation: ncspin 0.9s linear infinite;';
             inner.appendChild(spinner);
           }
           const text = document.createElement('div');
           text.className = 'nc-loading-text';
+          text.style.cssText = 'font-size:16px;font-weight:600;letter-spacing:0.01em;';
           text.textContent = message || (options.logo ? '' : 'Loading…');
           if (text.textContent) inner.appendChild(text);
           ov.appendChild(inner);
-          const style = document.createElement('style');
-          style.textContent = '@keyframes ncspin{to{transform:rotate(360deg)}}';
-          document.head.appendChild(style);
+          if (!document.getElementById('nc-loading-style')) {
+            const style = document.createElement('style');
+            style.id = 'nc-loading-style';
+            style.textContent = '@keyframes ncspin{to{transform:rotate(360deg)}}';
+            document.head.appendChild(style);
+          }
           document.body.appendChild(ov);
         } else {
           const t = ov.querySelector('.nc-loading-text');
-          if (t) t.textContent = message || 'Loading…';
-          // Ensure text is readable on dark bg
+          if (t) {
+            t.textContent = message || 'Loading…';
+            t.style.display = (message || !options.logo) ? '' : 'none';
+          } else if (message) {
+            const text = document.createElement('div');
+            text.className = 'nc-loading-text';
+            text.style.cssText = 'font-size:16px;font-weight:600;letter-spacing:0.01em;';
+            text.textContent = message;
+            ov.firstElementChild?.appendChild(text);
+          }
           const inner = ov.firstElementChild; if (inner) inner.style.color = '#fff';
           ov.style.display = 'flex';
         }
         return ov;
       } catch (_) { }
+    }
+
+    function hideLoadingOverlay() {
+      try {
+        const ov = document.getElementById('nc-loading-overlay');
+        if (ov) ov.style.display = 'none';
+      } catch (_) { }
+    }
+
+    function setSigninBusy(busy) {
+      const btn = document.getElementById('signin-submit');
+      if (btn) {
+        btn.disabled = !!busy;
+        btn.textContent = busy ? 'Signing in…' : 'Sign In';
+        btn.style.opacity = busy ? '0.75' : '';
+      }
+      if (inputEl) inputEl.disabled = !!busy;
+      if (passwordEl) passwordEl.disabled = !!busy;
     }
 
     // --- Sign-in Logic (Email OR Phone) ---
@@ -693,6 +926,242 @@
     const passwordEl = document.getElementById('password');
     const passwordSection = document.getElementById('password-section');
     const err = document.getElementById('auth-error');
+    const emailPill = document.getElementById('signin-pill-email');
+
+    /** Letters/words → email. 4+ digits (no letters) → phone (+1 US). */
+    function detectIdKind(raw) {
+      const val = String(raw || '').trim();
+      if (!val) return 'id';
+      if (/[a-zA-Z]/.test(val)) return 'email';
+      const digits = val.replace(/\D/g, '');
+      if (digits.length >= 4) return 'phone';
+      return 'id';
+    }
+
+    function pillLabelForKind(kind) {
+      if (kind === 'email') return 'Email';
+      if (kind === 'phone') return 'Phone number';
+      return 'Email or phone';
+    }
+
+    /** Match server normalizeUsPhone → E.164 +1XXXXXXXXXX */
+    function normalizeUsPhone(raw) {
+      const digits = String(raw || '').replace(/\D/g, '');
+      let ten = null;
+      if (digits.length === 10) ten = digits;
+      else if (digits.length === 11 && digits.startsWith('1')) ten = digits.slice(1);
+      else return null;
+      if (!/^[2-9]\d{2}[2-9]\d{6}$/.test(ten)) return null;
+      return '+1' + ten;
+    }
+
+    function isValidEmail(v) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
+    }
+
+    function formatUsPhoneDisplay(raw) {
+      let d = String(raw || '').replace(/\D/g, '');
+      if (d.length >= 11 && d[0] === '1') d = d.slice(1);
+      d = d.slice(0, 10);
+      if (!d.length) return '+1 ';
+      if (d.length < 4) return '+1 (' + d;
+      if (d.length < 7) return '+1 (' + d.slice(0, 3) + ') ' + d.slice(3);
+      return '+1 (' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+    }
+
+    function validateIdentifier(raw) {
+      const val = String(raw || '').trim();
+      if (!val) return 'Please enter your email or phone number.';
+      const kind = detectIdKind(val);
+      if (kind === 'email') {
+        if (!isValidEmail(val)) return 'Enter a valid email.';
+        return null;
+      }
+      if (kind === 'phone') {
+        if (!normalizeUsPhone(val)) return 'Enter a valid US phone number (+1).';
+        return null;
+      }
+      return 'Enter a valid email or US phone number.';
+    }
+
+    function showIdError(msg) {
+      if (!err) return;
+      err.textContent = msg || '';
+      err.style.display = msg ? 'block' : 'none';
+    }
+
+    function normalizedIdentifierForSubmit(raw) {
+      const val = String(raw || '').trim();
+      if (detectIdKind(val) === 'phone') return normalizeUsPhone(val) || val;
+      return val;
+    }
+
+    function fillEmailPill() {
+      if (!emailPill) return;
+      const kind = detectIdKind(inputEl?.value);
+      const label = pillLabelForKind(kind);
+      emailPill.dataset.stepIndex = kind;
+      emailPill.innerHTML =
+        '<span class="pill-copy">' +
+          '<span class="pill-label">' + label + '</span>' +
+          '<span class="pill-hint">Tap to edit</span>' +
+        '</span>' +
+        '<span class="pill-check" aria-hidden="true">✓</span>';
+      emailPill.setAttribute('aria-label', label + '. Tap to edit.');
+    }
+
+    let pillAnimGen = 0;
+    function updateSigninEmailPill() {
+      if (!emailPill || !inputEl) return;
+      const qrOpen = (() => {
+        const p = document.getElementById('qr-app-panel');
+        return p && p.style.display === 'block' && !p.classList.contains('is-out');
+      })();
+      const otpOpen = document.body.classList.contains('otp-open') ||
+        (document.getElementById('otp-overlay')?.style.display === 'flex');
+      const onPassword = document.body.classList.contains('focus-password');
+      const hasEmail = !!(inputEl.value || '').trim();
+      const show = onPassword && hasEmail && !qrOpen && !otpOpen;
+      const kind = detectIdKind(inputEl.value);
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const isShown = !emailPill.hidden && emailPill.classList.contains('is-visible');
+      const gen = ++pillAnimGen;
+
+      if (!show) {
+        if (!isShown && emailPill.hidden) return;
+        if (reduceMotion || !isShown) {
+          emailPill.classList.remove('is-visible');
+          emailPill.hidden = true;
+          emailPill.dataset.stepIndex = '';
+          emailPill.textContent = '';
+          return;
+        }
+        emailPill.classList.remove('is-visible');
+        let done = false;
+        const finish = () => {
+          if (done || pillAnimGen !== gen) return;
+          done = true;
+          emailPill.removeEventListener('transitionend', onEnd);
+          emailPill.hidden = true;
+          emailPill.dataset.stepIndex = '';
+          emailPill.textContent = '';
+        };
+        const onEnd = (e) => {
+          if (e.target !== emailPill || e.propertyName !== 'opacity') return;
+          finish();
+        };
+        emailPill.addEventListener('transitionend', onEnd);
+        setTimeout(finish, 320);
+        return;
+      }
+
+      if (isShown && emailPill.dataset.stepIndex === kind) {
+        fillEmailPill();
+        return;
+      }
+
+      fillEmailPill();
+      emailPill.hidden = false;
+      if (reduceMotion) {
+        emailPill.classList.add('is-visible');
+        return;
+      }
+      emailPill.classList.remove('is-visible');
+      void emailPill.offsetWidth;
+      requestAnimationFrame(() => {
+        if (pillAnimGen !== gen) return;
+        emailPill.classList.add('is-visible');
+      });
+    }
+
+    emailPill?.addEventListener('click', () => {
+      try { inputEl.focus({ preventScroll: true }); } catch (_) {
+        try { inputEl.focus(); } catch (__) {}
+      }
+      updateSigninEmailPill();
+    });
+
+    // Live +1 phone formatting once 4 digits (no letters)
+    inputEl?.addEventListener('input', () => {
+      const kind = detectIdKind(inputEl.value);
+      if (kind === 'phone') {
+        const formatted = formatUsPhoneDisplay(inputEl.value);
+        if (inputEl.value !== formatted) {
+          inputEl.value = formatted;
+          try { inputEl.setSelectionRange(formatted.length, formatted.length); } catch (_) {}
+        }
+      }
+      updateSigninEmailPill();
+    });
+
+    // Keep pill in sync with focus / typing / VK Done
+    [inputEl, passwordEl].forEach((el) => {
+      el?.addEventListener('focus', () => setTimeout(updateSigninEmailPill, 40));
+      el?.addEventListener('blur', () => setTimeout(updateSigninEmailPill, 160));
+      el?.addEventListener('vk:done', () => setTimeout(updateSigninEmailPill, 80));
+    });
+    passwordEl?.addEventListener('input', updateSigninEmailPill);
+    new MutationObserver(updateSigninEmailPill).observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    updateSigninEmailPill();
+    window.ncUpdateSigninPill = updateSigninEmailPill;
+
+    /** Returns true if advance should stop (invalid). */
+    function gateEmailAdvance(current) {
+      if (!current || current !== inputEl) return false;
+      const msg = validateIdentifier(inputEl.value);
+      if (msg) {
+        showIdError(msg);
+        try { inputEl.focus({ preventScroll: true }); } catch (_) {
+          try { inputEl.focus(); } catch (__) {}
+        }
+        return true;
+      }
+      showIdError('');
+      if (detectIdKind(inputEl.value) === 'phone') {
+        const e164 = normalizeUsPhone(inputEl.value);
+        if (e164) inputEl.value = formatUsPhoneDisplay(e164);
+      }
+      return false;
+    }
+
+    window.ncSigninGate = {
+      handleVkDone(current) {
+        if (!document.body.classList.contains('signin')) return false;
+        if (current !== inputEl) return false;
+        if (gateEmailAdvance(current)) return true; // blocked
+        return false; // valid — let VK advance to password
+      },
+    };
+
+    // Don't let password focus skip an incomplete email/phone
+    passwordEl?.addEventListener('focus', (e) => {
+      const msg = validateIdentifier(inputEl?.value);
+      if (!msg) return;
+      e.preventDefault();
+      showIdError(msg);
+      setTimeout(() => {
+        try { inputEl.focus({ preventScroll: true }); } catch (_) {
+          try { inputEl.focus(); } catch (__) {}
+        }
+      }, 0);
+    });
+
+    if (inputEl && passwordEl) {
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (gateEmailAdvance(inputEl)) return;
+        passwordEl.focus();
+      });
+      passwordEl.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        document.getElementById('signin-submit')?.click();
+      });
+    }
 
     // Landed here after the inactivity monitor signed the shopper out.
     try {
@@ -703,14 +1172,75 @@
       }
     } catch (_) { }
 
-    /* OTP Elements Temporarily Disabled
     const otpOverlay = document.getElementById('otp-overlay');
+    const otpHint = document.getElementById('otp-hint');
     const otpInput = document.getElementById('otp-input');
     const otpVerifyBtn = document.getElementById('otp-verify-btn');
+    const otpResendBtn = document.getElementById('otp-resend-btn');
     const otpCancelBtn = document.getElementById('otp-cancel-btn');
     const otpError = document.getElementById('otp-error');
-    let currentPhone = '';
-    */
+    let pendingOtpPhone = '';
+    let pendingOtpPassword = '';
+
+    function openSigninOtp(phone, password, message, email) {
+      pendingOtpPhone = phone || '';
+      pendingOtpPassword = password || '';
+      if (otpHint) {
+        otpHint.textContent = message
+          || ('Enter the code sent to ' + (email || 'your email') + '.');
+      }
+      if (otpOverlay) otpOverlay.style.display = 'flex';
+      if (otpError) otpError.style.display = 'none';
+      if (otpInput) { otpInput.value = ''; otpInput.focus(); }
+    }
+
+    if (otpInput && otpVerifyBtn) {
+      otpInput.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        otpVerifyBtn.click();
+      });
+    }
+
+    async function finishSigninWithSession(session) {
+      const { data, error } = await window.sb.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      if (error) throw error;
+
+      try {
+        const uid = data?.user?.id || session.user?.id;
+        const em = data?.user?.email || session.user?.email;
+        if (uid) {
+          await window.sb.from('profiles').update({ email: em, active: true }).eq('id', uid);
+        }
+      } catch (_) { }
+
+      const agreed = await window.ncPolicy.requireAccepted(window.sb, data?.user?.id || session.user?.id);
+      if (!agreed) {
+        try { await window.sb.auth.signOut(); } catch (_) { }
+        throw new Error('You must accept the Privacy Policy to use NobleCart.');
+      }
+
+      try { await window.sb.rpc('record_profile_login'); } catch (_) { }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('admin')) {
+        window.location.href = 'admin/index.html';
+        return;
+      }
+
+      const cartId = window.ncCartId ? window.ncCartId() : urlParams.get('cart');
+      const uid = data?.user?.id || session.user?.id;
+      if (cartId && uid) {
+        try { await window.sb.rpc('claim_cart_user', { p_cart_id: cartId, p_user_id: uid }); } catch (_) {}
+      }
+
+      try { showLoadingOverlay('', { logo: true }); } catch (_) { }
+      const dest = cartId ? 'cabinet.html?cart=' + encodeURIComponent(cartId) : 'cabinet.html';
+      setTimeout(() => { window.location.href = dest; }, 4000);
+    }
 
     /* Smart input detection Temporarily Disabled
     // For now, if it looks like a phone (digits/plus), hide password.
@@ -730,111 +1260,156 @@
     }
     */
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      err.style.display = 'none';
-      const userVal = inputEl.value.trim();
+    function stashSignupEmailPrefill(email) {
+      const emailPrefill = String(email || '').trim().toLowerCase();
+      if (!emailPrefill || !/@/.test(emailPrefill)) return;
+      const payload = JSON.stringify({ email: emailPrefill, at: Date.now() });
+      try { sessionStorage.setItem('nc_signup_email', payload); } catch (_) {}
+      try { localStorage.setItem('nc_signup_email', payload); } catch (_) {}
+    }
 
-      if (!userVal) {
-        err.textContent = 'Please enter your email.';
-        err.style.display = 'block';
+    function readFunctionsPayload(signData, signErr) {
+      return (async () => {
+        let payload = signData;
+        if (payload && typeof payload === 'object' && (payload.error || payload.not_found)) {
+          return payload;
+        }
+        if (!signErr) return payload || {};
+        const ctx = signErr.context;
+        if (!ctx) return payload || { error: signErr.message || 'Request failed' };
+        try {
+          if (typeof ctx.json === 'function') {
+            const j = await ctx.json();
+            if (j && typeof j === 'object') return j;
+          }
+        } catch (_) {}
+        try {
+          if (typeof ctx.clone === 'function') {
+            const j = await ctx.clone().json();
+            if (j && typeof j === 'object') return j;
+          }
+        } catch (_) {}
+        try {
+          if (typeof ctx.text === 'function') {
+            const t = await ctx.text();
+            if (t) return JSON.parse(t);
+          }
+        } catch (_) {}
+        return payload || { error: signErr.message || 'Request failed' };
+      })();
+    }
+
+    let signinInFlight = false;
+    async function runSigninSubmit() {
+      if (signinInFlight) return;
+      err.style.display = 'none';
+      const idErr = validateIdentifier(inputEl.value);
+      if (idErr) {
+        showIdError(idErr);
+        try { inputEl.focus({ preventScroll: true }); } catch (_) {
+          try { inputEl.focus(); } catch (__) {}
+        }
         return;
       }
 
-      /* Phone Auth Checks temporarily disabled
-      const isEmail = userVal.includes('@');
-      const isPhone = !isEmail && /^[+\d\s\-\(\)]+$/.test(userVal);
+      const userVal = normalizedIdentifierForSubmit(inputEl.value);
 
-      if (isPhone) {
-        // --- Phone Flow ---
-        currentPhone = userVal;
-        try {
-          if (!window.sb) throw new Error('Auth not initialized.');
-          const { error } = await window.sb.auth.signInWithOtp({ phone: currentPhone });
-          if (error) throw error;
-
-          // Show OTP UI
-          otpOverlay.style.display = 'flex';
-          otpInput.focus();
-        } catch (ex) {
-          err.textContent = ex.message || 'Failed to send SMS code.';
-          err.style.display = 'block';
-        }
-        return; // Stop here, wait for OTP
-      }
-      */
-
-      // --- Email Flow (Standard) ---
       const password = passwordEl.value.trim();
       if (!password) {
         err.textContent = 'Please enter your password.';
         err.style.display = 'block';
+        try {
+          document.body.classList.remove('focus-email');
+          document.body.classList.add('keyboard-visible', 'focus-password');
+        } catch (_) {}
+        try { passwordEl.focus({ preventScroll: true }); } catch (_) {
+          try { passwordEl.focus(); } catch (__) {}
+        }
         return;
       }
 
+      signinInFlight = true;
+      setSigninBusy(true);
+      try { showLoadingOverlay('Signing you in…'); } catch (_) {}
+
       try {
         if (!window.sb) throw new Error('Auth not initialized.');
-        // Normalize simple admin handle to an email for login
-        let email = userVal;
-        if (email && !email.includes('@') && email.toLowerCase() === 'admin') {
-          email = 'admin@example.com';
-        }
 
-        let { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+        const { data: signData, error: signErr } = await window.sb.functions.invoke('auth-signin', {
+          body: { identifier: userVal, password },
+        });
 
-        if (error) {
-          throw error;
-        }
+        const payload = await readFunctionsPayload(signData, signErr);
 
-        // Mark profile active on sign-in. The row itself is created by the
-        // on_auth_user_created trigger at signup, so this only refreshes state.
-        // is_admin is intentionally not set here: it is granted in SQL only.
-        try {
-          const uid = data?.user?.id;
-          const em = data?.user?.email || email;
-          if (uid) {
-            // Plain update, never upsert: 0012 revoked table-level UPDATE and did
-            // not re-grant it on id, and PostgREST puts every posted column into
-            // an upsert's ON CONFLICT DO UPDATE list. Upserting here 403s.
-            await window.sb.from('profiles').update({ email: em, active: true }).eq('id', uid);
+        if (payload && payload.error) {
+          if (payload.needs_otp) {
+            hideLoadingOverlay();
+            setSigninBusy(false);
+            signinInFlight = false;
+            openSigninOtp(
+              payload.phone,
+              password,
+              payload.error || 'Enter the verification code we sent to your email.',
+              payload.email
+            );
+            return;
           }
-        } catch (_) { }
-
-        // Accounts created through the app, or from before the policy existed,
-        // can reach here without ever having agreed.
-        const agreed = await window.ncPolicy.requireAccepted(window.sb, data?.user?.id);
-        if (!agreed) {
-          try { await window.sb.auth.signOut(); } catch (_) { }
-          err.textContent = 'You must accept the Privacy Policy to use NobleCart.';
-          err.style.display = 'block';
-          return;
+          if (payload.wrong_password || /password is wrong/i.test(payload.error || '')) {
+            hideLoadingOverlay();
+            setSigninBusy(false);
+            signinInFlight = false;
+            err.textContent = 'That password is wrong.';
+            err.style.display = 'block';
+            try {
+              document.body.classList.remove('focus-email');
+              document.body.classList.add('keyboard-visible', 'focus-password');
+            } catch (_) {}
+            try { passwordEl.focus({ preventScroll: true }); } catch (_) {
+              try { passwordEl.focus(); } catch (__) {}
+            }
+            return;
+          }
+          if (payload.not_found && /@/.test(userVal)) {
+            stashSignupEmailPrefill(payload.email || userVal);
+            err.textContent = 'No account found with that email. Tap “Create account” below within 20 seconds to continue with it.';
+            err.style.display = 'block';
+            hideLoadingOverlay();
+            setSigninBusy(false);
+            signinInFlight = false;
+            return;
+          }
+          throw new Error(payload.error);
         }
+        if (signErr && !(payload && payload.session)) throw signErr;
 
-        // Count this UI sign-in on profiles.login_count (RPC; clients cannot set the value).
-        try { await window.sb.rpc('record_profile_login'); } catch (_) { }
-
-        // On success, show logo overlay for 4 seconds, then go to cabinet
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('admin')) {
-          window.location.href = 'admin/index.html';
-          return;
+        const session = payload?.session;
+        if (!session?.access_token || !session?.refresh_token) {
+          throw new Error('Sign-in failed (no session).');
         }
-
-        // Link this cart to the signed-in user
-        const cartId = window.ncCartId ? window.ncCartId() : urlParams.get('cart');
-        if (cartId && data?.user?.id) {
-          try { await window.sb.rpc('claim_cart_user', { p_cart_id: cartId, p_user_id: data.user.id }); } catch (_) {}
-        }
-
-        try { showLoadingOverlay('', { logo: true }); } catch (_) { }
-        const dest = cartId ? 'cabinet.html?cart=' + encodeURIComponent(cartId) : 'cabinet.html';
-        setTimeout(() => { window.location.href = dest; }, 4000);
+        // Keep overlay up through session finish + redirect
+        await finishSigninWithSession(session);
       } catch (e) {
+        hideLoadingOverlay();
+        setSigninBusy(false);
+        signinInFlight = false;
         const msg = e?.message || '';
-        // Supabase returns the same "Invalid login credentials" for an unknown
-        // email and a wrong password, on purpose, so the message has to cover both.
-        if (/invalid login credentials/i.test(msg)) {
-          err.textContent = 'No account found with that email, or the password is incorrect. Tap “Create account” below if you are new.';
+        if (/No account found with that email/i.test(msg) && /@/.test(userVal)) {
+          stashSignupEmailPrefill(userVal);
+          err.textContent = 'No account found with that email. Tap “Create account” below within 20 seconds to continue with it.';
+        } else if (/password is wrong/i.test(msg)) {
+          err.textContent = 'That password is wrong.';
+          try {
+            document.body.classList.remove('focus-email');
+            document.body.classList.add('keyboard-visible', 'focus-password');
+          } catch (_) {}
+          try { passwordEl.focus({ preventScroll: true }); } catch (_) {
+            try { passwordEl.focus(); } catch (__) {}
+          }
+        } else if (/invalid login credentials/i.test(msg)) {
+          err.textContent = 'That password is wrong.';
+          try { passwordEl.focus({ preventScroll: true }); } catch (_) {
+            try { passwordEl.focus(); } catch (__) {}
+          }
         } else if (/email not confirmed/i.test(msg)) {
           err.textContent = 'Please confirm your email address before signing in.';
         } else {
@@ -842,42 +1417,78 @@
         }
         err.style.display = 'block';
       }
-    });
+    }
 
-    /* OTP Verify Button Logic Disabled
+    form?.addEventListener('submit', (e) => { e.preventDefault(); runSigninSubmit(); });
+    document.getElementById('signin-submit')?.addEventListener('click', () => { runSigninSubmit(); });
+
     if (otpVerifyBtn) {
       otpVerifyBtn.addEventListener('click', async () => {
-        const token = otpInput.value.trim();
-        if (!token) return;
-        otpError.style.display = 'none';
+        const token = (otpInput?.value || '').trim();
+        if (!token || !pendingOtpPhone) return;
+        if (otpError) otpError.style.display = 'none';
+        otpVerifyBtn.disabled = true;
+        try { showLoadingOverlay('Verifying…'); } catch (_) {}
         try {
-          const { data, error } = await window.sb.auth.verifyOtp({
-            phone: currentPhone,
-            token: token,
-            type: 'sms'
+          const { data, error } = await window.sb.functions.invoke('auth-verify-otp', {
+            body: { phone: pendingOtpPhone, code: token, password: pendingOtpPassword },
           });
-          if (error) throw error;
-
-          // Login Success
-          const urlParams = new URLSearchParams(window.location.search);
-          if (urlParams.get('admin')) {
-            window.location.href = 'TableUiBackend/admin/index.html';
-            return;
+          let payload = data;
+          if ((!payload || payload.error) && error) {
+            try {
+              if (typeof error.context?.json === 'function') payload = await error.context.json();
+            } catch (_) {}
           }
-          try { showLoadingOverlay('', { logo: true }); } catch (_) { }
-          setTimeout(() => { window.location.href = 'cabinet.html'; }, 4000);
+          if (payload?.error) throw new Error(payload.error);
+          if (error) throw error;
+          if (!payload?.session) throw new Error(payload?.message || 'Verified. Please sign in again.');
+          if (otpOverlay) otpOverlay.style.display = 'none';
+          await finishSigninWithSession(payload.session);
         } catch (e) {
-          otpError.textContent = e.message || 'Invalid Code';
-          otpError.style.display = 'block';
+          hideLoadingOverlay();
+          otpVerifyBtn.disabled = false;
+          if (otpError) {
+            otpError.textContent = e.message || 'Invalid Code';
+            otpError.style.display = 'block';
+          }
+        }
+      });
+    }
+    if (otpResendBtn) {
+      otpResendBtn.addEventListener('click', async () => {
+        if (!pendingOtpPhone) return;
+        if (otpError) otpError.style.display = 'none';
+        try {
+          const { data, error } = await window.sb.functions.invoke('auth-resend-otp', {
+            body: { phone: pendingOtpPhone },
+          });
+          let payload = data;
+          if ((!payload || payload.error) && error) {
+            try {
+              if (typeof error.context?.json === 'function') payload = await error.context.json();
+            } catch (_) {}
+          }
+          if (payload?.error) throw new Error(payload.error);
+          if (error) throw error;
+          if (otpError) {
+            otpError.style.color = '#166534';
+            otpError.textContent = 'Code resent.';
+            otpError.style.display = 'block';
+          }
+        } catch (e) {
+          if (otpError) {
+            otpError.style.color = '';
+            otpError.textContent = e.message || 'Could not resend code.';
+            otpError.style.display = 'block';
+          }
         }
       });
     }
     if (otpCancelBtn) {
       otpCancelBtn.addEventListener('click', () => {
-        otpOverlay.style.display = 'none';
+        if (otpOverlay) otpOverlay.style.display = 'none';
       });
     }
-    */
   </script>
   <script>
     // App QR Sign-in: kiosk shows QR encoding cart_id, mobile app scans,
@@ -958,6 +1569,7 @@
             qrPanel.style.display = 'none';
             qrPanel.classList.remove('is-out', 'is-ready', 'is-waiting');
           }
+          try { window.ncUpdateSigninPill?.(); } catch (_) {}
           return;
         }
 
@@ -984,6 +1596,7 @@
           qrPanel.style.display = 'none';
           qrPanel.classList.remove('is-out', 'is-ready', 'is-waiting');
           clearQrFrame();
+          try { window.ncUpdateSigninPill?.(); } catch (_) {}
         }, 400);
       }
 
@@ -1284,6 +1897,7 @@
         clearQrFrame();
         setTopBtnEmailMode(true);
         showPhoneGuide();
+        try { window.ncUpdateSigninPill?.(); } catch (_) {}
       }
 
       function isQrOpen() {
@@ -1299,7 +1913,40 @@
   <script src="site.js"></script>
   <script>
     // Carry the cart id over to create-account so coming back here still has it.
-    ncLinkWithCart(document.getElementById('create-link'), 'create-account.html');
+    // Also pass a short-lived email prefill when "not found" was recent (<20s).
+    (function () {
+      const link = document.getElementById('create-link');
+      if (!link) return;
+      ncLinkWithCart(link, 'create-account.html');
+      link.addEventListener('click', function () {
+        const PREFILL_MS = 20 * 1000;
+        let email = '';
+        let at = 0;
+        try {
+          const raw = sessionStorage.getItem('nc_signup_email') || localStorage.getItem('nc_signup_email');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            email = String(parsed.email || '').trim().toLowerCase();
+            at = Number(parsed.at) || 0;
+          }
+        } catch (_) {}
+        const fresh = email && at && (Date.now() - at) <= PREFILL_MS;
+        let href = link.getAttribute('href') || 'create-account.html';
+        try {
+          const u = new URL(href, window.location.href);
+          if (fresh) {
+            u.searchParams.set('email', email);
+            u.searchParams.set('e_at', String(at));
+          } else {
+            u.searchParams.delete('email');
+            u.searchParams.delete('e_at');
+            try { sessionStorage.removeItem('nc_signup_email'); } catch (_) {}
+            try { localStorage.removeItem('nc_signup_email'); } catch (_) {}
+          }
+          link.href = u.pathname.split('/').pop() + u.search;
+        } catch (_) {}
+      });
+    })();
   </script>
 </body>
 

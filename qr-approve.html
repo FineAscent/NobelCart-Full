@@ -60,8 +60,8 @@
 
         <form id="phone-signin-form" class="auth-form" novalidate autocomplete="on">
           <div class="auth-field">
-            <label class="auth-label" for="email">Email</label>
-            <input id="email" class="auth-input" type="email" name="username" placeholder="you@example.com" autocomplete="username" inputmode="email" autocapitalize="none" required />
+            <label class="auth-label" for="email">Email or phone</label>
+            <input id="email" class="auth-input" type="text" name="username" placeholder="you@example.com or (555) 123-4567" autocomplete="username" inputmode="text" autocapitalize="none" required />
             <div id="email-help" class="helper" aria-live="polite"></div>
           </div>
           <div class="auth-field">
@@ -234,13 +234,13 @@
         if (sess){ approveBtn.style.display = 'inline-block'; }
       } catch (e) { /* ignore */ }
 
-      function isValidEmail(v){
-        // Simple RFC-like check
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      function isValidIdentifier(v){
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return true;
+        const digits = String(v || '').replace(/\D/g, '');
+        return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
       }
       function isStrongPassword(v){
-        // Basic rule: at least 8 chars
-        return typeof v === 'string' && v.length >= 8;
+        return typeof v === 'string' && v.length >= 6;
       }
       function setValid(el, helpEl, ok, okMsg, errMsg){
         if (ok){
@@ -262,8 +262,8 @@
           emailHelp.className = 'helper';
           return;
         }
-        const ok = isValidEmail(val);
-        setValid(emailInput, emailHelp, ok, 'Looks good.', 'Enter a valid email.');
+        const ok = isValidIdentifier(val);
+        setValid(emailInput, emailHelp, ok, 'Looks good.', 'Enter a valid email or US phone.');
       });
 
       passwordInput.addEventListener('input', ()=>{
@@ -275,24 +275,35 @@
           return;
         }
         const ok = isStrongPassword(val);
-        setValid(passwordInput, passwordHelp, ok, 'Strong enough.', 'Use at least 8 characters.');
+        setValid(passwordInput, passwordHelp, ok, 'Strong enough.', 'Use at least 6 characters.');
       });
 
       form.addEventListener('submit', async (e)=>{
         e.preventDefault();
         hideError();
         try{
-          const email = emailInput.value.trim();
+          const identifier = emailInput.value.trim();
           const password = passwordInput.value.trim();
-          if (!email || !password) { showError('Enter email and password.'); return; }
-          // Validate before submit
-          const emailOk = isValidEmail(email);
+          if (!identifier || !password) { showError('Enter email or phone and password.'); return; }
+          const idOk = isValidIdentifier(identifier);
           const passOk = isStrongPassword(password);
-          setValid(emailInput, emailHelp, emailOk, 'Looks good.', 'Enter a valid email.');
-          setValid(passwordInput, passwordHelp, passOk, 'Strong enough.', 'Use at least 8 characters.');
-          if (!emailOk || !passOk) { return; }
-          const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+          setValid(emailInput, emailHelp, idOk, 'Looks good.', 'Enter a valid email or US phone.');
+          setValid(passwordInput, passwordHelp, passOk, 'Strong enough.', 'Use at least 6 characters.');
+          if (!idOk || !passOk) { return; }
+
+          const { data: signData, error: signErr } = await window.sb.functions.invoke('auth-signin', {
+            body: { identifier, password },
+          });
+          if (signData && signData.error) throw new Error(signData.error);
+          if (signErr) throw signErr;
+          const session = signData?.session;
+          if (!session?.access_token || !session?.refresh_token) throw new Error('Sign-in failed.');
+          const { error } = await window.sb.auth.setSession({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+          });
           if (error) throw error;
+
           approveBtn.style.display = 'inline-block';
           hint.textContent = 'Signed in. Tap "Approve and Send" to finish.';
           haptic([10]);

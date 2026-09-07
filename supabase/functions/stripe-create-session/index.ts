@@ -129,6 +129,45 @@ serve(async (req: any) => {
     return badRequest("Missing success_url/cancel_url/items");
   }
 
+  // Ban / account checks + Stripe customer attachment
+  let stripeCustomerId: string | null = null;
+  const hintUserId = payload?.customer_hint?.user_id ? String(payload.customer_hint.user_id) : "";
+  if (hintUserId && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, phone, phone_verified, active, stripe_customer_id, is_admin")
+        .eq("id", hintUserId)
+        .maybeSingle();
+
+      if (profile) {
+        if (profile.active === false) {
+          return badRequest("This account cannot checkout.", 403);
+        }
+        if (!profile.is_admin && !profile.phone_verified) {
+          return badRequest("Phone not verified. Finish signup before checkout.", 403);
+        }
+        if (profile.phone) {
+          const { data: banned } = await supabase
+            .from("banned_identifiers")
+            .select("id")
+            .eq("type", "phone")
+            .eq("value", profile.phone)
+            .maybeSingle();
+          if (banned) {
+            return badRequest("This account cannot checkout.", 403);
+          }
+        }
+        if (profile.stripe_customer_id) {
+          stripeCustomerId = String(profile.stripe_customer_id);
+        }
+      }
+    } catch (e) {
+      console.error("Checkout ban/customer check failed", e);
+    }
+  }
+
   // Transform items into Stripe line_items with price_data
   const form = new URLSearchParams();
   form.set("mode", "payment");
@@ -139,6 +178,10 @@ serve(async (req: any) => {
   } else {
     form.set("success_url", success_url);
     form.set("cancel_url", cancel_url);
+  }
+
+  if (stripeCustomerId) {
+    form.set("customer", stripeCustomerId);
   }
 
   const meta: Record<string, string> = {};

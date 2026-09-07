@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css" />
   <style>
     .admin-wrap {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 24px 16px;
     }
@@ -46,7 +46,7 @@
       padding: 10px 12px;
       border-bottom: 1px solid #f3f4f6;
       text-align: left;
-      font-size: 14px;
+      font-size: 13px;
       vertical-align: middle;
     }
 
@@ -71,6 +71,9 @@
     .pill-l2 { background: #ffedd5; color: #9a3412; }
     .pill-l3 { background: #fee2e2; color: #991b1b; }
     .pill-off { background: #f3f4f6; color: #6b7280; }
+    .pill-ok { background: #dcfce7; color: #166534; }
+    .pill-warn { background: #fef3c7; color: #92400e; }
+    .pill-ban { background: #fee2e2; color: #991b1b; }
 
     .btn {
       border: 1px solid #d1d5db;
@@ -79,10 +82,12 @@
       padding: 6px 10px;
       cursor: pointer;
       font: inherit;
+      font-size: 12px;
     }
 
     .btn:hover { background: #f9fafb; }
     .btn:disabled { opacity: 0.55; cursor: default; }
+    .btn-danger { border-color: #fca5a5; color: #991b1b; }
 
     .search {
       border: 1px solid #d1d5db;
@@ -113,23 +118,42 @@
       color: #6b7280;
       margin: 0 0 12px;
     }
-  </style>
-</head>
 
-<body class="refunds-standalone">
-  <style>
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 28px 0 10px;
+    }
+
+    .ban-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .ban-form input, .ban-form select {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font: inherit;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
     body.refunds-standalone {
       background: #f3f3f3;
       min-height: 100vh;
     }
-
-    .admin-wrap {
-      max-width: 1200px;
-      width: 100%;
-      padding: 24px 16px;
-      margin: 0 auto;
-    }
   </style>
+</head>
+
+<body class="refunds-standalone">
   <div class="admin-wrap">
     <div class="admin-title">
       <a class="btn" href="index.html"
@@ -141,7 +165,7 @@
 
     <div class="session-toolbar">
       <button id="refresh" class="btn">Refresh</button>
-      <input id="search" class="search" type="search" placeholder="Filter by name or email…" />
+      <input id="search" class="search" type="search" placeholder="Filter by name, email, or phone…" />
       <span class="muted" id="status">—</span>
     </div>
 
@@ -151,18 +175,48 @@
           <tr>
             <th>Name</th>
             <th>Email</th>
+            <th>Phone</th>
+            <th>Verified</th>
+            <th>Stripe</th>
             <th>Signed Up</th>
-            <th>Logins</th>
-            <th>Last Login</th>
             <th>Status</th>
             <th>Role / Level</th>
-            <th>Allergy Warnings</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="tbody">
           <tr>
-            <td colspan="8" class="muted">Loading…</td>
+            <td colspan="9" class="muted">Loading…</td>
           </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Banned identifiers</h2>
+    <p class="hint">Ban a phone or card fingerprint. Only that identifier is blocked — other users are unaffected.</p>
+    <div class="ban-form">
+      <select id="ban-type">
+        <option value="phone">phone</option>
+        <option value="card_fingerprint">card_fingerprint</option>
+      </select>
+      <input id="ban-value" type="text" placeholder="Value (E.164 phone or fingerprint)" style="min-width:260px;" />
+      <input id="ban-reason" type="text" placeholder="Reason (optional)" style="min-width:180px;" />
+      <button id="ban-add" class="btn btn-danger">Add ban</button>
+      <span class="muted" id="ban-status"></span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="session-grid">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Value</th>
+            <th>Reason</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ban-tbody">
+          <tr><td colspan="5" class="muted">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -178,6 +232,8 @@
     })[c]);
 
     let allUsers = [];
+    let allBans = [];
+    let fingerprintByUser = {};
     let myLevel = 0;
     let myId = null;
 
@@ -196,7 +252,25 @@
       el('level-hint').textContent = myLevel >= 3
         ? 'You are Admin L3 — you can grant or change admin levels below.'
         : `You are Admin L${myLevel}. Only Admin L3 can change levels.`;
-      loadUsers();
+      await Promise.all([loadUsers(), loadBans(), loadFingerprints()]);
+    }
+
+    async function loadFingerprints() {
+      try {
+        const { data, error } = await window.sb
+          .from('user_card_fingerprints')
+          .select('user_id, fingerprint, last_seen_at')
+          .order('last_seen_at', { ascending: false });
+        if (error) throw error;
+        fingerprintByUser = {};
+        (data || []).forEach((row) => {
+          if (!fingerprintByUser[row.user_id]) fingerprintByUser[row.user_id] = [];
+          fingerprintByUser[row.user_id].push(row.fingerprint);
+        });
+      } catch (e) {
+        console.warn('fingerprints load', e);
+        fingerprintByUser = {};
+      }
     }
 
     async function loadUsers() {
@@ -205,7 +279,7 @@
       try {
         const { data, error } = await window.sb
           .from('profiles')
-          .select('id, display_name, email, created_at, active, is_admin, admin_level, show_allergy_caution, login_count, last_login_at')
+          .select('id, display_name, email, phone, phone_verified, stripe_customer_id, created_at, active, is_admin, admin_level, show_allergy_caution, login_count, last_login_at, date_of_birth')
           .order('created_at', { ascending: false });
         if (error) throw error;
         allUsers = Array.isArray(data) ? data : [];
@@ -213,8 +287,23 @@
         status.textContent = allUsers.length + ' user' + (allUsers.length === 1 ? '' : 's');
       } catch (e) {
         console.error(e);
-        el('tbody').innerHTML = '<tr><td colspan="8" class="muted">Error loading users.</td></tr>';
+        el('tbody').innerHTML = '<tr><td colspan="9" class="muted">Error loading users.</td></tr>';
         status.textContent = 'Error: ' + (e.message || e);
+      }
+    }
+
+    async function loadBans() {
+      try {
+        const { data, error } = await window.sb
+          .from('banned_identifiers')
+          .select('id, type, value, reason, created_at')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        allBans = Array.isArray(data) ? data : [];
+        renderBans();
+      } catch (e) {
+        console.error(e);
+        el('ban-tbody').innerHTML = '<tr><td colspan="5" class="muted">Error loading bans.</td></tr>';
       }
     }
 
@@ -230,36 +319,55 @@
         </select>`;
     }
 
+    function isPhoneBanned(phone) {
+      if (!phone) return false;
+      return allBans.some((b) => b.type === 'phone' && b.value === phone);
+    }
+
     function render() {
       const q = (el('search').value || '').trim().toLowerCase();
       const rows = q
         ? allUsers.filter(u =>
           (u.email || '').toLowerCase().includes(q) ||
-          (u.display_name || '').toLowerCase().includes(q))
+          (u.display_name || '').toLowerCase().includes(q) ||
+          (u.phone || '').toLowerCase().includes(q))
         : allUsers;
 
       const tb = el('tbody');
       if (!rows.length) {
-        tb.innerHTML = '<tr><td colspan="8" class="muted">No users found.</td></tr>';
+        tb.innerHTML = '<tr><td colspan="9" class="muted">No users found.</td></tr>';
         return;
       }
 
       tb.innerHTML = rows.map(u => {
         const created = u.created_at ? new Date(u.created_at).toLocaleString() : '—';
-        const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—';
-        const logins = Number.isFinite(Number(u.login_count)) ? Number(u.login_count) : 0;
         const name = u.display_name ? esc(u.display_name) : '<span class="muted">(no name)</span>';
         const active = u.active === false
           ? '<span class="pill pill-off">Inactive</span>'
           : '<span class="pill">Active</span>';
-        const allergy = u.show_allergy_caution === false ? 'Off' : 'On';
+        const verified = u.phone_verified
+          ? '<span class="pill pill-ok">Yes</span>'
+          : '<span class="pill pill-warn">No</span>';
+        const banned = isPhoneBanned(u.phone)
+          ? ' <span class="pill pill-ban">Banned</span>'
+          : '';
+        const fps = fingerprintByUser[u.id] || [];
+        const banPhoneBtn = u.phone
+          ? `<button class="btn btn-danger" data-action="ban-phone" data-phone="${esc(u.phone)}">Ban phone</button>`
+          : '';
+        const toggleActive = `<button class="btn" data-action="toggle-active" data-user-id="${esc(u.id)}" data-active="${u.active === false ? '0' : '1'}">${u.active === false ? 'Activate' : 'Deactivate'}</button>`;
+        const banFpBtns = fps.slice(0, 3).map((fp) =>
+          `<button class="btn btn-danger" data-action="ban-fp" data-fp="${esc(fp)}" title="${esc(fp)}">Ban card</button>`
+        ).join('');
+
         return `
           <tr data-user-id="${esc(u.id)}">
             <td>${name}</td>
-            <td class="nowrap">${esc(u.email) || '<span class="muted">(no email)</span>'}</td>
+            <td class="nowrap">${esc(u.email) || '<span class="muted">—</span>'}</td>
+            <td class="nowrap">${esc(u.phone) || '<span class="muted">—</span>'}${banned}</td>
+            <td>${verified}</td>
+            <td class="nowrap muted" title="${esc(u.stripe_customer_id || '')}">${u.stripe_customer_id ? esc(String(u.stripe_customer_id).slice(0, 14)) + '…' : '—'}</td>
             <td class="nowrap muted">${esc(created)}</td>
-            <td class="nowrap">${logins}</td>
-            <td class="nowrap muted">${esc(lastLogin)}</td>
             <td>${active}</td>
             <td>
               <div class="role-cell">
@@ -267,9 +375,32 @@
                 ${levelControls(u)}
               </div>
             </td>
-            <td class="muted">${allergy}</td>
+            <td>
+              <div class="actions">
+                ${toggleActive}
+                ${banPhoneBtn}
+                ${banFpBtns}
+              </div>
+            </td>
           </tr>`;
       }).join('');
+    }
+
+    function renderBans() {
+      const tb = el('ban-tbody');
+      if (!allBans.length) {
+        tb.innerHTML = '<tr><td colspan="5" class="muted">No bans yet.</td></tr>';
+        return;
+      }
+      tb.innerHTML = allBans.map((b) => `
+        <tr>
+          <td><span class="pill">${esc(b.type)}</span></td>
+          <td class="nowrap">${esc(b.value)}</td>
+          <td class="muted">${esc(b.reason) || '—'}</td>
+          <td class="nowrap muted">${b.created_at ? esc(new Date(b.created_at).toLocaleString()) : '—'}</td>
+          <td><button class="btn" data-action="unban" data-type="${esc(b.type)}" data-value="${esc(b.value)}">Remove</button></td>
+        </tr>
+      `).join('');
     }
 
     async function onLevelChange(select) {
@@ -304,11 +435,88 @@
       }
     }
 
-    el('refresh').addEventListener('click', loadUsers);
+    async function banIdentifier(type, value, reason) {
+      const { error } = await window.sb.rpc('ban_identifier', {
+        p_type: type,
+        p_value: value,
+        p_reason: reason || null,
+      });
+      if (error) throw error;
+      await Promise.all([loadBans(), loadUsers()]);
+    }
+
+    el('refresh').addEventListener('click', async () => {
+      await Promise.all([loadUsers(), loadBans(), loadFingerprints()]);
+    });
     el('search').addEventListener('input', render);
     el('tbody').addEventListener('change', (e) => {
       const sel = e.target.closest('select.level-select');
       if (sel) onLevelChange(sel);
+    });
+
+    el('tbody').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      try {
+        if (action === 'ban-phone') {
+          const phone = btn.getAttribute('data-phone');
+          if (!confirm('Ban phone ' + phone + '? Matching accounts will be deactivated.')) return;
+          await banIdentifier('phone', phone, 'Banned from admin users');
+        } else if (action === 'ban-fp') {
+          const fp = btn.getAttribute('data-fp');
+          if (!confirm('Ban card fingerprint ' + fp + '?')) return;
+          await banIdentifier('card_fingerprint', fp, 'Banned from admin users');
+        } else if (action === 'toggle-active') {
+          const userId = btn.getAttribute('data-user-id');
+          const makeActive = btn.getAttribute('data-active') === '0';
+          const { data, error } = await window.sb.rpc('set_profile_active', {
+            target_user_id: userId,
+            make_active: makeActive,
+          });
+          if (error) throw error;
+          const updated = Array.isArray(data) ? data[0] : data;
+          const idx = allUsers.findIndex((u) => u.id === userId);
+          if (idx >= 0 && updated) allUsers[idx].active = updated.active;
+          render();
+        }
+      } catch (err) {
+        alert(err.message || 'Action failed');
+      }
+    });
+
+    el('ban-tbody').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-action="unban"]');
+      if (!btn) return;
+      try {
+        const { error } = await window.sb.rpc('unban_identifier', {
+          p_type: btn.getAttribute('data-type'),
+          p_value: btn.getAttribute('data-value'),
+        });
+        if (error) throw error;
+        await Promise.all([loadBans(), loadUsers()]);
+      } catch (err) {
+        alert(err.message || 'Failed to remove ban');
+      }
+    });
+
+    el('ban-add').addEventListener('click', async () => {
+      const type = el('ban-type').value;
+      const value = (el('ban-value').value || '').trim();
+      const reason = (el('ban-reason').value || '').trim();
+      if (!value) {
+        el('ban-status').textContent = 'Enter a value.';
+        return;
+      }
+      el('ban-status').textContent = 'Saving…';
+      try {
+        await banIdentifier(type, value, reason || null);
+        el('ban-value').value = '';
+        el('ban-reason').value = '';
+        el('ban-status').textContent = 'Banned.';
+      } catch (e) {
+        el('ban-status').textContent = e.message || 'Failed';
+      }
     });
 
     boot();

@@ -128,7 +128,7 @@ exec "$CHROME" \
   --disable-infobars \
   --disable-session-crashed-bubble \
   --disable-restore-session-state \
-  --disable-features=TranslateUI,PasswordManagerOnboarding,AutofillServerCommunication \
+  --disable-features=TranslateUI,PasswordManagerOnboarding,AutofillServerCommunication,PasswordManager,AutofillEnableAccountWalletStorage,PasswordImport,BiometricAuthenticationForFilling,AutofillAddressProfileSavePrompt \
   --disable-translate \
   --disable-notifications \
   --disable-component-update \
@@ -141,6 +141,7 @@ exec "$CHROME" \
   --disable-domain-reliability \
   --disable-client-side-phishing-detection \
   --disable-save-password-bubble \
+  --disable-autofill-keyboard-accessory-view \
   --password-store=basic \
   --no-first-run \
   --no-default-browser-check \

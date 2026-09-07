@@ -30,7 +30,6 @@ body.signin.focus-password .email-field {
     margin-bottom: 0;
     opacity: 0;
     overflow: hidden;
-    pointer-events: none;
 }
 
 /* Back button (category view) */
@@ -1569,6 +1568,9 @@ body.signin.keyboard-visible .auth-wrapper {
 }
 
 /* --- Inactivity presence check --- */
+.presence-overlay--above-otp {
+    z-index: 100001 !important;
+}
 .presence-modal .presence-countdown {
     margin-top: 14px;
     font-size: 15px;
@@ -2103,6 +2105,34 @@ body.signin.keyboard-visible .auth-wrapper {
 
     .vk-preview--wide {
         font-size: 18px;
+    }
+}
+
+/* Tighter virtual keyboard for 10.1" / 600px-tall kiosk panels */
+@media (max-height: 640px) {
+    .vk {
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    }
+
+    .vk-keys {
+        gap: 7px;
+    }
+
+    .vk-row {
+        gap: 7px;
+    }
+
+    .vk-key {
+        padding: 10px 0;
+        font-size: 15px;
+        border-radius: 10px;
+        min-height: 40px;
+    }
+
+    .vk-preview {
+        min-width: 48px;
+        padding: 6px 10px;
+        font-size: 22px;
     }
 }
 

@@ -64,10 +64,13 @@ serve(async (req: any) => {
 
     console.log(`Processing checkout.session.completed for ${sessionId}`);
 
-    // Fetch full session with line_items to ensure we have all data securely
-    const res = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(sessionId)}?expand[]=line_items`, {
-      headers: { "authorization": `Bearer ${STRIPE_SECRET_KEY}` },
-    });
+    // Fetch full session with line_items + payment_intent.payment_method for card fingerprint
+    const expand =
+      "expand[]=line_items&expand[]=payment_intent&expand[]=payment_intent.payment_method";
+    const res = await fetch(
+      `${STRIPE_API}/checkout/sessions/${encodeURIComponent(sessionId)}?${expand}`,
+      { headers: { "authorization": `Bearer ${STRIPE_SECRET_KEY}` } },
+    );
     if (!res.ok) {
       console.error(`Failed to fetch session ${sessionId}: ${res.status}`);
       return badRequest('Failed to fetch session from Stripe', 502);
@@ -77,6 +80,26 @@ serve(async (req: any) => {
     // Extract Metadata
     const userId = session.metadata?.user_id;
     const userEmail = session.metadata?.user_email || session.customer_details?.email || session.customer_email;
+
+    // Resolve card fingerprint from PaymentMethod
+    let cardFingerprint: string | null = null;
+    try {
+      const pi = session.payment_intent;
+      const pm = typeof pi === "object" && pi ? pi.payment_method : null;
+      if (pm && typeof pm === "object" && pm.card?.fingerprint) {
+        cardFingerprint = String(pm.card.fingerprint);
+      } else if (typeof pm === "string" && pm) {
+        const pmRes = await fetch(`${STRIPE_API}/payment_methods/${encodeURIComponent(pm)}`, {
+          headers: { authorization: `Bearer ${STRIPE_SECRET_KEY}` },
+        });
+        if (pmRes.ok) {
+          const pmData = await pmRes.json();
+          if (pmData?.card?.fingerprint) cardFingerprint = String(pmData.card.fingerprint);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not resolve card fingerprint", e);
+    }
     
     if (!userId) {
       console.warn(`No user_id in session metadata for ${sessionId}. Skipping receipt save.`);
@@ -139,6 +162,57 @@ serve(async (req: any) => {
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+      // Card fingerprint ban → auto-refund + flag receipt
+      let fraudStatus = "ok";
+      if (cardFingerprint) {
+        const { data: bannedCard } = await supabase
+          .from("banned_identifiers")
+          .select("id")
+          .eq("type", "card_fingerprint")
+          .eq("value", cardFingerprint)
+          .maybeSingle();
+
+        if (bannedCard) {
+          fraudStatus = "blocked_refunded";
+          try {
+            let paymentIntentId =
+              typeof session.payment_intent === "string"
+                ? session.payment_intent
+                : session.payment_intent?.id;
+            if (paymentIntentId) {
+              const rf = new URLSearchParams();
+              rf.set("payment_intent", paymentIntentId);
+              const rRes = await fetch(`${STRIPE_API}/refunds`, {
+                method: "POST",
+                headers: {
+                  authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+                  "content-type": "application/x-www-form-urlencoded",
+                },
+                body: rf,
+              });
+              if (!rRes.ok) {
+                const text = await rRes.text().catch(() => "");
+                console.error("Auto-refund failed for banned fingerprint:", rRes.status, text);
+              } else {
+                console.log(`Auto-refunded banned card fingerprint on session ${sessionId}`);
+              }
+            }
+          } catch (e) {
+            console.error("Auto-refund error", e);
+          }
+        } else {
+          // Store fingerprint against user for future admin bans
+          await supabase.from("user_card_fingerprints").upsert(
+            {
+              user_id: userId,
+              fingerprint: cardFingerprint,
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,fingerprint" },
+          );
+        }
+      }
+
       // A. Upsert Receipt
       const { data: receipt, error: receiptError } = await supabase
         .from('receipts')
@@ -148,6 +222,8 @@ serve(async (req: any) => {
           currency: currency,
           amount_total_cents: amountTotal,
           items: itemsForJson,
+          card_fingerprint: cardFingerprint,
+          fraud_status: fraudStatus,
           created_at: new Date().toISOString()
         }, { onConflict: 'session_id' })
         .select()
@@ -174,31 +250,33 @@ serve(async (req: any) => {
         }
       }
 
-      // 5. Send Email
-      // We can invoke the send-checkout-email function
-      // Or just call it directly if we want to bundle logic, but invoking is cleaner separation.
-      try {
-        await fetch(`${SUPABASE_URL}/functions/v1/send-checkout-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            receipt_id: receiptId,
-            user_email: userEmail,
-            items: itemsForJson,
-            total_cents: amountTotal,
-            currency: currency
-          })
-        });
-        console.log(`Email trigger sent for receipt ${receiptId}`);
-      } catch (e) {
-        console.error('Failed to trigger email function:', e);
+      // 5. Send Email (skip for blocked/refunded fraud)
+      if (fraudStatus === "ok") {
+        try {
+          await fetch(`${SUPABASE_URL}/functions/v1/send-checkout-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              receipt_id: receiptId,
+              user_email: userEmail,
+              items: itemsForJson,
+              total_cents: amountTotal,
+              currency: currency
+            })
+          });
+          console.log(`Email trigger sent for receipt ${receiptId}`);
+        } catch (e) {
+          console.error('Failed to trigger email function:', e);
+        }
+      } else {
+        console.log(`Skipped checkout email for fraud-blocked receipt ${receiptId}`);
       }
       
-      return success({ received: true, receipt_id: receiptId });
+      return success({ received: true, receipt_id: receiptId, fraud_status: fraudStatus });
     } else {
       console.error('Supabase credentials missing');
       return badRequest('Server configuration error', 500);

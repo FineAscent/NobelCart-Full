@@ -51,12 +51,19 @@ function ensureModalRoot() {
 }
 
 // ---- Lightweight modal for presence check (are you still there?) ----
-function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm here", countdownSec = 0, onConfirm, onRender } = {}) {
+function showPresenceModal({
+  message = 'Are you still there?',
+  buttonText = "I'm here",
+  countdownSec = 0,
+  aboveOtp = false,
+  onConfirm,
+  onRender,
+} = {}) {
   ensureModalRoot();
   const root = document.querySelector('#modal-root');
   if (!root) return null;
   const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay presence-overlay';
+  overlay.className = 'modal-overlay presence-overlay' + (aboveOtp ? ' presence-overlay--above-otp' : '');
   const modal = document.createElement('div');
   modal.className = 'modal presence-modal';
   const safeMsg = String(message).replace(/</g, '&lt;');
@@ -65,7 +72,7 @@ function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm
     <div class="modal-header">Still there?</div>
     <div class="modal-body">
       <div class="modal-product">${safeMsg}</div>
-      ${countdownSec > 0 ? `<div class="presence-countdown" aria-live="polite">Signing out in <strong>${countdownSec}</strong>s</div>` : ''}
+      ${countdownSec > 0 ? `<div class="presence-countdown" aria-live="polite">Continuing in <strong>${countdownSec}</strong>s if no response</div>` : ''}
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary presence-ok">${safeBtn}</button>
@@ -94,7 +101,16 @@ function showPresenceModal({ message = 'Are you still there?', buttonText = "I'm
     if (tick) { clearInterval(tick); tick = null; }
     try { root.removeChild(overlay); } catch (_) { }
   };
-  if (btnOk) btnOk.addEventListener('click', () => { try { onConfirm && onConfirm(); } finally { close(); } });
+  if (btnOk) btnOk.addEventListener('click', (e) => {
+    try { e.stopPropagation(); } catch (_) { }
+    try { onConfirm && onConfirm(); } finally { close(); }
+  });
+  // Clicks on the dimmed backdrop should not count as "I'm here"
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      try { e.stopPropagation(); } catch (_) { }
+    }
+  });
   if (onRender) { try { onRender({ close, overlay, modal }); } catch (_) { } }
   return { close, overlay, modal };
 }
@@ -1934,19 +1950,29 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     const isAdminPath = /(^|\/)admin\//.test(location.pathname);
     const isAdminMode = new URLSearchParams(window.location.search).has('admin');
+    const isAttractPage = /image\.html$/i.test(location.pathname);
 
-    if (!isAdminPath && !isAdminMode) {
+    if (!isAdminPath && !isAdminMode && !isAttractPage) {
       let idleTimer = null;
       let graceTimer = null;
       let presenceShown = false;
       let presenceHandle = null;
       let isUserSignedIn = false;
 
-      // Signed-in: warn after 5 min with no input, then log out if still idle.
-      // Guest: shorter idle loop back to the attract screen (unchanged).
+      // Idle → "Still there?" popup. No response for 30s → clear storage + attract loop.
+      // Attract loop (image.html) only starts after that — not on first idle tick.
       const AUTH_IDLE_MS = 5 * 60 * 1000;
-      const AUTH_GRACE_MS = 60 * 1000;
       const GUEST_IDLE_MS = 3 * 60 * 1000;
+      const PRESENCE_GRACE_MS = 30 * 1000;
+
+      const isOtpOpen = () => {
+        try {
+          if (document.body.classList.contains('otp-open')) return true;
+          const ov = document.getElementById('otp-overlay');
+          if (ov && ov.style.display && ov.style.display !== 'none') return true;
+        } catch (_) { }
+        return false;
+      };
 
       const clearPresence = () => {
         if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
@@ -1957,72 +1983,93 @@ document.addEventListener('DOMContentLoaded', () => {
         presenceShown = false;
       };
 
-      const signOutForInactivity = async () => {
+      const preserveCartId = () => {
+        let id = '';
+        try {
+          if (typeof window.ncCartId === 'function') id = String(window.ncCartId() || '');
+        } catch (_) { }
+        if (!id) {
+          try { id = localStorage.getItem('nc_cart_id') || ''; } catch (_) { }
+        }
+        if (!id) {
+          try { id = new URLSearchParams(location.search).get('cart') || ''; } catch (_) { }
+        }
+        return cleanCartId(id);
+      };
+
+      const hardResetSession = async () => {
+        const cartId = preserveCartId();
         try { await clearActiveSession(); } catch (_) { }
-        try { localStorage.removeItem('nc_cart_v1'); } catch (_) { }
-        try { sessionStorage.clear(); } catch (_) { }
         if (window.sb) {
           try { await window.sb.auth.signOut({ scope: 'local' }); } catch (_) { }
         }
-        window.location.href = withCart('signin.html');
+        try { localStorage.clear(); } catch (_) { }
+        try { sessionStorage.clear(); } catch (_) { }
+        if (cartId) {
+          try { localStorage.setItem('nc_cart_id', cartId); } catch (_) { }
+          try { sessionStorage.setItem('nc_cart_id', cartId); } catch (_) { }
+        }
+        window.location.href = withCart('image.html');
+      };
+
+      const showIdlePresence = () => {
+        if (presenceShown) return;
+        presenceShown = true;
+        const otpOpen = isOtpOpen();
+        const graceSec = Math.round(PRESENCE_GRACE_MS / 1000);
+        presenceHandle = showPresenceModal({
+          message: otpOpen
+            ? 'Are you still there? Your verification stays open — tap below to keep going.'
+            : 'Are you still there? Tap below to keep shopping.',
+          buttonText: "I'm here",
+          countdownSec: graceSec,
+          aboveOtp: otpOpen,
+          onConfirm: () => {
+            // Do not close OTP / summary overlays — only dismiss this prompt.
+            presenceHandle = null;
+            presenceShown = false;
+            if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+            resetIdleTimer({ keepPresence: true });
+          },
+        });
+
+        if (!presenceHandle) {
+          const confirmed = window.confirm('Are you still there?');
+          if (confirmed) {
+            presenceShown = false;
+            resetIdleTimer({ keepPresence: true });
+          } else {
+            hardResetSession();
+          }
+          return;
+        }
+
+        graceTimer = setTimeout(() => {
+          if (!presenceShown) return;
+          clearPresence();
+          hardResetSession();
+        }, PRESENCE_GRACE_MS);
       };
 
       const handleIdleTimeout = () => {
-        if (isUserSignedIn) {
-          presenceShown = true;
-          const graceSec = Math.round(AUTH_GRACE_MS / 1000);
-          presenceHandle = showPresenceModal({
-            message: 'No activity for 5 minutes. Tap below to stay signed in, or you will be signed out.',
-            buttonText: "I'm still here",
-            countdownSec: graceSec,
-            onConfirm: () => {
-              clearPresence();
-              resetIdleTimer();
-            },
-          });
-
-          if (!presenceHandle) {
-            const confirmed = window.confirm('No activity for 5 minutes. Stay signed in?');
-            if (confirmed) {
-              clearPresence();
-              resetIdleTimer();
-            } else {
-              signOutForInactivity();
-            }
-            return;
-          }
-
-          graceTimer = setTimeout(() => {
-            if (!presenceShown) return;
-            clearPresence();
-            signOutForInactivity();
-          }, AUTH_GRACE_MS);
-
-        } else {
-          // Guest: back to the idle attract loop (no prompt)
-          window.location.href = withCart('image.html');
-        }
+        showIdlePresence();
       };
 
-      const resetIdleTimer = () => {
-        clearPresence();
+      const resetIdleTimer = (opts) => {
+        if (!opts?.keepPresence) clearPresence();
         if (idleTimer) clearTimeout(idleTimer);
         const timeout = isUserSignedIn ? AUTH_IDLE_MS : GUEST_IDLE_MS;
         idleTimer = setTimeout(handleIdleTimeout, timeout);
       };
 
-      // Any real input resets the idle clock. While the warning is up, ignore
-      // mouse-move / scroll / focus noise so the modal does not vanish by itself.
+      // While the presence prompt is up, only the "I'm here" button confirms.
+      // Ignore background activity so the OTP sheet (and everything under it) stays put.
       const onActivity = (e) => {
-        if (presenceShown && (e.type === 'mousemove' || e.type === 'scroll' || e.type === 'focus')) {
-          return;
-        }
+        if (presenceShown) return;
         resetIdleTimer();
       };
 
       const initMonitor = async () => {
-        // Check auth status
-        // Check auth status & subscribe to changes
         if (window.sb) {
           try {
             const { data } = await window.sb.auth.getSession();
@@ -2031,9 +2078,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isUserSignedIn = false;
           }
 
-          // Listen for dynamic auth changes (e.g. late hydration)
           window.sb.auth.onAuthStateChange((event, session) => {
-            // Delink this cart from the user on sign-out
             if (event === 'SIGNED_OUT' && CART_ID && window.sb) {
               try {
                 const waitId = __checkoutWait && __checkoutWait.requestId;
@@ -2044,18 +2089,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const wasSignedIn = isUserSignedIn;
-
-            // Check if we are on an auth page
             const isAuthPage = location.pathname.includes('signin.html') || location.pathname.includes('create-account.html');
 
             if (isAuthPage) {
-              // Always treat as guest on signin pages to ensure idle loop works (3 mins)
               isUserSignedIn = false;
             } else {
-              // Normal behavior
               isUserSignedIn = !!session;
-
-              // Sync user preferences if signed in
               if (isUserSignedIn && window.sb) {
                 window.sb.from('profiles')
                   .select('show_allergy_caution')
@@ -2067,25 +2106,20 @@ document.addEventListener('DOMContentLoaded', () => {
                       localStorage.setItem('nc_show_allergy_info', val ? 'true' : 'false');
                     }
                   })
-                  .catch(() => { }); // silent fail
+                  .catch(() => { });
               }
             }
 
-            // If state actually changed, reset timer immediately to apply new policy
             if (wasSignedIn !== isUserSignedIn) {
-              console.debug('Inactivity monitor: Auth state changed to', isUserSignedIn ? 'signed-in' : 'guest');
               resetIdleTimer();
             }
           });
         }
 
-        // Force "not signed in" state on auth pages to ensure 3-minute idle loop
-        // prevents race conditions where session tracking might lag during sign-out
         const isAuthPage = location.pathname.includes('signin.html') || location.pathname.includes('create-account.html');
         if (isAuthPage) {
           isUserSignedIn = false;
         } else if (window.sb) {
-          // Initial sync on load (if not auth page)
           window.sb.auth.getSession().then(({ data }) => {
             if (data?.session?.user) {
               window.sb.from('profiles')
