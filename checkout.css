@@ -187,28 +187,10 @@ body.checkout .container {
     min-height: 0;
     overflow-y: auto;
     margin-bottom: 8px;
-    padding-right: 4px;
+    padding-right: 0;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     overscroll-behavior: contain;
-}
-
-.cart-items-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.cart-items-container::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.cart-items-container::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-.cart-items-container::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.18);
 }
 
 .checkout-footer {
@@ -251,7 +233,11 @@ body.checkout .container {
     text-align: center;
 }
 
-.cart-items {
+/* The outer container owns scrolling; avoid a second nested scroll surface. */
+.checkout-right .cart-items {
+    flex: none;
+    overflow: visible;
+    margin-bottom: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;

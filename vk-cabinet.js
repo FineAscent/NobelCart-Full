@@ -216,6 +216,9 @@
     ensureKeyboard();
     if (!vkEl) return;
     vkEl.style.display = 'block';
+    // Establish the hidden position before the first entrance transition.
+    if (!active) vkEl.getBoundingClientRect();
+    vkEl.classList.add('is-open');
     active = true;
     window.__vkActive = true;
   }
@@ -223,7 +226,8 @@
   function hide() {
     if (!vkEl) return;
     if (vkEl.__vkFeedback) vkEl.__vkFeedback.clear();
-    vkEl.style.display = 'none';
+    vkEl.classList.remove('is-open');
+    if (!document.body.classList.contains('search-morph')) vkEl.style.display = 'none';
     active = false;
     window.__vkActive = false;
   }
@@ -243,6 +247,17 @@
       show(searchInput);
     });
 
+    // Scrolling may hide the keyboard while the field still has focus.
+    searchInput.addEventListener('click', () => {
+      if (!active) show(searchInput);
+    });
+
+    // Nested pane scroll events do not bubble, so observe them in capture phase.
+    // Leave focus and the query intact; scrolling only dismisses the keyboard.
+    document.addEventListener('scroll', (event) => {
+      if (active && !event.target?.closest?.('.vk')) hide();
+    }, { capture: true, passive: true });
+
     // Hide VK when input loses focus (let site.js collapse it)
     searchInput.addEventListener('blur', () => {
       hide();
@@ -251,7 +266,7 @@
     // When the search icon is clicked, wait for site.js to toggle expansion, then decide
     // When the search icon is clicked, wait for site.js to toggle expansion, then decide
     document.addEventListener('click', (e) => {
-      const searchIcon = e.target.closest('.section-header .search-icon');
+      const searchIcon = e.target.closest('.section-header .search-toggle, .section-header .search-icon');
       if (searchIcon) {
         setTimeout(() => {
           const searchInput = document.querySelector('.section-header .search-input');

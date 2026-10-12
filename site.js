@@ -678,6 +678,14 @@ async function showProductOnPage(productId) {
 // Expose for debugging/console use
 window.showProductOnPage = showProductOnPage;
 
+// Capture also sees scrolls inside the product pane, cart, and virtual keyboard.
+function trackKioskActivity(onActivity) {
+  const events = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel',
+    'touchstart', 'touchmove', 'touchend', 'mousedown', 'mousemove', 'mouseup',
+    'click', 'dblclick', 'wheel', 'scroll', 'keydown', 'keyup', 'input', 'change', 'focus'];
+  events.forEach(type => document.addEventListener(type, onActivity, { passive: true, capture: true }));
+}
+
 // ---- Supabase Receipt & Checkout History ----
 // Fetch all receipts for the current user
 async function fetchUserReceipts({ limit = 50, offset = 0 } = {}) {
@@ -2137,8 +2145,7 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
-        const activityEvents = ['click', 'mousemove', 'keydown', 'touchstart', 'scroll', 'focus'];
-        activityEvents.forEach(ev => window.addEventListener(ev, onActivity, { passive: true, capture: true }));
+        trackKioskActivity(onActivity);
 
         resetIdleTimer();
       };
@@ -2224,43 +2231,91 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Add click functionality to search icon (category view)
-  // Search interactions
-  document.addEventListener('click', (e) => {
-    const searchIcon = e.target.closest('.search-icon');
-    const searchInput = document.querySelector('.search-input');
-    const sectionHeader = document.querySelector('.section-header');
-    const leftSection = document.querySelector('.left-section');
+  // Keep search state and focus in sync, including touch and keyboard dismissal.
+  const searchInput = document.querySelector('.section-header .search-input');
+  const searchContainer = searchInput?.closest('.search-container');
+  const searchHeader = searchInput?.closest('.section-header');
+  const searchSection = searchInput?.closest('.left-section');
+  const searchToggle = searchContainer?.querySelector('.search-toggle');
+  // Every page with this search header uses the same motion and dismissal behavior.
+  const animatedSearch = Boolean(searchInput && searchHeader);
+  if (animatedSearch) document.body.classList.add('search-morph');
+  const searchClose = searchContainer?.querySelector('.search-close');
 
-    if (searchIcon && searchInput && sectionHeader) {
-      searchInput.classList.toggle('expanded');
-      sectionHeader.classList.toggle('expanded');
-
-      if (leftSection) {
-        if (searchInput.classList.contains('expanded')) {
-          leftSection.classList.add('searching');
-          setTimeout(() => searchInput.focus(), 100);
-        } else {
-          leftSection.classList.remove('searching');
-        }
+  function setSearchOpen(open, restoreFocus = false) {
+    if (!searchInput || !searchHeader) return;
+    // Dismissing the keyboard or touching results must not hide an active query.
+    if (!open && searchInput.value.trim()) return;
+    searchInput.classList.toggle('expanded', open);
+    searchHeader.classList.toggle('expanded', open);
+    searchSection?.classList.toggle('searching', open);
+    if (animatedSearch) {
+      searchInput.tabIndex = open ? 0 : -1;
+      if (searchClose) {
+        searchClose.inert = !open;
+        searchClose.tabIndex = open ? 0 : -1;
       }
+      searchToggle?.setAttribute('aria-expanded', String(open));
+      searchToggle?.setAttribute('aria-label', open ? 'Close search' : 'Open search');
+      searchHeader.querySelectorAll('.back-btn, .tabbar').forEach(el => {
+        el.inert = open;
+      });
+    }
+    if (open) searchInput.focus({ preventScroll: true });
+    else {
+      searchInput.blur();
+      if (restoreFocus) searchToggle?.focus({ preventScroll: true });
+    }
+  }
+
+  const updateSearchLabels = () => {
+    const hasText = Boolean(searchInput?.value.trim());
+    searchClose?.setAttribute('aria-label', hasText ? 'Clear search' : 'Close search');
+    searchToggle?.setAttribute('aria-label', searchInput?.classList.contains('expanded')
+      ? (hasText ? 'Show search keyboard' : 'Close search') : 'Open search');
+  };
+  searchInput?.addEventListener('input', updateSearchLabels);
+  searchClose?.addEventListener('click', () => {
+    if (searchInput?.value) {
+      searchInput.value = '';
+      // Restore the selected category (or the cabinet sections) immediately.
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.focus({ preventScroll: true });
+    } else {
+      setSearchOpen(false, true);
     }
   });
 
-  // Collapse search when clicking outside
-  document.addEventListener('mousedown', (e) => {
-    const searchContainer = e.target.closest('.search-container');
-    const vkKeyboard = e.target.closest('.vk') || e.target.closest('#vk-cabinet');
-    const searchInput = document.querySelector('.search-input');
-    const sectionHeader = document.querySelector('.section-header');
-    const leftSection = document.querySelector('.left-section');
-
-    if (!searchContainer && !vkKeyboard && searchInput && searchInput.classList.contains('expanded')) {
-      searchInput.classList.remove('expanded');
-      if (sectionHeader) sectionHeader.classList.remove('expanded');
-      if (leftSection) leftSection.classList.remove('searching');
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.section-header .search-toggle, .section-header .search-icon')) {
+      setSearchOpen(Boolean(searchInput?.value.trim()) || !searchInput?.classList.contains('expanded'));
+      updateSearchLabels();
     }
   });
+
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('.search-container, .vk, #vk-cabinet') && searchInput?.classList.contains('expanded')) {
+      setSearchOpen(false);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && searchInput?.classList.contains('expanded')) {
+      setSearchOpen(false, true);
+    }
+  });
+
+  if (animatedSearch) {
+    searchInput?.addEventListener('vk:done', () => setSearchOpen(false, true));
+    searchHeader?.addEventListener('focusout', () => {
+      // Wait for focus to settle so tabbing between the input and toggle stays open.
+      queueMicrotask(() => {
+        if (searchInput.classList.contains('expanded') &&
+            !searchContainer.contains(document.activeElement) &&
+            !document.activeElement?.closest('.vk')) setSearchOpen(false);
+      });
+    });
+  }
 
   // Index page: bind to existing static category cards (preserve original look)
   if (document.body.classList.contains('index')) {
@@ -2376,43 +2431,44 @@ document.addEventListener('DOMContentLoaded', () => {
       tryLoadCabinetWithWait();
     }
 
-    // Category data load: fetch & render only selected category, wire search filter
-    if (isCategoryPage) {
-      const params = new URLSearchParams(window.location.search);
-      const cat = params.get('name');
-      const grid = document.querySelector('.products-grid');
+    // Both views search the available catalog; clearing restores the original view.
+    if (isCategoryPage || isCabinetPage) {
       const input = document.querySelector('.search-input');
-      let allCatItems = [];
-      (async () => {
-        if (!grid) return;
-        // Make sure Loading placeholder is visible immediately
-        grid.innerHTML = '<div class="product-card visible"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div></div></div>';
-        try {
-          const items = await fetchProducts({ availability: 'In Stock', limit: 200 });
-          allCatItems = items.filter(p => (p.category || '').trim() === (cat || '').trim());
-          await renderProductsToGrid(grid, allCatItems);
-          // wire live filtering
-          if (input) {
-            const applyFilter = () => {
-              const q = (input.value || '').trim().toLowerCase();
-              if (!q) {
-                renderProductsToGrid(grid, allCatItems);
-                return;
-              }
-              const filtered = allCatItems.filter(p =>
-                (p.name && p.name.toLowerCase().includes(q)) ||
-                (p.barcode && String(p.barcode).toLowerCase().includes(q))
-              );
-              renderProductsToGrid(grid, filtered);
-            };
-            input.addEventListener('input', debounce(applyFilter, 200));
-          }
-        } catch (e) {
-          console.error('Failed to load category products', e);
-          grid.innerHTML = '<div style="color:#b91c1c;">Failed to load products.</div>';
+      const section = document.querySelector('.left-section');
+      const header = section?.querySelector('.section-header');
+      const grid = isCategoryPage ? section?.querySelector('.products-grid') : null;
+      const cat = isCategoryPage ? new URLSearchParams(location.search).get('name') : '';
+      let catalogPromise;
+      const getCatalog = () => {
+        if (!catalogPromise) {
+          catalogPromise = fetchProducts({ availability: 'In Stock', limit: 1000 })
+            .catch(error => { catalogPromise = null; throw error; });
         }
-      })();
+        return catalogPromise;
+      };
+      const browseElements = section ? Array.from(section.children).filter(el => el !== header) : [];
+      const search = window.NobelCatalogSearch?.attach({
+        input, browseElements, anchor: header, currentCategory: cat,
+        getProducts: getCatalog, renderProducts: renderProductsToGrid
+      });
+      if (isCategoryPage && grid) {
+        grid.innerHTML = '<div class="product-card visible"><div class="product-info"><div class="product-image"></div><div class="product-name">Loading...</div></div></div>';
+        (async () => {
+          try {
+            const items = await getCatalog();
+            const categoryItems = items.filter(p =>
+              window.NobelCatalogSearch.normalize(p.category) === window.NobelCatalogSearch.normalize(cat));
+            if (categoryItems.length) await renderProductsToGrid(grid, categoryItems);
+            else grid.textContent = 'No products in this category.';
+            if (input?.value.trim()) search?.update();
+          } catch (e) {
+            console.error('Failed to load category products', e);
+            grid.textContent = 'Failed to load products. Please refresh.';
+          }
+        })();
+      }
     }
+
   }
 
   // Tab interactions (shared): toggle active state between left title and Cabinet
@@ -3099,13 +3155,9 @@ document.addEventListener('DOMContentLoaded', () => {
     inactivityTimer = setTimeout(revertView, INACTIVITY_LIMIT_MS);
   }
 
-  // Real interactions only — ignore mousemove/scroll noise so the timer means
-  // "no taps", matching kiosk use. Capture phase so stopPropagation cannot skip us.
-  const activityEvents = ['pointerdown', 'touchstart', 'mousedown', 'click', 'keydown'];
-  activityEvents.forEach((evt) => {
-    document.addEventListener(evt, () => {
-      if (isGridOrCategoryActive()) resetTimer();
-    }, { passive: true, capture: true });
+  // Every interaction, including momentum scrolling, renews the existing idle timeout.
+  trackKioskActivity(() => {
+    if (isGridOrCategoryActive()) resetTimer();
   });
 
   // Start/stop when index swaps between OpenSearch and the category grid.

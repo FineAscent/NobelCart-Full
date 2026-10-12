@@ -7,10 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cabinet</title>
   <script src="phone-gate.js"></script>
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=32" />
 </head>
 
-<body class="page-opacity-0">
+<body class="page-opacity-0 search-morph">
   <div class="container">
     <div class="left-section">
 
@@ -29,12 +29,19 @@
           </button>
         </div>
         <div class="search-container">
-          <input type="text" class="search-input" placeholder="Search products..." inputmode="none" readonly
+          <input id="cabinet-search" type="text" class="search-input" aria-label="Search products" tabindex="-1" placeholder="Search products..." inputmode="none" readonly
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
-          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button type="button" class="search-toggle" aria-label="Open search" aria-expanded="false" aria-controls="cabinet-search">
+          <svg aria-hidden="true" class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8"></circle>
             <path d="m21 21-4.35-4.35"></path>
           </svg>
+          </button>
+          <button type="button" class="search-close" aria-label="Close search" tabindex="-1" inert>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <path d="m7 7 10 10M17 7 7 17"></path>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -131,8 +138,9 @@
       }
     })();
   </script>
-  <script src="site.js?v=21"></script>
-  <script src="vk-cabinet.js"></script>
+  <script src="product-search.js?v=1"></script>
+  <script src="site.js?v=26"></script>
+  <script src="vk-cabinet.js?v=4"></script>
 </body>
 
 </html>
