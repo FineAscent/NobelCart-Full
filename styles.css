@@ -774,10 +774,10 @@ body.search-morph .section-header .tabbar {
 body.search-morph .left-section.searching .back-btn,
 body.search-morph .left-section.searching .tabbar {
     opacity: 0;
-    transform: translateY(-14px) scale(.94);
+    transform: translateY(-6px);
     pointer-events: none !important;
     visibility: hidden;
-    transition: opacity 180ms ease, transform 420ms var(--search-ease), visibility 0s 180ms;
+    transition: opacity 350ms ease, transform 650ms ease, visibility 0s 350ms;
 }
 
 body.search-morph .section-header .search-container {
@@ -789,14 +789,15 @@ body.search-morph .section-header .search-container {
     right: var(--search-inset);
     top: 50%;
     transform: translateY(-50%);
-    width: 44px !important;
+    width: calc(100% - 2 * var(--search-inset)) !important;
     height: 44px;
+    pointer-events: none;
     gap: 0;
     border-radius: 22px;
     background: transparent;
     box-shadow: 0 0 0 1px transparent;
     z-index: 10002;
-    transition: width 600ms var(--search-ease), background-color 300ms ease, box-shadow 300ms ease;
+    transition: background-color 400ms ease;
 }
 
 body.search-morph .left-section.searching .search-container {
@@ -848,8 +849,15 @@ body.search-morph .search-close {
     transition: background-color 180ms ease;
 }
 
-/* The left edge travels with the expanding shell; this carries the icon with it. */
-body.search-morph .search-toggle { left: 0; }
+/* Move only the icon on the compositor; the shell keeps a stable width. */
+body.search-morph .search-toggle {
+    left: 0;
+    pointer-events: auto;
+    transform: translateX(var(--search-travel, 0px));
+    transition: transform 800ms cubic-bezier(.4, 0, .2, 1), background-color 180ms ease;
+    will-change: transform;
+}
+body.search-morph .searching .search-toggle { transform: translateX(0); }
 
 body.search-morph .search-close {
     right: 0;
@@ -1078,8 +1086,10 @@ body.index .section-header {
     opacity: 0;
     pointer-events: none;
     transition: opacity 180ms ease, transform 180ms ease;
-    z-index: 10001;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    z-index: 100050;
+    max-width: calc(100vw - 32px);
+    text-align: center;
+    box-shadow: none;
 }
 
 .hint-toast.show {
@@ -1409,7 +1419,7 @@ body.signin.keyboard-visible .auth-wrapper {
     max-width: 420px;
     background: #f3f3f3;
     border-radius: 16px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14);
+    box-shadow: none;
     padding: 18px 18px 14px;
 }
 
@@ -1469,7 +1479,7 @@ body.signin.keyboard-visible .auth-wrapper {
     background: #FDFBF9;
     border: 1px solid #e7e7e7;
     border-radius: 22px;
-    box-shadow: 0 12px 40px rgba(45, 42, 38, 0.12);
+    box-shadow: none;
 }
 
 .checkout-wait-pulse {
@@ -2063,10 +2073,7 @@ body.signin.keyboard-visible .auth-wrapper {
     line-height: 1.1;
     text-align: center;
     white-space: nowrap;
-    /* Tight shadow — wide blur bands into rings on the 10.1" panel. */
-    box-shadow:
-        0 2px 4px rgba(45, 42, 38, 0.16),
-        0 1px 2px rgba(45, 42, 38, 0.10);
+    box-shadow: none;
     pointer-events: none;
     transform-origin: bottom center;
     /* Compositor-only properties, so the fade holds up on a low-refresh panel. */
@@ -2162,7 +2169,7 @@ body.signin.keyboard-visible .auth-wrapper {
     }
 }
 
-/* Tighter virtual keyboard for 10.1" / 600px-tall kiosk panels */
+/* Taller keycaps for the 10.1-inch / 600px-high kiosk display. */
 @media (max-height: 640px) {
     .vk {
         padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
@@ -2177,10 +2184,10 @@ body.signin.keyboard-visible .auth-wrapper {
     }
 
     .vk-key {
-        padding: 10px 0;
-        font-size: 15px;
-        border-radius: 10px;
-        min-height: 40px;
+        padding: 14px 0;
+        font-size: 17px;
+        border-radius: 12px;
+        min-height: 56px;
     }
 
     .vk-preview {
@@ -2812,4 +2819,190 @@ body.search-morph .section-header::before {
     body.search-morph .section-header::before {
         inset: -7px -8px 0 -10px;
     }
+}
+
+.remove-item {
+    position: relative;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    padding: 5px;
+    border: none;
+    border-radius: 8px;
+    background: #e7e7e7;
+    color: #786b5d;
+    touch-action: manipulation;
+}
+.remove-item svg { width: 14px; height: 14px; flex-shrink: 0; pointer-events: none; }
+/* Retain a comfortable touch area around the smaller visible control. */
+.remove-item::after { content: ''; position: absolute; inset: -5px; border-radius: 8px; }
+.remove-item:hover { border-radius: 8px; background: #ded8d1; color: #543106; }
+.remove-item:focus-visible { outline: 2px solid #8b7355; outline-offset: 2px; }
+.cart-item { gap: 8px; }
+.item-right { gap: 8px; }
+.product-card, .category-card { touch-action: pan-y; }
+
+@media (min-width: 900px) and (max-height: 850px) {
+    body:not(.signin):not(.create-account) > .container {
+        margin: 10px;
+        height: calc(100dvh - 20px);
+    }
+    .cart-item { width: 100%; }
+    .right-section .cart-items { padding-inline: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.search-morph .search-toggle { transition: none; }
+}
+
+/* Fit the page above the keyboard; each pane remains scrollable. */
+body.keyboard-open:not(.signin):not(.create-account) > .container {
+    height: calc(100dvh - var(--nc-keyboard-height) - 20px) !important;
+}
+body.signin.keyboard-open:not(.create-account) .container {
+    height: calc(100dvh - var(--nc-keyboard-height)) !important;
+}
+body.signin.keyboard-open:not(.create-account) .auth-wrapper {
+    min-height: 0;
+    overflow-y: auto;
+    display: block;
+    padding: 12px 14px;
+}
+body.signin.keyboard-open:not(.create-account) .signin-center .auth-card {
+    transform: none;
+}
+@media (max-height: 700px) {
+    body.signin.keyboard-open:not(.create-account) .signin-center .auth-card {
+        padding: 14px 20px;
+        gap: 8px;
+    }
+    body.signin.keyboard-open:not(.create-account) .auth-subtitle { margin-bottom: 0; }
+    body.signin.keyboard-open:not(.create-account) .auth-form { gap: 6px; }
+    body.signin.keyboard-open:not(.create-account) .auth-label { margin-top: 0; }
+    body.signin.keyboard-open:not(.create-account) .auth-button {
+        min-height: 44px;
+        padding: 10px 16px;
+        font-size: 16px;
+        margin-top: 8px;
+    }
+    body.signin.keyboard-open:not(.create-account) .qr-app-btn { margin-top: 0; }
+    body.signin.keyboard-open:not(.create-account) .auth-links { margin-top: 0; }
+}
+
+/* Tap the scale demonstration to expand it; tap again to restore it. */
+button.wm-guide-frame {
+    position: relative;
+    display: block;
+    padding: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    font: inherit;
+}
+button.wm-guide-frame:focus-visible {
+    outline: 3px solid #8b7355;
+    outline-offset: 3px;
+}
+.weight-modal {
+    --wm-preview-width: 760px;
+    transition: width 440ms cubic-bezier(.4, 0, .2, 1), max-width 440ms cubic-bezier(.4, 0, .2, 1);
+}
+.weight-modal .wm-guide-frame {
+    transition: max-height 440ms cubic-bezier(.4, 0, .2, 1);
+}
+.weight-modal.weight-modal--preview-expanded {
+    width: min(var(--wm-preview-width), 96vw);
+    max-width: var(--wm-preview-width);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+}
+.weight-modal--preview-expanded .wm-guide .wm-guide-frame {
+    max-height: min(50vh, 420px);
+}
+.weight-modal--preview-expanded .wm-guide--compact .wm-guide-frame {
+    max-height: min(38vh, 280px);
+}
+@media (min-width: 1024px) and (max-width: 1366px) and (min-height: 720px) and (max-height: 900px) {
+    .weight-modal { --wm-preview-width: 840px; }
+}
+@media (max-height: 640px) {
+    .weight-modal { --wm-preview-width: 720px; }
+    .weight-modal--preview-expanded .wm-guide .wm-guide-frame { max-height: min(40vh, 240px); }
+    .weight-modal--preview-expanded .wm-guide--compact .wm-guide-frame { max-height: min(30vh, 180px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .weight-modal, .weight-modal .wm-guide-frame { transition: none; }
+}
+
+/* One consistent inset for cart rows, dividers, and the Total footer. */
+.right-section > .total-header {
+    width: 100%;
+    max-width: none;
+    margin: 8px 0 18px;
+    font-weight: 600;
+    color: #3a372f;
+}
+.right-section > .cart-items {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    margin: 0 0 12px;
+}
+.right-section .cart-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: none;
+    min-height: 58px;
+    margin: 0;
+    padding: 12px;
+    border-bottom: 1px solid #ddd9d3;
+    border-radius: 0;
+}
+.right-section .cart-item.selected {
+    background: #eceae7;
+    border-radius: 10px;
+}
+.right-section .item-left { min-width: 0; gap: 0; }
+.item-copy { min-width: 0; }
+.right-section .item-label {
+    line-height: 1.4;
+    font-weight: 500;
+    color: #3a372f;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+.item-quantity {
+    margin-top: 3px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #786f64;
+}
+.item-quantity[hidden] { display: none; }
+.right-section .item-right { gap: 10px; }
+.right-section .item-price {
+    line-height: 1.4;
+    font-weight: 600;
+    color: #3a372f;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.right-section > .subtotal {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    border-top: 1px solid #ddd9d3;
+}
+.right-section .subtotal-label,
+.right-section .subtotal-amount { line-height: 1.4; }
+.right-section .subtotal-amount { font-variant-numeric: tabular-nums; }
+.right-section > #scale-weight-row { padding: 8px 12px !important; }
+.right-section > .checkout-btn {
+    width: calc(100% - 24px) !important;
+    min-height: 44px;
+    margin: 12px 12px 0 !important;
+    padding: 10px 16px !important;
 }

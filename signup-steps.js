@@ -945,6 +945,7 @@
         document.body.classList.remove('otp-open');
         const vk = document.getElementById('vk-auth');
         if (vk) vk.style.display = 'none';
+        window.ncSetKeyboardViewport?.(vk, false);
         window.__vkActive = false;
         if (session?.access_token && session?.refresh_token) {
           await window.sb.auth.setSession({
@@ -1045,6 +1046,7 @@
         document.body.classList.remove('keyboard-visible');
         const vk = document.getElementById('vk-auth');
         if (vk) vk.style.display = 'none';
+        window.ncSetKeyboardViewport?.(vk, false);
         window.__vkActive = false;
       }
 

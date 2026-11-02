@@ -155,6 +155,26 @@ function showAllergyModal({ name, allergyText, onConfirm }) {
   setTimeout(() => btnOk.focus(), 50);
 }
 
+function bindWeightPreview(modal) {
+  const toggle = modal.querySelector('.wm-guide-frame');
+  if (!toggle) return;
+  let expanded = false;
+  const setExpanded = value => {
+    expanded = value;
+    modal.classList.toggle('weight-modal--preview-expanded', expanded);
+    toggle.setAttribute('aria-expanded', String(expanded));
+    toggle.setAttribute('aria-label', expanded ? 'Shrink scale preview' : 'Enlarge scale preview');
+  };
+  toggle.addEventListener('click', () => setExpanded(!expanded));
+  modal.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && expanded) {
+      event.preventDefault();
+      setExpanded(false);
+      toggle.focus({ preventScroll: true });
+    }
+  });
+}
+
 async function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   ensureModalRoot();
   const root = document.querySelector('#modal-root');
@@ -193,9 +213,9 @@ async function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
 
   modal.innerHTML = `
     <div class="wm-guide${skipFullGuide ? ' wm-guide--compact' : ''}">
-      <div class="wm-guide-frame">
+      <button type="button" class="wm-guide-frame" aria-label="Enlarge scale preview" aria-expanded="false">
         <video class="wm-guide-video" src="${guideVideoSrc}" autoplay muted playsinline loop preload="auto"></video>
-      </div>
+      </button>
       <div class="wm-guide-caption">How to weigh your item</div>
       <div class="wm-guide-hint">Then place <strong>${productSafe}</strong> on the scale</div>
     </div>
@@ -228,6 +248,7 @@ async function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   overlay.appendChild(modal);
   root.appendChild(overlay);
 
+  bindWeightPreview(modal);
   const guideEl = modal.querySelector('.wm-guide');
   const weighEl = modal.querySelector('.wm-weigh');
   const guideActions = modal.querySelector('.wm-guide-actions');
@@ -462,6 +483,7 @@ async function fetchProductsByIds(ids = []) {
 
 const IMAGE_URL_REFRESH_MS = 40 * 1000;
 const IMAGE_URL_CACHE_BUFFER_MS = 8 * 1000;
+const __imageUrlPending = new Map();
 const __imageUrlCache = new Map(); // key -> { url, expiresAt }
 let __imageRefreshTimer = null;
 
@@ -517,14 +539,20 @@ async function getImageUrlForKey(key) {
   const cacheKey = String(key);
   const hit = __imageUrlCache.get(cacheKey);
   if (hit && hit.expiresAt > Date.now()) return hit.url;
-  try {
-    const data = await apiFetch('/image-url', { method: 'POST', body: { key: cacheKey } });
-    const url = data && data.url ? data.url : null;
-    return url ? rememberImageUrl(cacheKey, url) : null;
-  } catch (e) {
-    console.warn('image-url failed for key', key, e);
-    return null;
-  }
+  if (__imageUrlPending.has(cacheKey)) return __imageUrlPending.get(cacheKey);
+  const pending = (async () => {
+    try {
+      const data = await apiFetch('/image-url', { method: 'POST', body: { key: cacheKey } });
+      return data?.url ? rememberImageUrl(cacheKey, data.url) : null;
+    } catch (e) {
+      console.warn('image-url failed for key', key, e);
+      return null;
+    } finally {
+      __imageUrlPending.delete(cacheKey);
+    }
+  })();
+  __imageUrlPending.set(cacheKey, pending);
+  return pending;
 }
 
 function getItemImageKey(it) {
@@ -553,9 +581,38 @@ async function refreshCartImages({ rerender = true } = {}) {
     }
   }));
   if (dirty) {
-    saveCart(items);
-    if (rerender) renderCart();
+    // Preserve cart edits made while the image request was in flight.
+    const latest = loadCart();
+    latest.forEach(item => {
+      const resolved = items.find(it => it.id != null ? String(it.id) === String(item.id) : it.name === item.name);
+      if (resolved) {
+        item.image = resolved.image;
+        item.imageKey = resolved.imageKey;
+      }
+    });
+    saveCart(latest);
+    if (rerender) {
+      const rows = document.querySelectorAll('.right-section .cart-item');
+      rows.forEach(row => {
+        const item = items.find(it => String(it.id != null ? it.id : `name:${it.name}`) === row.dataset.key);
+        const image = row.querySelector('.item-image');
+        if (item?.image && image) image.style.backgroundImage = `url('${item.image}')`;
+      });
+    }
   }
+}
+
+async function updateProductCardImage(card, url) {
+  const imgDiv = card.querySelector('.product-image');
+  if (!imgDiv || card.getAttribute('data-image') === url) return;
+  const preview = new Image();
+  preview.src = url;
+  try { await preview.decode(); } catch (_) { return; }
+  if (!card.isConnected) return;
+  imgDiv.style.backgroundImage = `url('${url}')`;
+  imgDiv.style.backgroundSize = 'cover';
+  imgDiv.style.backgroundPosition = 'center';
+  card.setAttribute('data-image', url);
 }
 
 async function refreshProductCardImages(root) {
@@ -569,13 +626,7 @@ async function refreshProductCardImages(root) {
     if (current && isSignedUrlFresh(current) && card.getAttribute('data-image-key')) return;
     const url = await getImageUrlForKey(key);
     if (!url) return;
-    const imgDiv = card.querySelector('.product-image');
-    if (imgDiv) {
-      imgDiv.style.backgroundImage = `url('${url}')`;
-      imgDiv.style.backgroundSize = 'cover';
-      imgDiv.style.backgroundPosition = 'center';
-    }
-    card.setAttribute('data-image', url);
+    await updateProductCardImage(card, url);
     card.setAttribute('data-image-key', key);
   }));
 }
@@ -677,6 +728,16 @@ async function showProductOnPage(productId) {
 }
 // Expose for debugging/console use
 window.showProductOnPage = showProductOnPage;
+
+// Reserve the measured keyboard height so every page can keep its controls visible.
+window.ncSetKeyboardViewport = (keyboard, visible) => {
+  const height = visible && keyboard ? keyboard.offsetHeight : 0;
+  document.body.style.setProperty('--nc-keyboard-height', `${height}px`);
+  document.body.classList.toggle('keyboard-open', height > 0);
+  document.dispatchEvent(new CustomEvent('vk:visibility', {
+    bubbles: true, detail: { visible: height > 0, height }
+  }));
+};
 
 // Capture also sees scrolls inside the product pane, cart, and virtual keyboard.
 function trackKioskActivity(onActivity) {
@@ -1382,13 +1443,14 @@ function renderCart() {
       if (key === selectedItemKey) div.classList.add('selected');
 
       const qty = Number(it.qty) || 1;
-      let labelText = (it.name || 'item');
+      const labelText = it.name || 'item';
+      let quantityText = '';
       if (it.weighted) {
         const shown = qty % 1 === 0 ? qty.toString() : qty.toFixed(3).replace(/\.0+$/, '');
         const u = it.unit ? ` ${it.unit}` : '';
-        labelText = `${labelText} ${shown}${u}`;
+        quantityText = `${shown}${u}`;
       } else if (qty > 1) {
-        labelText = `${labelText} x${qty}`;
+        quantityText = `Qty ${qty}`;
       }
 
       let imgHtml = '';
@@ -1400,13 +1462,19 @@ function renderCart() {
           <div class="item-left">
             <div class="item-number">${idx + 1}</div>
             ${imgHtml}
-            <div class="item-label">${labelText}</div>
+            <div class="item-copy">
+              <div class="item-label"></div>
+              <div class="item-quantity"${quantityText ? '' : ' hidden'}></div>
+            </div>
           </div>
           <div class="item-right">
             <div class="item-price">${formatMoney(line)}</div>
-            <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}">✕</button>
+            <button class="remove-item" title="Remove" aria-label="Remove item" data-key="${key}"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
           </div>
         `;
+
+      div.querySelector('.item-label').textContent = labelText;
+      div.querySelector('.item-quantity').textContent = quantityText;
 
       // Click to select
       div.addEventListener('click', (e) => {
@@ -1558,20 +1626,66 @@ function addToCart({ id, name, price, qty = 1, weighted = false, unit = null, un
   } catch (_) { }
 }
 
+// Small helper: transient hint toast
+let toastTimeoutId = null;
+function showHintToast(message) {
+  let toast = document.querySelector('.hint-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'hint-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+  if (toastTimeoutId) clearTimeout(toastTimeoutId);
+  toastTimeoutId = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2400);
+}
+
+// Use ordinary clicks for both touch and mouse; native dblclick is not reliable
+// on kiosk touch panels. Scrolling cancels a pending tap without blocking pan.
+function bindKioskDoubleTap(root, selector, onFirstTap, onDoubleTap) {
+  let lastCard = null;
+  let lastTapAt = 0;
+  let start = null;
+  let moved = false;
+  const clear = () => { lastCard = null; lastTapAt = 0; };
+  root.addEventListener('pointerdown', e => {
+    start = { x: e.clientX, y: e.clientY };
+    moved = false;
+  }, { passive: true });
+  root.addEventListener('pointermove', e => {
+    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) {
+      moved = true;
+      clear();
+    }
+  }, { passive: true });
+  root.addEventListener('pointercancel', () => { moved = true; clear(); }, { passive: true });
+  document.addEventListener('scroll', clear, { capture: true, passive: true });
+  root.addEventListener('click', e => {
+    const card = e.target.closest(selector);
+    if (!card || !root.contains(card) || moved) return;
+    const now = Date.now();
+    if (lastCard === card && now - lastTapAt <= 1500) {
+      clear();
+      onDoubleTap(card);
+    } else {
+      lastCard = card;
+      lastTapAt = now;
+      onFirstTap(card);
+    }
+  });
+}
+
 // Hoisted function declaration so it can be called before definition
 function bindGridForCart(gridEl) {
   if (!gridEl || gridEl.dataset.cartBound === '1') return;
   gridEl.dataset.cartBound = '1';
-  // Single click hint
-  gridEl.addEventListener('click', (e) => {
-    const card = e.target.closest('.product-card');
-    if (!card || !gridEl.contains(card)) return;
-    try { showHintToast('Double tap to add'); } catch (_) { }
-  });
-  // Double click add
-  gridEl.addEventListener('dblclick', (e) => {
-    const card = e.target.closest('.product-card');
-    if (!card || !gridEl.contains(card)) return;
+  bindKioskDoubleTap(gridEl, '.product-card', () => showHintToast('Tap again to add item'), (card) => {
+    document.querySelector('.hint-toast')?.classList.remove('show');
     const id = card.getAttribute('data-id');
     const name = card.getAttribute('data-name') || (card.querySelector('.product-name')?.textContent || '').trim();
     const priceAttr = card.getAttribute('data-price');
@@ -1755,22 +1869,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (t) clearTimeout(t);
       t = setTimeout(() => fn(...args), wait);
     };
-  }
-  // Small helper: transient hint toast
-  let toastTimeoutId = null;
-  function showHintToast(message) {
-    let toast = document.querySelector('.hint-toast');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.className = 'hint-toast';
-      document.body.appendChild(toast);
-    }
-    toast.textContent = message;
-    toast.classList.add('show');
-    if (toastTimeoutId) clearTimeout(toastTimeoutId);
-    toastTimeoutId = setTimeout(() => {
-      toast.classList.remove('show');
-    }, 1300);
   }
   // Initialize cart UI from storage and bind any existing grids
   const isAdminPath = /(^|\/)admin\//.test(location.pathname);
@@ -1969,8 +2067,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Idle → "Still there?" popup. No response for 30s → clear storage + attract loop.
       // Attract loop (image.html) only starts after that — not on first idle tick.
-      const AUTH_IDLE_MS = 5 * 60 * 1000;
-      const GUEST_IDLE_MS = 3 * 60 * 1000;
+      const AUTH_IDLE_MS = 7 * 60 * 1000;
+      const GUEST_IDLE_MS = 7 * 60 * 1000;
       const PRESENCE_GRACE_MS = 30 * 1000;
 
       const isOtpOpen = () => {
@@ -2028,7 +2126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         presenceHandle = showPresenceModal({
           message: otpOpen
             ? 'Are you still there? Your verification stays open — tap below to keep going.'
-            : 'Are you still there? Tap below to keep shopping.',
+            : 'Are you still there? Tap below to keep shopping. You will be signed out if you do not respond.',
           buttonText: "I'm here",
           countdownSec: graceSec,
           aboveOtp: otpOpen,
@@ -2037,6 +2135,8 @@ document.addEventListener('DOMContentLoaded', () => {
             presenceHandle = null;
             presenceShown = false;
             if (graceTimer) { clearTimeout(graceTimer); graceTimer = null; }
+            lastActivityAt = Date.now();
+            try { sessionStorage.setItem('nc_last_activity_at', String(lastActivityAt)); } catch (_) { }
             resetIdleTimer({ keepPresence: true });
           },
         });
@@ -2045,6 +2145,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const confirmed = window.confirm('Are you still there?');
           if (confirmed) {
             presenceShown = false;
+            lastActivityAt = Date.now();
+            try { sessionStorage.setItem('nc_last_activity_at', String(lastActivityAt)); } catch (_) { }
             resetIdleTimer({ keepPresence: true });
           } else {
             hardResetSession();
@@ -2063,17 +2165,25 @@ document.addEventListener('DOMContentLoaded', () => {
         showIdlePresence();
       };
 
+      // Preserve real activity across automatic category → index navigation.
+      let lastActivityAt = Date.now();
+      try {
+        const stored = Number(sessionStorage.getItem('nc_last_activity_at'));
+        if (stored > 0 && stored <= lastActivityAt) lastActivityAt = stored;
+      } catch (_) { }
       const resetIdleTimer = (opts) => {
         if (!opts?.keepPresence) clearPresence();
         if (idleTimer) clearTimeout(idleTimer);
         const timeout = isUserSignedIn ? AUTH_IDLE_MS : GUEST_IDLE_MS;
-        idleTimer = setTimeout(handleIdleTimeout, timeout);
+        idleTimer = setTimeout(handleIdleTimeout, Math.max(0, timeout - (Date.now() - lastActivityAt)));
       };
 
       // While the presence prompt is up, only the "I'm here" button confirms.
       // Ignore background activity so the OTP sheet (and everything under it) stays put.
       const onActivity = (e) => {
         if (presenceShown) return;
+        lastActivityAt = Date.now();
+        try { sessionStorage.setItem('nc_last_activity_at', String(lastActivityAt)); } catch (_) { }
         resetIdleTimer();
       };
 
@@ -2145,12 +2255,11 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
-        trackKioskActivity(onActivity);
-
-        resetIdleTimer();
       };
 
-      initMonitor();
+      trackKioskActivity(onActivity);
+      resetIdleTimer();
+      initMonitor().catch(() => { });
     }
   } catch (_) { }
 
@@ -2239,7 +2348,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchToggle = searchContainer?.querySelector('.search-toggle');
   // Every page with this search header uses the same motion and dismissal behavior.
   const animatedSearch = Boolean(searchInput && searchHeader);
-  if (animatedSearch) document.body.classList.add('search-morph');
+  if (animatedSearch) {
+    document.body.classList.add('search-morph');
+    const updateSearchTravel = () => searchContainer.style.setProperty('--search-travel',
+      `${Math.max(0, searchContainer.clientWidth - 44)}px`);
+    updateSearchTravel();
+    new ResizeObserver(updateSearchTravel).observe(searchContainer);
+  }
   const searchClose = searchContainer?.querySelector('.search-close');
 
   function setSearchOpen(open, restoreFocus = false) {
@@ -2319,41 +2434,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Index page: bind to existing static category cards (preserve original look)
   if (document.body.classList.contains('index')) {
-    const cards = document.querySelectorAll('.category-card');
     let navigating = false;
-    const TAP_WINDOW_MS = 3000;
-    cards.forEach(card => {
-      const titleEl = card.querySelector('.category-title');
-      const title = titleEl ? titleEl.textContent.trim() : '';
-      let lastTapAt = 0;
-
-      // Two taps within 3s on the same card opens it (kiosk-friendly vs native dblclick)
-      card.addEventListener('click', () => {
-        if (navigating) return;
-        const now = Date.now();
-        if (lastTapAt && (now - lastTapAt) <= TAP_WINDOW_MS) {
-          navigating = true;
-          lastTapAt = 0;
-
-          // Trigger fade out on the grid container
-          const gridView = document.getElementById('view-category-grid');
-          if (gridView) {
-            gridView.classList.add('fade-out-active');
-          }
-
-          const q = title ? ('?name=' + encodeURIComponent(title)) : '';
-          if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch { } }
-          try { sessionStorage.setItem('lastView', 'category'); } catch { }
-
-          setTimeout(() => {
-            window.location.href = withCart('category.html' + q);
-          }, 300);
-          return;
-        }
-
-        lastTapAt = now;
-        showHintToast('Tap twice to open');
-      });
+    const grid = document.querySelector('.category-grid');
+    if (grid) bindKioskDoubleTap(grid, '.category-card', () => showHintToast('Tap again to open category'), card => {
+      if (navigating) return;
+      navigating = true;
+      const title = card.querySelector('.category-title')?.textContent.trim() || '';
+      document.getElementById('view-category-grid')?.classList.add('fade-out-active');
+      const q = title ? ('?name=' + encodeURIComponent(title)) : '';
+      if (title) { try { sessionStorage.setItem('lastCategoryName', title); } catch { } }
+      try { sessionStorage.setItem('lastView', 'category'); } catch { }
+      setTimeout(() => { window.location.href = withCart('category.html' + q); }, 300);
     });
   } else {
     // Non-index pages
@@ -3095,13 +3186,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // after idle. Activity must reliably reset that clock — listen on document in
 // the capture phase so taps on cards, tabs, and the cart still count.
 document.addEventListener('DOMContentLoaded', () => {
-  const INACTIVITY_LIMIT_MS = 30 * 1000; // 30 seconds
+  const INACTIVITY_LIMIT_MS = 40 * 1000; // 40 seconds
   let inactivityTimer = null;
 
   const viewOpenSearch = document.getElementById('view-opensearch');
   const viewCategoryGrid = document.getElementById('view-category-grid');
   const isIndexPage = document.body.classList.contains('index');
-  const isCategoryPage = document.body.classList.contains('category-page');
+  const isCategoryPage = document.body.classList.contains('category-page') || /(?:^|\/)cabinet\.html$/.test(window.location.pathname || '');
 
   // Only these pages need the grid/category idle revert.
   if (!isIndexPage && !isCategoryPage) return;

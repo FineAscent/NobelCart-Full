@@ -177,6 +177,9 @@
       </div>
     `;
     document.body.appendChild(vkEl);
+    new ResizeObserver(() => {
+      if (active) window.ncSetKeyboardViewport?.(vkEl, true);
+    }).observe(vkEl);
 
     const row1 = vkEl.querySelector('[data-row="1"]');
     const row2 = vkEl.querySelector('[data-row="2"]');
@@ -375,10 +378,8 @@
     } else {
       updateDoneLabel();
     }
+    window.ncSetKeyboardViewport?.(vkEl, true);
     ensureVisible(targetInput);
-    try {
-      document.dispatchEvent(new CustomEvent('vk:visibility', { detail: { visible: true } }));
-    } catch (_) { }
   }
 
   function hide(force) {
@@ -388,9 +389,7 @@
     vkEl.style.display = 'none';
     active = false;
     window.__vkActive = false;
-    try {
-      document.dispatchEvent(new CustomEvent('vk:visibility', { detail: { visible: false } }));
-    } catch (_) { }
+    window.ncSetKeyboardViewport?.(vkEl, false);
   }
 
   function init() {
@@ -481,7 +480,7 @@
         const scrollAmount = elRect.bottom - limit + 40; // +40 for padding
 
         // Check if we are in the checkout scrollable container
-        const checkoutLeft = el.closest('.checkout-left');
+        const checkoutLeft = el.closest('.checkout-left, .auth-wrapper');
         if (checkoutLeft) {
           checkoutLeft.scrollBy({ top: scrollAmount, behavior: 'smooth' });
         } else {

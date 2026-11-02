@@ -83,6 +83,9 @@
       </div>
     `;
     document.body.appendChild(vkEl);
+    new ResizeObserver(() => {
+      if (active) window.ncSetKeyboardViewport?.(vkEl, true);
+    }).observe(vkEl);
 
     const row1 = vkEl.querySelector('[data-row="1"]');
     const row2 = vkEl.querySelector('[data-row="2"]');
@@ -221,6 +224,7 @@
     vkEl.classList.add('is-open');
     active = true;
     window.__vkActive = true;
+    window.ncSetKeyboardViewport?.(vkEl, true);
   }
 
   function hide() {
@@ -230,6 +234,7 @@
     if (!document.body.classList.contains('search-morph')) vkEl.style.display = 'none';
     active = false;
     window.__vkActive = false;
+    window.ncSetKeyboardViewport?.(vkEl, false);
   }
 
   function toggle(targetInput) {
@@ -252,11 +257,11 @@
       if (!active) show(searchInput);
     });
 
-    // Nested pane scroll events do not bubble, so observe them in capture phase.
-    // Leave focus and the query intact; scrolling only dismisses the keyboard.
-    document.addEventListener('scroll', (event) => {
+    // Dismiss on a user's scroll gesture, not on scrolls caused by resizing
+    // the product pane to make room for the keyboard.
+    ['wheel', 'touchmove'].forEach(type => document.addEventListener(type, event => {
       if (active && !event.target?.closest?.('.vk')) hide();
-    }, { capture: true, passive: true });
+    }, { capture: true, passive: true }));
 
     // Hide VK when input loses focus (let site.js collapse it)
     searchInput.addEventListener('blur', () => {
