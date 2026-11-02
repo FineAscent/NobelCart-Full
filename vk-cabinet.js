@@ -39,11 +39,20 @@
 
       const vkRect = vkEl.getBoundingClientRect();
       const btnRect = btn.getBoundingClientRect();
+      // Give letters a consistent keycap-sized bubble; action labels get only
+      // the extra width they need. Clamp by the actual bubble width at edges.
+      const width = label.length > 1
+        ? Math.min(120, Math.max(88, label.length * 10 + 24))
+        : Math.min(76, Math.max(56, btnRect.width * 0.72));
+      const height = Math.min(72, Math.max(56, btnRect.height + 8));
+      preview.style.setProperty('--vk-preview-width', `${width}px`);
+      preview.style.setProperty('--vk-preview-height', `${height}px`);
       const center = btnRect.left - vkRect.left + btnRect.width / 2;
-      preview.style.left = Math.min(Math.max(center, 48), Math.max(vkRect.width - 48, 48)) + 'px';
-      preview.style.bottom = (vkRect.bottom - btnRect.top + 10) + 'px';
+      const inset = width / 2 + 8;
+      preview.style.left = Math.min(Math.max(center, inset), Math.max(vkRect.width - inset, inset)) + 'px';
+      preview.style.bottom = (vkRect.bottom - btnRect.top + 8) + 'px';
 
-      // Replay the entry spring on every tap, including when the bubble is
+      // Replay the entry animation on every tap, including when the bubble is
       // already up and only moving to another key.
       preview.style.animation = 'none';
       void preview.offsetWidth;

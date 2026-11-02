@@ -768,7 +768,8 @@ body.search-morph .section-header .tabbar {
     display: inline-flex !important;
     opacity: 1;
     transform: translateY(0) scale(1);
-    transition: opacity 280ms ease 180ms, transform 520ms var(--search-ease) 100ms, visibility 0s;
+    transition: opacity 280ms ease 440ms, transform 360ms var(--search-ease) 360ms, visibility 0s;
+    will-change: opacity, transform;
 }
 
 body.search-morph .left-section.searching .back-btn,
@@ -822,7 +823,7 @@ body.search-morph .section-header .search-input {
     visibility: hidden;
     pointer-events: none;
     transform: translateX(18px);
-    transition: opacity 120ms ease, transform 200ms ease, visibility 0s 120ms;
+    transition: opacity 240ms ease, transform 400ms var(--search-ease), visibility 0s 240ms;
 }
 
 body.search-morph .section-header .search-input.expanded {
@@ -2062,12 +2063,17 @@ body.signin.keyboard-visible .auth-wrapper {
     position: absolute;
     left: 0;
     bottom: 0;
-    min-width: 79px;
-    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--vk-preview-width, 64px);
+    height: var(--vk-preview-height, 64px);
+    min-width: 0;
+    padding: 0 10px;
     background: #f3f3f3;
     border: 1px solid rgba(45, 42, 38, 0.08);
     color: #2d2a26;
-    border-radius: 18px;
+    border-radius: 14px;
     font-size: 28px;
     font-weight: 700;
     line-height: 1.1;
@@ -2087,11 +2093,10 @@ body.signin.keyboard-visible .auth-wrapper {
     z-index: 2;
 }
 
-/* Entry is a keyframed spring rather than a transition, so the overshoot on the
-   way in does not also apply in reverse on the way out. */
+/* A small lift makes each press visible without an oversized bounce. */
 @keyframes vk-preview-pop {
     from {
-        transform: translate(-50%, 8px) scale(0.72);
+        transform: translate(-50%, 4px) scale(0.94);
     }
 
     to {
@@ -2103,11 +2108,11 @@ body.signin.keyboard-visible .auth-wrapper {
     opacity: 1;
     transform: translate(-50%, 0) scale(1);
     transition: opacity 110ms cubic-bezier(0.22, 1, 0.36, 1);
-    animation: vk-preview-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: vk-preview-pop 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .vk-preview--wide {
-    font-size: 20px;
+    font-size: 16px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2158,15 +2163,6 @@ body.signin.keyboard-visible .auth-wrapper {
         border-radius: 12px;
     }
 
-    .vk-preview {
-        min-width: 52px;
-        padding: 8px 12px;
-        font-size: 26px;
-    }
-
-    .vk-preview--wide {
-        font-size: 18px;
-    }
 }
 
 /* Taller keycaps for the 10.1-inch / 600px-high kiosk display. */
@@ -2190,11 +2186,6 @@ body.signin.keyboard-visible .auth-wrapper {
         min-height: 56px;
     }
 
-    .vk-preview {
-        min-width: 48px;
-        padding: 6px 10px;
-        font-size: 22px;
-    }
 }
 
 /* --- Account: Previous Purchases Typography --- */
@@ -2855,10 +2846,8 @@ body.search-morph .section-header::before {
     body.search-morph .search-toggle { transition: none; }
 }
 
-/* Fit the page above the keyboard; each pane remains scrollable. */
-body.keyboard-open:not(.signin):not(.create-account) > .container {
-    height: calc(100dvh - var(--nc-keyboard-height) - 20px) !important;
-}
+/* Search keyboard overlays the catalog and Checkout without resizing either.
+   Auth forms still reserve keyboard space so their active fields stay visible. */
 body.signin.keyboard-open:not(.create-account) .container {
     height: calc(100dvh - var(--nc-keyboard-height)) !important;
 }

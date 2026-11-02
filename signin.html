@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign In</title>
-  <link rel="stylesheet" href="styles.css?v=47" />
+  <link rel="stylesheet" href="styles.css?v=49" />
   <script src="phone-gate.js"></script>
   <script src="cart-id.js?v=2"></script>
 </head>
@@ -532,7 +532,7 @@
       font-weight: 700;
       letter-spacing: 0.2px;
       text-align: center;
-      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+      text-shadow: none;
     }
 
     /* 1260×2552 source, framed like a phone over the QR panel */
@@ -542,10 +542,8 @@
       border-radius: 22px;
       overflow: hidden;
       background: #0b0b0d;
-      box-shadow:
-        0 0 0 2px #1c1c1e,
-        0 0 0 4px #3a3a3c,
-        0 18px 44px rgba(0, 0, 0, 0.42);
+      border: 1px solid #3a3a3c;
+      box-shadow: none;
     }
 
     .phone-guide-device video {
@@ -594,7 +592,7 @@
       min-height: 44px;
       border-radius: 12px;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+      box-shadow: none;
     }
 
     .phone-guide-got-it:active {
@@ -777,7 +775,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="error-reporter.js"></script>
-  <script src="vk-auth.js?v=15"></script>
+  <script src="vk-auth.js?v=16"></script>
   <script src="policy-gate.js"></script>
   <script>
     // Clear stale/invalid local session to avoid 400 token errors and prevent watcher loops
