@@ -481,171 +481,210 @@ async function fetchProductsByIds(ids = []) {
   return results;
 }
 
-const IMAGE_URL_REFRESH_MS = 40 * 1000;
-const IMAGE_URL_CACHE_BUFFER_MS = 8 * 1000;
-const __imageUrlPending = new Map();
-const __imageUrlCache = new Map(); // key -> { url, expiresAt }
-let __imageRefreshTimer = null;
+const __productImages = window.NobelProductImages.create({
+  scope: API_BASE,
+  storage: (() => { try { return sessionStorage; } catch (_) { return null; } })(),
+  sign: async key => {
+    const controller = new AbortController();
+    let timer;
+    try {
+      const request = key.startsWith('cabinet-uploads/')
+        ? (async () => {
+          if (!window.sb) throw new Error('Image storage is not ready');
+          const { data, error } = await window.sb.storage.from('cabinet-uploads')
+            .createSignedUrl(key.slice('cabinet-uploads/'.length), 3600);
+          if (error) throw error;
+          return data?.signedUrl;
+        })()
+        : apiFetch('/image-url', { method: 'POST', body: { key }, signal: controller.signal }).then(data => data?.url);
+      return await Promise.race([request, new Promise((_, reject) => {
+        timer = setTimeout(() => { controller.abort(); reject(new Error('Image URL request timed out')); }, 10000);
+      })]);
+    } finally { clearTimeout(timer); }
+  }
+});
 
 function imageKeyFromUrl(url) {
-  if (!url || !/^https?:\/\//i.test(url)) return null;
   try {
-    const u = new URL(url);
-    if (!/amazonaws\.com/i.test(u.hostname)) return null;
-    const path = decodeURIComponent(u.pathname.replace(/^\//, ''));
+    const parsed = new URL(url);
+    let path = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
+    const storage = path.match(/^storage\/v1\/object\/(?:sign|public)\/(cabinet-uploads\/.+)$/);
+    if (storage && /\.supabase\.co$/i.test(parsed.hostname)) return storage[1];
+    if (!/(^|\.)amazonaws\.com$/i.test(parsed.hostname)) return null;
+    // Path-style S3 URLs include the bucket name; the signer expects just the object key.
+    if (/^s3[.-]/i.test(parsed.hostname)) path = path.split('/').slice(1).join('/');
     return path || null;
-  } catch (_) {
-    return null;
-  }
+  } catch (_) { return null; }
 }
 
-function presignedUrlExpiryMs(url) {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    const secs = Number(u.searchParams.get('X-Amz-Expires'));
-    const stamp = u.searchParams.get('X-Amz-Date');
-    if (!secs || !stamp) return null;
-    const start = Date.parse(
-      stamp.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z')
-    );
-    if (!Number.isFinite(start)) return null;
-    return start + secs * 1000;
-  } catch (_) {
-    return null;
-  }
-}
-
-function isSignedUrlFresh(url) {
-  const expiresAt = presignedUrlExpiryMs(url);
-  if (!expiresAt) return true;
-  return expiresAt > Date.now() + IMAGE_URL_CACHE_BUFFER_MS;
-}
-
-function rememberImageUrl(key, url) {
-  if (!key || !url) return url;
-  const expiresAt = presignedUrlExpiryMs(url);
-  __imageUrlCache.set(String(key), {
-    url,
-    expiresAt: expiresAt
-      ? expiresAt - IMAGE_URL_CACHE_BUFFER_MS
-      : Date.now() + IMAGE_URL_REFRESH_MS,
-  });
-  return url;
-}
-
+function isSignedUrlFresh(url) { return __productImages.fresh(url); }
 async function getImageUrlForKey(key) {
-  if (!key) return null;
-  const cacheKey = String(key);
-  const hit = __imageUrlCache.get(cacheKey);
-  if (hit && hit.expiresAt > Date.now()) return hit.url;
-  if (__imageUrlPending.has(cacheKey)) return __imageUrlPending.get(cacheKey);
-  const pending = (async () => {
-    try {
-      const data = await apiFetch('/image-url', { method: 'POST', body: { key: cacheKey } });
-      return data?.url ? rememberImageUrl(cacheKey, data.url) : null;
-    } catch (e) {
-      console.warn('image-url failed for key', key, e);
-      return null;
-    } finally {
-      __imageUrlPending.delete(cacheKey);
-    }
-  })();
-  __imageUrlPending.set(cacheKey, pending);
-  return pending;
+  try { return key ? await __productImages.resolve(key) : null; }
+  catch (_) { return null; }
 }
-
-function getItemImageKey(it) {
-  if (!it) return null;
-  if (it.imageKey) return String(it.imageKey);
-  return imageKeyFromUrl(it.image);
-}
-
-async function refreshCartImages({ rerender = true } = {}) {
-  const items = loadCart();
-  if (!items.length) return;
-  let dirty = false;
-  await Promise.all(items.map(async (it) => {
-    const key = getItemImageKey(it);
-    if (!key) return;
-    if (it.image && isSignedUrlFresh(it.image) && it.imageKey) return;
-    const url = await getImageUrlForKey(key);
-    if (!url) return;
-    if (!it.imageKey) {
-      it.imageKey = key;
-      dirty = true;
-    }
-    if (it.image !== url) {
-      it.image = url;
-      dirty = true;
-    }
-  }));
-  if (dirty) {
-    // Preserve cart edits made while the image request was in flight.
-    const latest = loadCart();
-    latest.forEach(item => {
-      const resolved = items.find(it => it.id != null ? String(it.id) === String(item.id) : it.name === item.name);
-      if (resolved) {
-        item.image = resolved.image;
-        item.imageKey = resolved.imageKey;
-      }
-    });
-    saveCart(latest);
-    if (rerender) {
-      const rows = document.querySelectorAll('.right-section .cart-item');
-      rows.forEach(row => {
-        const item = items.find(it => String(it.id != null ? it.id : `name:${it.name}`) === row.dataset.key);
-        const image = row.querySelector('.item-image');
-        if (item?.image && image) image.style.backgroundImage = `url('${item.image}')`;
-      });
-    }
-  }
-}
-
-async function updateProductCardImage(card, url) {
-  const imgDiv = card.querySelector('.product-image');
-  if (!imgDiv || card.getAttribute('data-image') === url) return;
-  const preview = new Image();
-  preview.src = url;
-  try { await preview.decode(); } catch (_) { return; }
-  if (!card.isConnected) return;
-  imgDiv.style.backgroundImage = `url('${url}')`;
-  imgDiv.style.backgroundSize = 'cover';
-  imgDiv.style.backgroundPosition = 'center';
-  card.setAttribute('data-image', url);
-}
-
-async function refreshProductCardImages(root) {
-  const scope = root && root.querySelectorAll ? root : document;
-  const cards = Array.from(scope.querySelectorAll('.product-card'));
-  await Promise.all(cards.map(async (card) => {
-    let key = card.getAttribute('data-image-key');
-    const current = card.getAttribute('data-image');
-    if (!key && current) key = imageKeyFromUrl(current);
-    if (!key) return;
-    if (current && isSignedUrlFresh(current) && card.getAttribute('data-image-key')) return;
-    const url = await getImageUrlForKey(key);
-    if (!url) return;
-    await updateProductCardImage(card, url);
-    card.setAttribute('data-image-key', key);
-  }));
-}
-
-function startImageRefreshLoop() {
-  if (__imageRefreshTimer) return;
-  const tick = () => {
-    if (document.visibilityState === 'hidden') return;
-    refreshCartImages({ rerender: true }).catch(() => { });
-    refreshProductCardImages().catch(() => { });
-  };
-  __imageRefreshTimer = setInterval(tick, IMAGE_URL_REFRESH_MS);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') tick();
-  });
-  tick();
-}
-
 window.getImageUrlForKey = getImageUrlForKey;
+window.addEventListener('pagehide', () => __productImages.flush());
+
+function getItemImageKey(item) { return item?.imageKey || imageKeyFromUrl(item?.image); }
+function productImageDescriptor(product) {
+  const key = Array.isArray(product.imageKeys) && product.imageKeys[0];
+  if (key) return { key: String(key), url: null };
+  const image = product.image_url;
+  if (!image) return { key: null, url: null };
+  return /^https?:\/\//i.test(image)
+    ? { key: imageKeyFromUrl(image), url: image }
+    : { key: String(image), url: null };
+}
+
+// Update only the matching item's image metadata, never quantities or the whole cart DOM.
+function rememberCartProductImage(id, name, asset) {
+  const items = loadCart();
+  const item = items.find(it => id != null ? String(it.id) === String(id) : it.id == null && it.name === name);
+  if (!item || (item.image === asset.url && (!asset.key || item.imageKey === asset.key))) return;
+  item.image = asset.url;
+  if (asset.key) item.imageKey = asset.key;
+  saveCart(items);
+}
+
+const __cardImages = new WeakMap();
+let __imageObserver = null;
+let __imageRecoveryStarted = false;
+
+// Reuse the actual preloaded element: no second image download or background decode.
+// If two visible views share a photo, the second element uses the browser's image cache.
+const __claimedProductPhotos = new WeakSet();
+async function productPhotoElement(asset) {
+  let image;
+  if (asset.image && !__claimedProductPhotos.has(asset.image)) {
+    image = asset.image;
+    __claimedProductPhotos.add(image);
+  } else image = new Image();
+  image.decoding = 'async';
+  image.draggable = false;
+  if (image.complete && image.naturalWidth > 0 && image.getAttribute('src') === asset.url) return image;
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { image.onload = image.onerror = null; reject(new Error('Photo display timed out')); }, 12000);
+    image.onload = () => { clearTimeout(timer); image.onload = image.onerror = null; resolve(); };
+    image.onerror = () => { clearTimeout(timer); image.onload = image.onerror = null; reject(new Error('Photo display failed')); };
+    image.src = asset.url;
+  });
+  return image;
+}
+
+function showCardImageError(card, state) {
+  const image = card.querySelector('.product-image');
+  if (!image || image.querySelector('.product-photo')) return;
+  image.classList.remove('image-loading');
+  image.classList.add('image-error');
+  image.setAttribute('aria-busy', 'false');
+  image.setAttribute('role', 'group');
+  image.textContent = 'Photo unavailable';
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'product-image-retry';
+  retry.textContent = 'Retry';
+  retry.addEventListener('click', event => {
+    event.stopPropagation();
+    __productImages.retry(state.descriptor.key || state.descriptor.url);
+    state.attempts = 0;
+    loadCardImage(card, state);
+  });
+  image.appendChild(retry);
+}
+
+async function loadCardImage(card, state) {
+  if (!card.isConnected || state.pending || state.status === 'loaded' || state.attempts >= 3) return;
+  clearTimeout(state.retryTimer);
+  state.pending = true;
+  state.attempts++;
+  const image = card.querySelector('.product-image');
+  if (image && !image.querySelector('.product-photo')) {
+    image.classList.remove('image-error');
+    image.classList.add('image-loading');
+    image.textContent = '';
+    image.setAttribute('aria-busy', 'true');
+  }
+  try {
+    const asset = await __productImages.photo(state.descriptor, {
+      isCurrent: () => card.isConnected && state.near && __cardImages.get(card) === state
+    });
+    if (!card.isConnected || __cardImages.get(card) !== state) return;
+    const photo = await productPhotoElement(asset);
+    if (!card.isConnected || __cardImages.get(card) !== state) return;
+    photo.className = 'product-photo';
+    photo.alt = state.name || 'Product photo';
+    image.classList.remove('image-loading', 'image-error');
+    image.setAttribute('aria-busy', 'false');
+    image.setAttribute('role', 'img');
+    image.replaceChildren(photo);
+    card.setAttribute('data-image', asset.url);
+    state.status = 'loaded';
+    rememberCartProductImage(state.id, state.name, asset);
+  } catch (error) {
+    if (!card.isConnected || __cardImages.get(card) !== state) return;
+    state.status = 'failed';
+    if (error.cancelled) { state.attempts--; return; }
+    showCardImageError(card, state);
+    if (state.attempts < 3) {
+      state.retryTimer = setTimeout(() => {
+        if (state.near) loadCardImage(card, state);
+      }, Math.max(1000, (error.retryAt || Date.now() + 5000) - Date.now()));
+    }
+  } finally { state.pending = false; }
+}
+
+function observeCardImage(card, state) {
+  __cardImages.set(card, state);
+  if (typeof IntersectionObserver === 'undefined') {
+    state.near = true;
+    loadCardImage(card, state);
+    return;
+  }
+  if (!__imageObserver) {
+    __imageObserver = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        const current = __cardImages.get(entry.target);
+        if (!entry.target.isConnected) {
+          __imageObserver.unobserve(entry.target);
+          if (current) clearTimeout(current.retryTimer);
+          continue;
+        }
+        if (!current) continue;
+        current.near = entry.isIntersecting;
+        if (current.near) loadCardImage(entry.target, current);
+      }
+    }, { rootMargin: '180px 0px', threshold: 0.01 });
+  }
+  __imageObserver.observe(card);
+}
+
+function startProductImageRecovery() {
+  if (__imageRecoveryStarted) return;
+  __imageRecoveryStarted = true;
+  const recover = reset => {
+    if (document.visibilityState === 'hidden') return;
+    if (reset && selectedItemKey && document.getElementById('selected-item-display') &&
+        !document.querySelector('#selected-item-display img')) {
+      const item = loadCart().find(it => String(it.id != null ? it.id : `name:${it.name}`) === selectedItemKey);
+      if (item) {
+        __productImages.retry(getItemImageKey(item) || item.image);
+        selectCartItem(selectedItemKey);
+      }
+    }
+    document.querySelectorAll('.product-card').forEach(card => {
+      const state = __cardImages.get(card);
+      if (!state || !state.near || state.status !== 'failed') return;
+      if (reset) {
+        state.attempts = 0;
+        __productImages.retry(state.descriptor.key || state.descriptor.url);
+      }
+      loadCardImage(card, state);
+    });
+  };
+  // Already-painted photos stay put. Only failed visible photos need recovery.
+  window.addEventListener('online', () => recover(true));
+  document.addEventListener('visibilitychange', () => recover(false));
+}
 
 // 2. Function to get a single product by ID (User provided snippet adapted)
 async function getProduct(id) {
@@ -844,135 +883,36 @@ function productCardHTML(p) {
 
 async function renderProductsToGrid(gridEl, items) {
   if (!gridEl) return;
+  gridEl.querySelectorAll('.product-card').forEach(card => {
+    if (__imageObserver) __imageObserver.unobserve(card);
+    clearTimeout(__cardImages.get(card)?.retryTimer);
+  });
   gridEl.innerHTML = items.map(productCardHTML).join('');
-
-  // Trigger fade-in for category page
-  if (document.body.classList.contains('category-page')) {
-    // Small delay to ensure DOM paint happens with opacity:0 first
-    setTimeout(() => {
-      const cards = gridEl.querySelectorAll('.product-card');
-      cards.forEach(card => card.classList.add('visible'));
-    }, 100);
-  }
-
-  // Bind add-to-cart interactions for this grid
   try { bindGridForCart(gridEl); } catch (_) { }
-
-  // Resolve images asynchronously
   const cards = Array.from(gridEl.querySelectorAll('.product-card'));
-  const resolvedImages = new Map(); // key (id/name) -> url
-  const resolvedKeys = new Map();   // key (id/name) -> imageKey (backend path)
-
-  await Promise.all(cards.map(async (card, idx) => {
-    const p = items[idx];
-    const key = Array.isArray(p.imageKeys) && p.imageKeys.length ? p.imageKeys[0] : null;
-    let url = null;
-    let finalImageKey = null;
-
-    // Prefer existing API image resolver when key is provided
-    if (key) {
-      url = await getImageUrlForKey(key);
-      finalImageKey = key;
-    } else if (p.image_url) {
-      // image_url may be a full URL OR an external key that the API can sign
-      if (/^https?:\/\//i.test(p.image_url)) {
-        url = p.image_url;
-        const fromUrl = imageKeyFromUrl(p.image_url);
-        if (fromUrl) {
-          finalImageKey = fromUrl;
-          if (!isSignedUrlFresh(p.image_url)) {
-            try { url = await getImageUrlForKey(fromUrl); } catch { }
-          }
-        }
-      } else {
-        try { url = await getImageUrlForKey(p.image_url); } catch { }
-        finalImageKey = p.image_url;
-      }
+  cards.forEach((card, index) => {
+    const product = items[index];
+    ensureLocationTag(card, product.areaLocation);
+    const descriptor = productImageDescriptor(product);
+    const image = card.querySelector('.product-image');
+    image.setAttribute('role', 'img');
+    image.setAttribute('aria-label', product.name || 'Product photo');
+    if (descriptor.key) card.setAttribute('data-image-key', descriptor.key);
+    if (!descriptor.key && !descriptor.url) {
+      image.classList.add('image-error');
+      image.textContent = 'No photo available';
+      return;
     }
-    const imgDiv = card.querySelector('.product-image');
-    if (imgDiv) {
-      // If Supabase storage path provided, attempt signed URL
-      if (!url && p.image_url && typeof p.image_url === 'string' && window.sb) {
-        try {
-          // Expect p.image_url like: 'cabinet-uploads/<uid>/file.jpg' or full URL
-          if (/^https?:\/\//i.test(p.image_url)) {
-            url = p.image_url;
-            const fromUrl = imageKeyFromUrl(p.image_url);
-            if (fromUrl) finalImageKey = fromUrl;
-          } else {
-            const path = p.image_url.replace(/^cabinet-uploads\//, '');
-            const { data, error } = await window.sb.storage
-              .from('cabinet-uploads')
-              .createSignedUrl(path, 3600);
-            if (!error && data && data.signedUrl) url = data.signedUrl;
-            finalImageKey = p.image_url;
-          }
-        } catch { }
-      }
-      if (url) {
-        imgDiv.style.backgroundImage = `url('${url}')`;
-        imgDiv.style.backgroundSize = 'cover';
-        imgDiv.style.backgroundPosition = 'center';
-        // Save url to card for add-to-cart
-        card.setAttribute('data-image', url);
-        // Save the key/path for refreshing later
-        if (finalImageKey) {
-          card.setAttribute('data-image-key', finalImageKey);
-        }
-
-        // Track for cart update
-        if (p.id) {
-          resolvedImages.set(String(p.id), url);
-          if (finalImageKey) resolvedKeys.set(String(p.id), finalImageKey);
-        }
-        if (p.name) {
-          resolvedImages.set(`name:${p.name}`, url);
-          if (finalImageKey) resolvedKeys.set(`name:${p.name}`, finalImageKey);
-        }
-      }
-    }
-    // add/override location-tag with areaLocation if present
-    ensureLocationTag(card, p.areaLocation);
-  }));
-
-  try { await refreshProductCardImages(gridEl); } catch (_) { }
-
-  // Self-heal: Update cart items if we found images OR keys for them
-  if (resolvedImages.size > 0 || resolvedKeys.size > 0) {
-    const cartItems = loadCart();
-    let dirty = false;
-    cartItems.forEach(it => {
-      const idKey = it.id != null ? String(it.id) : null;
-      const nameKey = it.name ? `name:${it.name}` : null;
-
-      // 1. Backfill Image URL if missing
-      if (!it.image) {
-        let foundUrl = null;
-        if (idKey && resolvedImages.has(idKey)) foundUrl = resolvedImages.get(idKey);
-        else if (nameKey && resolvedImages.has(nameKey)) foundUrl = resolvedImages.get(nameKey);
-
-        if (foundUrl) {
-          it.image = foundUrl;
-          dirty = true;
-        }
-      }
-
-      // 2. Backfill Image Key if missing (crucial for refreshing expired URLs)
-      if (!it.imageKey) {
-        let foundKey = null;
-        if (idKey && resolvedKeys.has(idKey)) foundKey = resolvedKeys.get(idKey);
-        else if (nameKey && resolvedKeys.has(nameKey)) foundKey = resolvedKeys.get(nameKey);
-
-        if (foundKey) {
-          it.imageKey = foundKey;
-          dirty = true;
-        }
-      }
+    image.classList.add('image-loading');
+    image.textContent = '';
+    image.setAttribute('aria-busy', 'true');
+    observeCardImage(card, {
+      descriptor, id: product.id, name: product.name,
+      status: 'idle', attempts: 0, near: false, pending: false, retryTimer: null
     });
-    if (dirty) {
-      saveCart(cartItems);
-      renderCart();
-    }
+  });
+  if (document.body.classList.contains('category-page')) {
+    requestAnimationFrame(() => cards.forEach(card => card.classList.add('visible')));
   }
 }
 
@@ -1372,6 +1312,7 @@ function formatMoney(n) {
 
 // --- Cart Selection Logic ---
 let selectedItemKey = null;
+let selectedImageRevision = 0;
 
 function selectCartItem(key) {
   selectedItemKey = key;
@@ -1388,19 +1329,41 @@ function selectCartItem(key) {
     });
   }
 
-  // 2. Update Left Panel Display (if in OpenSearch mode)
+  // Load only the selected photo, with the same cache and bounded recovery as cards.
   const displayEl = document.getElementById('selected-item-display');
-  if (displayEl) {
-    if (item && item.image) {
-      displayEl.innerHTML = `<img src="${item.image}" class="selected-item-image" alt="${item.name}" draggable="false">`;
-    } else if (item) {
-      // Item selected but no image
-      displayEl.innerHTML = `<div class="placeholder-message">${item.name}</div>`;
-    } else {
-      // Nothing selected
-      displayEl.innerHTML = `<div class="placeholder-message">"Selected" item Image "shown here"</div>`;
-    }
+  if (!displayEl) return;
+  const revision = ++selectedImageRevision;
+  if (item && displayEl.dataset.itemKey === key &&
+      displayEl.querySelector('img')?.getAttribute('src') === item.image) return;
+  const current = () => revision === selectedImageRevision && displayEl.isConnected;
+  const placeholder = text => {
+    const message = document.createElement('div');
+    message.className = 'placeholder-message';
+    message.textContent = text;
+    displayEl.replaceChildren(message);
+  };
+  if (!item) {
+    displayEl.dataset.itemKey = '';
+    placeholder('Select an item to see its photo');
+    return;
   }
+  if (displayEl.dataset.itemKey !== key || !displayEl.querySelector('img')) placeholder(item.name || 'Item');
+  displayEl.dataset.itemKey = key;
+  const descriptor = { key: getItemImageKey(item), url: item.image || null };
+  if (!descriptor.key && !descriptor.url) return;
+  __productImages.photo(descriptor, { isCurrent: current }).then(async asset => {
+    if (!current()) return;
+    const image = await productPhotoElement(asset);
+    if (!current()) return;
+    const shown = displayEl.querySelector('img');
+    if (shown?.getAttribute('src') !== asset.url) {
+      image.className = 'selected-item-image';
+      image.alt = item.name || 'Item';
+      displayEl.replaceChildren(image);
+    }
+    rememberCartProductImage(item.id, item.name, asset);
+  }).catch(() => { if (current() && !displayEl.querySelector('img')) placeholder(item.name || 'Photo unavailable'); });
+
 }
 
 function renderCart() {
@@ -1665,6 +1628,7 @@ function bindKioskDoubleTap(root, selector, onFirstTap, onDoubleTap) {
   }, { passive: true });
   root.addEventListener('pointercancel', () => { moved = true; clear(); }, { passive: true });
   document.addEventListener('scroll', clear, { capture: true, passive: true });
+  document.addEventListener('nc:drag-scroll', clear);
   root.addEventListener('click', e => {
     const card = e.target.closest(selector);
     if (!card || !root.contains(card) || moved) return;
@@ -1874,8 +1838,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const isAdminPath = /(^|\/)admin\//.test(location.pathname);
   if (!isAdminPath) {
     try { renderCart(); } catch (_) { }
-    try { refreshCartImages({ rerender: true }); } catch (_) { }
-    try { startImageRefreshLoop(); } catch (_) { }
+    try { startProductImageRecovery(); } catch (_) { }
     // Initialize force sign-out realtime watcher and send an initial heartbeat
     try { ensureForceSignoutWatcher(); } catch (_) { }
     try { ensureCartOccupancyWatcher(); } catch (_) { }
@@ -2006,20 +1969,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const needsScale = !!product.scaleNeed;
         const allergyVal = (product.allergySummary && product.allergySummary !== 'none') ? product.allergySummary : null;
 
-        // Resolve image if available
-        let image = null;
-        let imageKey = null;
-        if (Array.isArray(product.imageKeys) && product.imageKeys.length) {
-          imageKey = product.imageKeys[0];
-          try { image = await getImageUrlForKey(imageKey); } catch (_) { }
-        } else if (product.image_url) {
-          if (/^https?:\/\//i.test(product.image_url)) {
-            image = product.image_url;
-          } else {
-            imageKey = product.image_url;
-            try { image = await getImageUrlForKey(product.image_url); } catch (_) { }
-          }
-        }
+        // The selected-photo loader resolves the key when its download can start.
+        // Scanning and adding an item should not wait on a separate signing call.
+        const { key: imageKey, url: image } = productImageDescriptor(product);
 
         // Same flow as manual tap: allergy check → scale check → add
         const proceed = () => {
