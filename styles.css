@@ -1210,6 +1210,13 @@ body.signin {
     /* ensure input text is left-aligned */
 }
 
+body.signin #email::placeholder,
+body.create-account #create-email::placeholder {
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
 .auth-input:hover {
     background-color: #FDFBF9;
 }
