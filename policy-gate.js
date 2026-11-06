@@ -147,13 +147,16 @@
     const options = opts || {};
     if (openOverlay) return Promise.resolve(false);
 
+    // Sign-in waits here for a choice. Its busy overlay must not cover the form.
+    try { window.hideLoadingOverlay?.(); } catch (_) { }
+
     // The virtual keyboard is fixed to the bottom of the screen and would sit
     // under the modal covering the agree row, so drop focus to dismiss it.
     try { document.activeElement && document.activeElement.blur(); } catch (_) { }
 
     return new Promise((resolve) => {
       const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
+      overlay.className = 'modal-overlay policy-overlay';
       overlay.innerHTML = `
         <div class="modal policy-modal" role="dialog" aria-modal="true" aria-labelledby="policy-modal-title">
           <div class="modal-header" id="policy-modal-title">${NC_POLICY_TITLE}</div>
@@ -163,6 +166,7 @@
             <input type="checkbox" class="policy-agree-box" />
             <span>I have read and agree to the Privacy Policy.</span>
           </label>
+          <p class="policy-error" role="alert" hidden></p>
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary policy-cancel">${options.cancelText || 'Cancel'}</button>
             <button type="button" class="btn btn-primary policy-confirm" disabled>${options.confirmText || 'Agree & Continue'}</button>
@@ -172,11 +176,14 @@
 
       document.body.appendChild(overlay);
       openOverlay = overlay;
+      window.dispatchEvent(new Event('nc:policy-open'));
 
       const box = overlay.querySelector('.policy-agree-box');
       const confirm = overlay.querySelector('.policy-confirm');
       const cancel = overlay.querySelector('.policy-cancel');
       const scroll = overlay.querySelector('.policy-scroll');
+      const errorText = overlay.querySelector('.policy-error');
+      let saving = false;
 
       const close = (agreed) => {
         if (openOverlay !== overlay) return;
@@ -186,12 +193,33 @@
         resolve(agreed);
       };
 
-      const onKey = (e) => { if (e.key === 'Escape') close(false); };
+      const onKey = (e) => { if (e.key === 'Escape' && !saving) close(false); };
       document.addEventListener('keydown', onKey);
 
       box.addEventListener('change', () => { confirm.disabled = !box.checked; });
-      confirm.addEventListener('click', () => { if (box.checked) close(true); });
-      cancel.addEventListener('click', () => close(false));
+      confirm.addEventListener('click', async () => {
+        if (!box.checked || saving) return;
+        saving = true;
+        box.disabled = true;
+        confirm.disabled = true;
+        cancel.disabled = true;
+        errorText.hidden = true;
+        confirm.textContent = 'Saving…';
+        try {
+          if (options.onConfirm) await options.onConfirm();
+          close(true);
+        } catch (_) {
+          errorText.textContent = 'We couldn’t save your agreement. Please try again, or cancel and sign in again.';
+          errorText.hidden = false;
+        } finally {
+          saving = false;
+          box.disabled = false;
+          confirm.disabled = !box.checked;
+          cancel.disabled = false;
+          confirm.textContent = options.confirmText || 'Agree & Continue';
+        }
+      });
+      cancel.addEventListener('click', () => { if (!saving) close(false); });
 
       // Deliberately no backdrop-click close: agreeing has to be explicit.
       scroll.scrollTop = 0;
@@ -218,16 +246,13 @@
     }
     if (accepted) return true;
 
-    const agreed = await showPolicyModal();
-    if (!agreed) return false;
+    return showPolicyModal({ onConfirm: async () => {
+      const record = {
+        policy_accepted: true,
+        policy_accepted_at: new Date().toISOString(),
+        policy_version: NC_POLICY_VERSION,
+      };
 
-    const record = {
-      policy_accepted: true,
-      policy_accepted_at: new Date().toISOString(),
-      policy_version: NC_POLICY_VERSION,
-    };
-
-    try {
       // A plain update, not an upsert: PostgREST builds an upsert as
       // INSERT ... ON CONFLICT DO UPDATE and puts every posted column in the SET
       // list, including id. Migration 0012 revoked table-level UPDATE and never
@@ -246,12 +271,7 @@
           .insert(Object.assign({ id: userId }, record));
         if (insertError) throw insertError;
       }
-    } catch (e) {
-      // Do not let them through on a write failure: they would be prompted again
-      // next time anyway, and proceeding would leave no record of consent.
-      return false;
-    }
-    return true;
+    } });
   }
 
   window.ncPolicy = {

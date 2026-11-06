@@ -1528,6 +1528,11 @@ body.signin.keyboard-visible .auth-wrapper {
 }
 
 /* --- Privacy Policy Agreement Modal --- */
+.policy-overlay {
+    /* Above auth's busy overlay and touch keyboard; agreement must stay usable. */
+    z-index: 100060;
+}
+
 .policy-modal {
     max-width: 560px;
     display: flex;
@@ -1620,6 +1625,26 @@ body.signin.keyboard-visible .auth-wrapper {
 .policy-confirm:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+.policy-error {
+    margin: 0 0 12px;
+    color: #a52828;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Enlarge only the painted text on 10.1-inch landscape tablets. Transforms
+   preserve the existing capsule width, height, padding, and card layout. */
+@media (min-width: 800px) and (max-width: 1366px) and (min-height: 500px) and (max-height: 900px) {
+    body.signin .signup-pill .pill-copy {
+        transform: translateX(-3px) scale(1.16);
+        transform-origin: left center;
+    }
+
+    body.signin .signup-pill .pill-check {
+        transform: translateX(3px);
+    }
 }
 
 @media (max-width: 680px) {

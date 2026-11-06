@@ -401,6 +401,8 @@
     window.ncSetKeyboardViewport?.(vkEl, false);
   }
 
+  window.addEventListener('nc:policy-open', () => hide(true));
+
   function init() {
     // Page-specific chains (only elements that exist on this page are kept)
     fieldOrder = [
@@ -427,6 +429,11 @@
       el.addEventListener('blur', () => {
         // Small delay to allow focus to move to another input or for click to register
         setTimeout(() => {
+          // Agreement controls own focus until the modal is dismissed.
+          if (document.querySelector('.policy-overlay')) {
+            hide(true);
+            return;
+          }
           // Keep VK up on OTP until the user verifies (or leaves via Change my email).
           if (document.body.classList.contains('otp-open')) {
             const otp = document.getElementById('otp-input');
