@@ -1,3 +1,5 @@
+import { verificationEmailHtml } from "./verification-email.mjs";
+import { SUPPORT_EMAIL } from "./email-layout.mjs";
 // Shared helpers for NobelCart auth edge functions.
 
 // @ts-ignore
@@ -171,66 +173,47 @@ export async function sendBrevoSms(phone: string, content: string): Promise<{ me
   throw new Error(lastErr);
 }
 
-/** Signup / recovery OTP via Brevo transactional email (default channel). */
-export async function sendOtpEmail(
-  email: string,
-  code: string,
-): Promise<{ messageId?: string | number }> {
+/** All customer email uses the same Brevo identity and provider. */
+export async function sendBrevoEmail(opts: {
+  email: string;
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+}): Promise<{ messageId?: string | number }> {
   const key = Deno.env.get("BREVO_API_KEY") || "";
-  if (!key) throw new Error("Email OTP is not configured (BREVO_API_KEY).");
-
-  // Must be a sender verified in Brevo (SMTP & API → Senders).
-  // noreply@nobelcart.com is NOT verified and Gmail returns a silent delivery error.
-  const fromEmail = (
-    Deno.env.get("BREVO_OTP_FROM_EMAIL") ||
-    Deno.env.get("FROM_EMAIL") ||
-    ""
-  ).trim();
-  if (!fromEmail) {
-    throw new Error(
-      "Email OTP sender is not configured. Set BREVO_OTP_FROM_EMAIL to a verified Brevo sender.",
-    );
-  }
+  if (!key) throw new Error("Email is not configured (BREVO_API_KEY).");
+  const fromEmail = (Deno.env.get("FROM_EMAIL") || SUPPORT_EMAIL).trim();
   const fromName = (Deno.env.get("BREVO_OTP_FROM_NAME") || "NobleCart").trim();
-
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
-    headers: {
-      "api-key": key,
-      "content-type": "application/json",
-      accept: "application/json",
-    },
+    headers: { "api-key": key, "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({
       sender: { name: fromName, email: fromEmail },
-      to: [{ email }],
-      subject: "Your NobleCart verification",
-      htmlContent:
-        `<p>Your NobleCart verification:</p>` +
-        `<p style="font-size:28px;letter-spacing:4px;font-weight:700;">${code}</p>` +
-        `<p>It expires in 10 minutes. If you did not request this, you can ignore this email.</p>`,
-      textContent: `Your NobleCart verification: ${code}. It expires in 10 minutes.`,
+      replyTo: { email: fromEmail, name: fromName },
+      to: [{ email: opts.email }],
+      subject: opts.subject,
+      htmlContent: opts.htmlContent,
+      ...(opts.textContent ? { textContent: opts.textContent } : {}),
     }),
   });
-
-  const text = await res.text().catch(() => "");
-  let parsed: Record<string, unknown> = {};
-  try {
-    parsed = text ? JSON.parse(text) : {};
-  } catch {
-    parsed = { raw: text };
-  }
-
   if (!res.ok) {
-    console.error("Brevo email OTP error", res.status, text);
-    throw new Error(
-      `Failed to send verification email (${res.status}): ${text || res.statusText}. ` +
-        `Verify sender ${fromEmail} in Brevo (SMTP & API → Senders).`,
-    );
+    // Keep provider error details in server logs, never include API keys.
+    const detail = await res.text().catch(() => "");
+    console.error("Brevo email error", res.status, detail);
+    throw new Error(`Failed to send email (${res.status}). Verify sender ${fromEmail} in Brevo.`);
   }
+  const result = await res.json();
+  return { messageId: result.messageId };
+}
 
-  const messageId = parsed.messageId as string | number | undefined;
-  console.log("Brevo email OTP ok", { email, fromEmail, messageId });
-  return { messageId };
+/** Signup / recovery OTP with the approved NobleCart design. */
+export async function sendOtpEmail(email: string, code: string): Promise<{ messageId?: string | number }> {
+  return sendBrevoEmail({
+    email,
+    subject: "Your NobleCart verification",
+    htmlContent: verificationEmailHtml(code),
+    textContent: `Your NobleCart verification: ${code}. It expires in 10 minutes.`,
+  });
 }
 
 /** Send OTP using current channel (email now; SMS when OTP_CHANNEL=sms). */
