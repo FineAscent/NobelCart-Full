@@ -480,8 +480,7 @@
           '<span class="pill-copy">' +
             '<span class="pill-label">' + label + '</span>' +
             '<span class="pill-hint">Tap to edit</span>' +
-          '</span>' +
-          '<span class="pill-check" aria-hidden="true">✓</span>';
+          '</span>';
       }
 
       function clearPillContent(btn) {
