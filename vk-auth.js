@@ -4,6 +4,37 @@
   let vkEl = null;
   let input = null;
   let active = false;
+  let blurTimer = null;
+  let keyboardMotion = null;
+  const signinKeyboard = () => document.body.classList.contains('signin') && !document.body.classList.contains('create-account');
+
+  function moveSigninKeyboard(visible, wasVisible) {
+    if (!visible && !wasVisible) { keyboardMotion?.cancel(); vkEl.style.display = 'none'; return; }
+    if (!signinKeyboard() || !vkEl.animate) {
+      vkEl.style.display = visible ? 'block' : 'none';
+      return;
+    }
+    const style = getComputedStyle(vkEl);
+    const from = wasVisible ? { transform: style.transform, opacity: style.opacity }
+      : { transform: 'translateY(24px)', opacity: 0 };
+    keyboardMotion?.cancel();
+    vkEl.style.display = 'block';
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (!visible) vkEl.style.display = 'none';
+      return;
+    }
+    const motion = vkEl.animate([from, visible ? { transform: 'translateY(0)', opacity: 1 }
+      : { transform: 'translateY(24px)', opacity: 0 }], {
+      duration: 320, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'both',
+    });
+    keyboardMotion = motion;
+    motion.finished.then(() => {
+      if (keyboardMotion !== motion) return;
+      if (!visible && !active) vkEl.style.display = 'none';
+      motion.cancel();
+      keyboardMotion = null;
+    }).catch(() => {});
+  }
   /** Ordered focus chain: Done advances; last field submits the form. */
   let fieldOrder = [];
 
@@ -367,12 +398,19 @@
   }
 
   function show(targetInput) {
+    if (blurTimer !== null) { clearTimeout(blurTimer); blurTimer = null; }
     input = targetInput;
     ensureKeyboard();
     if (!vkEl) return;
+    const opening = !active;
+    const wasVisible = vkEl.style.display !== 'none';
+    if (opening && signinKeyboard()) window.dispatchEvent(new Event('nc:keyboard-will-change'));
     vkEl.style.display = 'block';
     active = true;
     window.__vkActive = true;
+    if (document.body.classList.contains('signin') && !document.body.classList.contains('create-account')) {
+      revealForFocus(targetInput);
+    }
     const wantNumbers = !!(
       targetInput?.dataset?.vkMode === 'numbers' ||
       targetInput?.dataset?.field === 'dob' ||
@@ -388,20 +426,29 @@
       updateDoneLabel();
     }
     window.ncSetKeyboardViewport?.(vkEl, true);
+    if (opening) moveSigninKeyboard(true, wasVisible);
     ensureVisible(targetInput);
   }
 
   function hide(force) {
     if (!force && document.body.classList.contains('otp-open')) return;
     if (!vkEl) return;
+    if (!active && !force) return;
+    if (active && signinKeyboard()) window.dispatchEvent(new Event('nc:keyboard-will-change'));
+    if (blurTimer !== null) { clearTimeout(blurTimer); blurTimer = null; }
     if (vkEl.__vkFeedback) vkEl.__vkFeedback.clear();
-    vkEl.style.display = 'none';
+    const wasVisible = vkEl.style.display !== 'none';
     active = false;
     window.__vkActive = false;
+    if (document.body.classList.contains('signin') && !document.body.classList.contains('create-account')) {
+      document.body.classList.remove('keyboard-visible', 'focus-email', 'focus-password');
+    }
     window.ncSetKeyboardViewport?.(vkEl, false);
+    moveSigninKeyboard(false, wasVisible);
   }
 
   window.addEventListener('nc:policy-open', () => hide(true));
+  window.addEventListener('nc:signin-phone', () => hide(true));
 
   function init() {
     // Page-specific chains (only elements that exist on this page are kept)
@@ -426,9 +473,13 @@
     function bind(el) {
       if (!el) return;
       el.addEventListener('focus', () => { show(el); });
+      // Escape can close the keyboard while the field still owns focus.
+      el.addEventListener('click', () => { if (!active || input !== el) show(el); });
       el.addEventListener('blur', () => {
         // Small delay to allow focus to move to another input or for click to register
-        setTimeout(() => {
+        if (blurTimer !== null) clearTimeout(blurTimer);
+        blurTimer = setTimeout(() => {
+          blurTimer = null;
           // Agreement controls own focus until the modal is dismissed.
           if (document.querySelector('.policy-overlay')) {
             hide(true);
@@ -482,6 +533,7 @@
 
     // Wait for VK to render/display
     setTimeout(() => {
+      if (!active || input !== el) return;
       const vkRect = vkEl.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
@@ -498,7 +550,7 @@
         // Check if we are in the checkout scrollable container
         const checkoutLeft = el.closest('.checkout-left, .auth-wrapper');
         if (checkoutLeft) {
-          checkoutLeft.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+          checkoutLeft.scrollBy({ top: scrollAmount, behavior: document.body.classList.contains('signin') ? 'auto' : 'smooth' });
         } else {
           // Fallback for body/window scrolling (like on signin)
           window.scrollBy({ top: scrollAmount, behavior: 'smooth' });

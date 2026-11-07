@@ -41,6 +41,14 @@ async function apiFetch(path, options = {}) {
 }
 // presence modal is defined after ensureModalRoot()
 
+function scaleKgToUnit(kg, unit) {
+  const normalized = String(unit || 'kg').trim().toLowerCase().replace(/^\//, '');
+  const factors = { lb: 2.2046226218, lbs: 2.2046226218, pound: 2.2046226218,
+    pounds: 2.2046226218, oz: 35.27396195, ounce: 35.27396195,
+    ounces: 35.27396195, g: 1000, gram: 1000, grams: 1000 };
+  return Number(kg) * (factors[normalized] || 1);
+}
+
 // ---- Lightweight modal for weight input (top-level) ----
 function ensureModalRoot() {
   if (!document.querySelector('#modal-root')) {
@@ -345,7 +353,7 @@ async function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
   const maybeAutoAdd = () => {
     if (!guideDone || autoConfirmed || !acceptLive || lastKg == null || lastKg <= MIN_KG || !stableSince) return;
     const held = Date.now() - stableSince;
-    const w = Math.abs(Number(input.value)) || lastKg;
+    const w = Math.abs(Number(input.value)) || scaleKgToUnit(lastKg, u);
     if (held < STABLE_MS) {
       const leftSec = Math.max(1, Math.ceil((STABLE_MS - held) / 1000));
       if (statusEl) statusEl.textContent = `Live from scale \u00b7 hold still ${leftSec}s\u2026`;
@@ -363,7 +371,7 @@ async function showWeightModal({ name, unit, pricePerUnit, onConfirm }) {
     if (!acceptLive) return;
     const w = Math.abs(Number(kg));
     if (!Number.isFinite(w)) return;
-    input.value = w.toFixed(3);
+    input.value = scaleKgToUnit(w, u).toFixed(3);
     updateEstimate();
     if (dotEl) {
       dotEl.style.background = '#22c55e';
@@ -954,14 +962,15 @@ function saveCart(items) {
   try { localStorage.setItem(CART_KEY, JSON.stringify(items || [])); } catch (_) { }
 }
 
+function getCartLineCents(item) {
+  const price = Number(item.price) || 0;
+  const qty = Number(item.qty) || 1;
+  return item.weighted ? Math.round(price * qty * 100)
+    : Math.round(price * 100) * Math.max(1, Math.round(qty));
+}
+
 function getCartSubtotal() {
-  const items = loadCart();
-  let subtotal = 0;
-  for (const it of items) {
-    const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
-    subtotal += line;
-  }
-  return Number(subtotal || 0);
+  return loadCart().reduce((cents, item) => cents + getCartLineCents(item), 0) / 100;
 }
 
 function compactCartItems(items) {
@@ -1393,7 +1402,7 @@ function renderCart() {
   }
 
   items.forEach((it, idx) => {
-    const line = (Number(it.price) || 0) * (Number(it.qty) || 1);
+    const line = getCartLineCents(it) / 100;
     subtotal += line;
 
     if (container) {
@@ -2238,7 +2247,11 @@ document.addEventListener('DOMContentLoaded', () => {
           try { showHintToast('Please sign in to checkout'); } catch (_) { }
           return;
         }
-      } catch (_) { }
+      } catch (_) {
+        e.preventDefault();
+        try { showHintToast('Unable to verify sign-in. Please try again.'); } catch (_) { }
+        return;
+      }
 
       const onCheckoutPage = location.pathname.includes('checkout.html');
       if (onCheckoutPage) {
@@ -2716,6 +2729,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// Stripe completion and settlement are distinct for delayed payment methods.
+function isCheckoutPaid(session) {
+  return session?.payment_status === 'paid' ||
+    (session?.payment_status === 'no_payment_required' && session?.status === 'complete');
+}
+
 // ---- Stripe Checkout wiring ----
 async function startCheckout(options = {}) {
   const { embedded = false, returnSession = false } = options;
@@ -2743,7 +2762,8 @@ async function startCheckout(options = {}) {
           id: it.id != null ? String(it.id) : undefined,
           weighted: '1',
           unit: it.unit || '',
-          qty: String(qty)
+          qty: String(qty),
+          unit_price_cents: String(Math.round(price * 100))
         }
       };
     }
@@ -2842,6 +2862,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let lastSessionId = null;
   let pollTimer = null;
+  let checkoutRun = 0;
 
   function setStatus(msg, kind = 'info') {
     statusEl.textContent = msg || '';
@@ -2897,7 +2918,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setStatus('Ready to scan', 'success');
   }
 
-  async function pollStatus(sessionId) {
+  async function pollStatus(sessionId, run) {
     if (!sessionId) {
       setStatus('No session id to poll. Regenerate QR.', 'error');
       return;
@@ -2911,7 +2932,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (pollTimer) clearInterval(pollTimer);
 
     let consecutiveErrors = 0;
+    let checking = false;
     const check = async () => {
+      if (run !== checkoutRun || checking) return;
+      checking = true;
       try {
         let data = null;
         const { data: d, error } = await window.sb.functions.invoke('stripe-create-session', {
@@ -2919,10 +2943,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         if (error) throw error;
         data = d;
+        if (run !== checkoutRun) return;
+        consecutiveErrors = 0;
         const status = data?.status || data?.payment_status;
         if (!status) return;
 
-        if (status === 'complete' || status === 'paid') {
+        if (isCheckoutPaid(data)) {
           setStatus('Payment complete. Finalizing...', 'success');
           clearInterval(pollTimer);
           pollTimer = null;
@@ -2942,6 +2968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           setStatus('Session expired. Please generate a new QR.', 'error');
         }
       } catch (e) {
+        if (run !== checkoutRun) return;
         console.warn('Status poll failed', e);
         consecutiveErrors += 1;
         if (consecutiveErrors >= 3) {
@@ -2949,17 +2976,22 @@ document.addEventListener('DOMContentLoaded', async () => {
           pollTimer = null;
           setStatus('Live status unavailable. Please refresh QR or check payment.', 'error');
         }
+      } finally {
+        checking = false;
       }
     };
 
-    // Kick off immediately and then interval
-    await check();
+    // Create the interval first so an immediate paid/expired response can stop it.
     pollTimer = setInterval(check, 3500);
+    await check();
   }
 
   let checkoutChannel = null;
 
   async function runQrCheckout({ refresh = false } = {}) {
+    const run = ++checkoutRun;
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
     try {
       setStatus(refresh ? 'Refreshing checkout link...' : 'Generating checkout link...', 'info');
       mountEl.classList.add('loading');
@@ -2971,6 +3003,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       const session = await startCheckout({ returnSession: true });
+      if (run !== checkoutRun) return;
       lastSessionId = session?.id || session?.session_id || null;
       const sessionUrl = session?.url;
 
@@ -2997,12 +3030,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const qrUrl = `${cleanOrigin}/p.html?c=${shortCode}`;
 
       await renderQrForUrl(qrUrl, { width: 340 });
-      pollStatus(lastSessionId);
+      if (run === checkoutRun) pollStatus(lastSessionId, run);
     } catch (e) {
+      if (run !== checkoutRun) return;
       console.error('QR checkout failed', e);
       mountEl.innerHTML = `<div style="color:#b91c1c; text-align:center;">Failed to create checkout: ${e?.message || e}</div>`;
     } finally {
-      mountEl.classList.remove('loading');
+      if (run === checkoutRun) mountEl.classList.remove('loading');
     }
   }
 
@@ -3062,6 +3096,12 @@ document.addEventListener('DOMContentLoaded', () => {
         data = await apiFetch(`/stripe/session-details?session_id=${encodeURIComponent(sessionId)}`);
       }
       if (!data) throw new Error('No details');
+      if (!isCheckoutPaid(data)) {
+        setStatus('Payment has not been confirmed. Your cart has been kept.', 'info');
+        return;
+      }
+      const badge = document.querySelector('.hero-badge');
+      if (badge) badge.textContent = 'Payment confirmed';
 
       // Prefer showing the user's email rather than rendering the full receipt details
       const sessionEmail = data.customer_email || data.customer_details?.email || data.receipt_email;
@@ -3090,7 +3130,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 items: items || []
               },
               { onConflict: 'session_id' }
-            );
+            ).select('id').single();
 
             if (receiptError) {
               console.warn('Failed to save receipt (non-fatal):', receiptError);
@@ -3098,19 +3138,20 @@ document.addEventListener('DOMContentLoaded', () => {
               console.debug('Receipt saved successfully with', items.length, 'items');
             }
 
-            // Send receipt email with checkout details
+            // Notify using the customer’s saved SMS/email preference
             try {
               if (window.sb?.functions?.invoke && userEmail && items.length > 0) {
                 await window.sb.functions.invoke('send-checkout-email', {
                   body: {
                     user_id: uid,
+                    receipt_id: receiptData?.id || null,
                     user_email: userEmail,
                     items: items,
                     total_cents: amount_total_cents,
                     currency: currency
                   }
                 });
-                console.debug('Receipt email sent successfully');
+                console.debug('Receipt notification requested successfully');
               }
             } catch (emailErr) {
               console.warn('Failed to send receipt email (non-fatal)', emailErr);
@@ -3123,7 +3164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Clear cart after a successful checkout
       try { saveCart([]); renderCart(); } catch { }
-      setStatus('Payment complete. Check your email for the receipt.', 'success');
+      setStatus('Payment complete. Your receipt is available in NobleCart.', 'success');
     } catch (e) {
       console.error('Failed to load receipt', e);
       setStatus('Failed to load receipt', 'error');

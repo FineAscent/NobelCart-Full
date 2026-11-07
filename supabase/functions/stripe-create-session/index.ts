@@ -204,10 +204,12 @@ serve(async (req: any) => {
     form.set(`line_items[${i}][price_data][currency]`, currency);
     form.set(`line_items[${i}][price_data][unit_amount]`, String(unit));
     form.set(`line_items[${i}][price_data][product_data][name]`, it.name || "Item");
-    // Carry through our internal product id via product metadata if present
-    const pid = it?.metadata && (it.metadata as any).id;
-    if (pid != null) {
-      form.set(`line_items[${i}][price_data][product_data][metadata][id]`, String(pid));
+    // Preserve weight, measurement unit, and original unit price for receipts.
+    for (const key of ['id', 'weighted', 'unit', 'qty', 'unit_price_cents']) {
+      const value = it.metadata?.[key];
+      if (value != null) {
+        form.set(`line_items[${i}][price_data][product_data][metadata][${key}]`, String(value));
+      }
     }
   });
 

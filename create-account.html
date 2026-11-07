@@ -7,7 +7,7 @@
   <title>Create Account</title>
   <script src="phone-gate.js"></script>
   <script src="cart-id.js?v=2"></script>
-  <link rel="stylesheet" href="styles.css?v=60" />
+  <link rel="stylesheet" href="styles.css?v=72" />
   <script src="drag-scroll.js?v=3" defer></script>
 </head>
 
@@ -20,7 +20,7 @@
         <button type="button" id="pill-left" class="signup-pill signup-pill--left" hidden aria-label="Previous step"></button>
         <button type="button" id="pill-right" class="signup-pill signup-pill--right" hidden aria-label="Go back"></button>
           <h1 id="create-title" class="auth-title">Create account</h1>
-          <p class="auth-subtitle">We’ll email a code to finish signup.</p>
+          <p class="auth-subtitle">We’ll send a verification code to finish signup.</p>
 
           <form id="create-form" class="auth-form" novalidate>
             <div id="step-viewport" class="step-viewport">
@@ -122,6 +122,15 @@
                 <h2 id="summary-title">Look good?</h2>
                 <p class="summary-sub">Tap ✓ if it’s right, or ✕ to edit.</p>
                 <ul id="summary-list" class="summary-list"></ul>
+                <section class="signup-sms-consent" aria-labelledby="signup-sms-title">
+                  <label class="signup-sms-choice" for="signup-sms-opt-in">
+                    <input type="checkbox" id="signup-sms-opt-in" role="switch" data-consent-version="2026-10-21.2"
+                      aria-describedby="signup-sms-disclosure signup-sms-links" />
+                    <span id="signup-sms-title">Text me updates <span class="sms-optional">(optional)</span></span>
+                  </label>
+                  <p id="signup-sms-disclosure">By opting in, you agree to automated verification, account and order texts from NobleCart by FineAscent LLC. Not required to sign up or buy. Message frequency varies. Message and data rates may apply. Reply STOP to cancel or HELP for help. Your mobile information is not sold or shared for marketing.</p>
+                  <p id="signup-sms-links"><a href="https://fineascent.org/noblecart/sms-terms/" target="_blank" rel="noopener">SMS Terms</a><span aria-hidden="true"> · </span><a href="https://fineascent.org/noblecart/privacy-policy/" target="_blank" rel="noopener">Privacy Policy</a></p>
+                </section>
                 <button type="button" id="summary-confirm" class="auth-button" disabled>Send code</button>
                 <div id="summary-error" class="auth-error" style="display:none;"></div>
               </div>
@@ -142,6 +151,7 @@
                 data-field="otp" data-vk-mode="numbers" />
               <button type="button" id="otp-verify-btn" class="auth-button">Verify Code</button>
               <button type="button" id="otp-resend-btn" class="text-button">Resend code</button>
+              <button type="button" id="otp-email-btn" class="text-button" hidden>Use email instead</button>
               <button type="button" id="otp-wrong-btn" class="text-button">Change my email</button>
               <div id="otp-error" class="auth-error" style="display:none;"></div>
             </div>
@@ -252,6 +262,62 @@
       box-sizing: border-box;
       box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
     }
+    .signup-sms-consent {
+      margin: 0 0 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(45, 42, 38, 0.14);
+      text-align: left;
+    }
+    .signup-sms-choice {
+      display: flex;
+      flex-direction: row-reverse;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #2d2a26;
+    }
+    .signup-sms-choice input {
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      margin: 0;
+      width: 38px;
+      height: 22px;
+      flex: 0 0 38px;
+      border: 1px solid rgba(45, 42, 38, 0.15);
+      border-radius: 999px;
+      background: #d6d2cd;
+      cursor: pointer;
+      transition: background-color 140ms ease;
+    }
+    .signup-sms-choice input::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 2px;
+      left: 2px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+      transition: transform 140ms ease;
+    }
+    .signup-sms-choice input:checked { background: #8b7355; }
+    .signup-sms-choice input:checked::before { transform: translateX(16px); }
+    .signup-sms-choice input:focus-visible { outline: 2px solid #543106; outline-offset: 3px; }
+    @media (prefers-reduced-motion: reduce) {
+      .signup-sms-choice input, .signup-sms-choice input::before { transition: none; }
+    }
+    .sms-optional { font-weight: 400; }
+    .signup-sms-consent p { margin: 7px 0 0; font-size: 12px; line-height: 1.5; color: #514b43; }
+    .signup-sms-consent a { color: #543106; text-decoration: underline; overflow-wrap: anywhere; }
+    .summary-card { touch-action: pan-y; overscroll-behavior-y: contain; scrollbar-width: none; }
+    .summary-card::-webkit-scrollbar { display: none; }
+
     .summary-card h2 {
       margin: 0 0 4px;
       font-size: 22px;
@@ -576,9 +642,10 @@
     .step-hint {
       margin: 6px 0 0;
       font-size: 0.8rem;
-      color: #b91c1c;
+      color: #625b51;
       font-weight: 600;
     }
+    .step-hint.is-invalid { color: #b91c1c; }
     .step-hint[hidden] { display: none !important; }
 
     body.create-account .auth-wrapper {
@@ -1191,7 +1258,7 @@
       });
     })();
   </script>
-  <script src="signup-steps.js?v=35"></script>
+  <script src="signup-steps.js?v=36"></script>
 </body>
 
 </html>

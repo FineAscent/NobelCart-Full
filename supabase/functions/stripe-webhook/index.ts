@@ -13,6 +13,8 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // @ts-ignore
+import { receiptLine } from "../_shared/receipt-line.mjs";
+
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 // @ts-ignore
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -58,7 +60,7 @@ serve(async (req: any) => {
   // For now, we trust the event ID and will fetch the session from Stripe to verify it exists and is valid.
 
   // 3. Handle checkout.session.completed
-  if (event.type === 'checkout.session.completed') {
+  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const sessionRaw = event.data.object;
     const sessionId = sessionRaw.id;
 
@@ -66,7 +68,7 @@ serve(async (req: any) => {
 
     // Fetch full session with line_items + payment_intent.payment_method for card fingerprint
     const expand =
-      "expand[]=line_items&expand[]=payment_intent&expand[]=payment_intent.payment_method";
+      "expand[]=line_items.data.price.product&expand[]=payment_intent&expand[]=payment_intent.payment_method";
     const res = await fetch(
       `${STRIPE_API}/checkout/sessions/${encodeURIComponent(sessionId)}?${expand}`,
       { headers: { "authorization": `Bearer ${STRIPE_SECRET_KEY}` } },
@@ -76,6 +78,9 @@ serve(async (req: any) => {
       return badRequest('Failed to fetch session from Stripe', 502);
     }
     const session = await res.json();
+    if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+      return success({ received: true, status: 'awaiting_payment' });
+    }
 
     // Extract Metadata
     const userId = session.metadata?.user_id;
@@ -117,44 +122,17 @@ serve(async (req: any) => {
     const itemsForTable: any[] = [];
 
     for (const li of lineItems) {
-      const quantity = li.quantity || 1;
-      const amount = li.amount_total || 0; // Total for this line
-      const unitAmount = li.price?.unit_amount || 0;
-      const description = li.description || li.price?.product?.name || "Item";
-      
-      // Metadata from price/product if available (we passed it in create-session)
-      // Note: Stripe puts product metadata on the product object, but line_items might not expand product fully unless requested.
-      // However, we passed metadata into line_items in create-session.
-      // Let's rely on what we get. The create-session function put metadata on line_items directly? 
-      // Checking create-session: form.set(`line_items[${i}][price_data][product_data][metadata][id]`, ...);
-      // This puts it on the product. We might need to fetch product or hope it's in the line item price.product expansion?
-      // "expand[]=line_items.data.price.product" might be needed.
-      // For now, we'll try to extract what we can.
-      
-      const productId = li.price?.product; // This is an ID string if not expanded
-      
-      // Simplified item for JSON column
-      itemsForJson.push({
-        name: description,
-        quantity: quantity,
-        amount_cents: unitAmount, // store unit price
-        total_cents: amount,
-        product_id: typeof productId === 'string' ? productId : productId?.id
-      });
-
-      // Item for checkout_items table
+      const item = receiptLine(li);
+      itemsForJson.push(item);
       itemsForTable.push({
         user_id: userId,
-        // receipt_id: will be filled after receipt insert
-        product_id: typeof productId === 'string' ? productId : productId?.id,
-        product_name: description,
-        quantity: quantity,
-        unit_price_cents: unitAmount,
-        total_price_cents: amount,
-        // We'd need to look at custom metadata to know if it's weighted.
-        // If we can't easily get it, default false.
-        is_weighted: false, 
-        unit: null
+        product_id: item.product_id,
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price_cents: item.amount_cents,
+        total_price_cents: item.total_cents,
+        is_weighted: item.is_weighted,
+        unit: item.unit
       });
     }
 

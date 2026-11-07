@@ -7,6 +7,13 @@
       const nameEl = document.getElementById('create-name');
       const dobEl = document.getElementById('create-dob');
       const phoneEl = document.getElementById('create-phone');
+      const smsOptIn = document.getElementById('signup-sms-opt-in');
+      const smsConsentPayload = () => ({
+        sms_opt_in: smsOptIn?.checked === true,
+        sms_consent_version: smsOptIn?.dataset.consentVersion || '',
+      });
+      // Consent is specific to the displayed number, so a number edit resets it.
+      phoneEl?.addEventListener('input', () => { if (smsOptIn) smsOptIn.checked = false; });
       const emailEl = document.getElementById('create-email');
       const pwEl = document.getElementById('create-password');
       const errEl = document.getElementById('create-error');
@@ -455,6 +462,11 @@
         });
       }
 
+      function hasStepValue(stepIndex) {
+        const field = [nameEl, dobEl, phoneEl, emailEl, pwEl][stepIndex];
+        return !!String(stepIndex === 1 ? getDobDisplay() : field?.value || '').trim();
+      }
+
       function showStepHint(stepIndex, msg) {
         clearStepHints();
         const field = steps[stepIndex];
@@ -463,7 +475,9 @@
         if (!hint) return;
         hint.textContent = msg || '';
         hint.hidden = !msg;
+        hint.classList.toggle('is-invalid', hasStepValue(stepIndex));
         field.classList.remove('is-shake');
+        if (!hasStepValue(stepIndex)) return;
         void field.offsetWidth;
         field.classList.add('is-shake');
         setTimeout(() => field.classList.remove('is-shake'), 450);
@@ -761,10 +775,11 @@
           return false;
         }
         // After “Change my email”, Done on email re-sends OTP to the new address.
-        if (activeStep === 3 && (pendingId || pendingUserId)) {
+        if ((activeStep === 3 || activeStep === 2) && (pendingId || pendingUserId)) {
           (async () => {
             try {
               const data = await invokeAuth('auth-signup', {
+                ...smsConsentPayload(),
                 full_name: (nameEl?.value || '').trim(),
                 date_of_birth: dobToIso(getDobDisplay()),
                 phone: (phoneEl?.value || '').trim(),
@@ -773,7 +788,7 @@
               });
               pendingId = data.pending_id || pendingId;
               pendingEmail = data.email || (emailEl?.value || '').trim();
-              openOtp(data.phone || (phoneEl?.value || '').trim(), pendingEmail);
+              openOtp(data.phone || (phoneEl?.value || '').trim(), pendingEmail, data.otp_channel);
             } catch (e) {
               showStepHint(3, e.message || 'Could not update email.');
               showError(e.message || 'Could not update email.');
@@ -855,6 +870,7 @@
       const otpVerifyBtn = document.getElementById('otp-verify-btn');
       const otpResendBtn = document.getElementById('otp-resend-btn');
       const otpWrongBtn = document.getElementById('otp-wrong-btn');
+      const otpEmailBtn = document.getElementById('otp-email-btn');
       const otpError = document.getElementById('otp-error');
 
       if (otpInput) {
@@ -876,14 +892,17 @@
         });
       }
 
+      let verificationToken = '';
       let pendingId = '';
       let pendingUserId = '';
       let pendingPhone = '';
       let pendingEmail = '';
       let pendingPassword = '';
+      let pendingOtpChannel = 'email';
 
       async function invokeAuth(name, body) {
         if (!window.sb?.functions?.invoke) throw new Error('Auth not ready');
+        if (verificationToken) body = { ...body, verification_token: verificationToken };
         const { data, error } = await window.sb.functions.invoke(name, { body });
         let payload = data;
         if ((!payload || payload.error) && error) {
@@ -891,27 +910,39 @@
             if (typeof error.context?.json === 'function') payload = await error.context.json();
           } catch (_) {}
         }
+        if (typeof payload?.verification_token === 'string') verificationToken = payload.verification_token;
         if (payload && payload.error) {
           const err = new Error(payload.error);
           err.payload = payload;
           throw err;
         }
         if (error) throw new Error(error.message || 'Request failed');
+        if (name === 'auth-signup' && body.sms_opt_in === true &&
+            (payload?.sms_opt_in !== true || payload?.sms_consent_version !== body.sms_consent_version)) {
+          throw new Error('SMS signup is not available yet. Leave the optional text-message box unchecked to continue.');
+        }
         return payload || {};
       }
 
-      function showError(msg) {
+      function showError(msg, invalid = true) {
         if (errEl) {
+          errEl.classList.toggle('is-invalid', invalid);
           errEl.textContent = msg || 'Something went wrong.';
           errEl.style.display = 'block';
         }
       }
 
-      function showOtpError(msg) {
+      function showOtpError(msg, invalid = false) {
+        otpError.classList.toggle('is-invalid', invalid);
         otpError.style.color = '';
         otpError.textContent = msg || 'Something went wrong.';
         otpError.style.display = 'block';
       }
+
+      form?.addEventListener('input', () => {
+        clearStepHints();
+        if (errEl) { errEl.style.display = 'none'; errEl.classList.remove('is-invalid'); }
+      });
 
       function closeOtp() {
         if (otpOverlay) otpOverlay.style.display = 'none';
@@ -923,11 +954,21 @@
         } catch (_) {}
       }
 
-      function openOtp(phone, email) {
+      function updateOtpDestination(channel) {
+        pendingOtpChannel = channel === 'sms' ? 'sms' : 'email';
+        const sms = pendingOtpChannel === 'sms';
+        const dest = sms ? pendingPhone : pendingEmail || 'your email';
+        otpHint.textContent = 'We sent a 6-digit code ' + (sms ? 'by text to ' : 'to ') + dest + '. Your account is created only after this code is verified.';
+        const heading = otpOverlay?.querySelector('h2');
+        if (heading) heading.textContent = sms ? 'Verify phone' : 'Verify email';
+        if (otpWrongBtn) otpWrongBtn.textContent = sms ? 'Change my phone number' : 'Change my email';
+        if (otpEmailBtn) otpEmailBtn.hidden = !sms;
+      }
+
+      function openOtp(phone, email, channel) {
         pendingPhone = phone;
         if (email) pendingEmail = email;
-        const dest = pendingEmail || email || 'your email';
-        otpHint.textContent = 'We sent a 6-digit code to ' + dest + '. Your account is created only after this code is verified.';
+        updateOtpDestination(channel);
         otpOverlay.style.display = 'flex';
         document.body.classList.add('otp-open', 'keyboard-visible');
         if (otpInput) otpInput.value = '';
@@ -1084,6 +1125,7 @@
           if (!window.ncPolicy) throw new Error('Privacy Policy unavailable. Please try again.');
 
           const data = await invokeAuth('auth-signup', {
+            ...smsConsentPayload(),
             full_name: fullName,
             date_of_birth: dobIso,
             phone,
@@ -1096,11 +1138,12 @@
           pendingEmail = data.email || email;
           pendingPassword = password;
           closeSummary();
-          openOtp(data.phone || phone, pendingEmail);
+          openOtp(data.phone || phone, pendingEmail, data.otp_channel);
         } catch (ex) {
           setSummaryLoading(false);
           const msg = ex?.message || '';
           if (summaryError) {
+            summaryError.classList.toggle('is-invalid', /already|invalid|in use|not valid|not match/i.test(msg));
             summaryError.textContent = /rate limit|too many/i.test(msg)
               ? 'Too many signups right now. Please try again in a few minutes.'
               : (msg || 'Failed to start signup.');
@@ -1118,7 +1161,7 @@
           if (err) {
             goToStep(i);
             showStepHint(i, err);
-            showError(err);
+            showError(err, hasStepValue(i));
             return;
           }
         }
@@ -1138,14 +1181,16 @@
           });
           await afterVerified(data.session);
         } catch (e) {
-          showOtpError(e.message || 'Invalid code');
+          showOtpError(e.message || 'Invalid code', true);
         }
       });
 
       otpResendBtn?.addEventListener('click', async () => {
         otpError.style.display = 'none';
         try {
-          await invokeAuth('auth-resend-otp', { phone: pendingPhone });
+          const delivered = await invokeAuth('auth-resend-otp', { phone: pendingPhone, delivery_channel: pendingOtpChannel });
+          updateOtpDestination(delivered.otp_channel);
+          otpError.classList.remove('is-invalid');
           otpError.style.color = '#166534';
           otpError.textContent = 'Code resent.';
           otpError.style.display = 'block';
@@ -1156,7 +1201,14 @@
 
       otpWrongBtn?.addEventListener('click', () => {
         closeOtp();
-        goToStep(3, { force: true });
+        goToStep(pendingOtpChannel === 'sms' ? 2 : 3, { force: true });
+      });
+      otpEmailBtn?.addEventListener('click', async () => {
+        try {
+          const delivered = await invokeAuth('auth-resend-otp', { phone: pendingPhone, delivery_channel: 'email' });
+          updateOtpDestination(delivered.otp_channel);
+          otpError.style.display = 'none';
+        } catch (e) { showOtpError(e.message || 'Could not send email code.'); }
       });
       window.ncCreateBoot = 'ready';
       } catch (err) {

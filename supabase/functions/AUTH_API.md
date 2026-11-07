@@ -8,25 +8,28 @@ Same Edge Functions as the kiosk. `verify_jwt = false` on these auth functions.
 supabase functions deploy auth-signup auth-verify-otp auth-update-phone auth-resend-otp auth-signin --no-verify-jwt
 ```
 
+Apply migrations through `0028_auth_challenge_security.sql` before deploying. Coordinate updated web/native clients first; tokenless older clients must update and restart verification. See [security rollout](../../docmentaion-Ai/AUTH_SECURITY_ROLLOUT.md). Nothing in this working tree has been deployed. See [app SMS integration](../../docmentaion-Ai/APP_SMS_INTEGRATION.md) for UI, payload, fallback, and rollout requirements. These local changes must be deployed before the app uses them.
+
 ## Signup flow (app)
 
 1. Collect: full name, DOB (`YYYY-MM-DD`), US phone, email, password (7+ letters/numbers only)
-2. `auth-signup` → sends OTP (email channel by default)
-3. User enters 6-digit code
-4. `auth-verify-otp` with same `phone` + `password` → returns `session`
-5. `sb.auth.setSession(session)`
+2. Fetch `GET auth-signup?action=sms-consent`; display its optional SMS choice, initially off, and disclosure/links.
+3. `auth-signup` with `client_type: "app"`, `sms_opt_in` and the displayed `sms_consent_version` → sends OTP. Opt-in prefers SMS; otherwise email. Always follow returned `otp_channel`.
+4. User enters 6-digit code
+5. Keep returned `verification_token` in memory. Call `auth-verify-otp` with `{ phone, code, password, verification_token }` → returns `session`
+6. If session tokens are present, `sb.auth.setSession(session)`; otherwise show the returned sign-in message.
 
 Optional:
-- Wrong number before verify → `auth-update-phone` with `{ pending_id, phone }`
-- Resend code → `auth-resend-otp` with `{ phone }`
+- Wrong number before verify → `auth-update-phone` with `{ pending_id, phone, verification_token }`
+- Resend code → `auth-resend-otp` with `{ phone, verification_token }`
 
 ## Sign-in flow (app)
 
 1. `auth-signin` with `{ identifier: emailOrPhone, password }`
-2. `sb.auth.setSession(data.session)`
-3. If `needs_otp` → show OTP UI, then `auth-verify-otp`
-4. If `wrong_password` → show “That password is wrong.”
-5. If `not_found` → offer create account
+2. If `needs_otp` with `otp_channel` → show OTP UI, then `auth-verify-otp`. Without a channel, show the delivery error and offer retry.
+3. Otherwise, when session tokens are present, `sb.auth.setSession(data.session)`
+4. Public credential failures use the same generic message. Do not infer account existence from a failure.
+5. Keep `verification_token` from password-proven `needs_otp` responses for verify/resend; no pending IDs are exposed by sign-in.
 
 ## QR kiosk login (after app user is signed in)
 
@@ -63,6 +66,7 @@ async function invokeAuth(name, body) {
       }
     } catch (_) {}
   }
+  if (payload?.needs_otp && payload?.verification_token) return payload;
   if (payload?.error) {
     const err = new Error(payload.error);
     err.payload = payload;
@@ -73,20 +77,24 @@ async function invokeAuth(name, body) {
 }
 
 /** Normalize display phone → E.164 (+1…) before calling APIs if you want; server also normalizes. */
-export async function signupStart({ full_name, date_of_birth, phone, email, password }) {
+export async function signupStart({ full_name, date_of_birth, phone, email, password, sms_opt_in = false, sms_consent_version, verification_token }) {
   // date_of_birth: 'YYYY-MM-DD'
   return invokeAuth('auth-signup', {
+    client_type: 'app',
+    verification_token, // only for edits to a signup you already own
+    sms_opt_in: sms_opt_in === true,
+    sms_consent_version,
     full_name,
     date_of_birth,
     phone,
     email,
     password,
   });
-  // → { pending_id, phone, email, expires_at, otp_channel }
+  // → { pending_id, verification_token, phone, email, expires_at, otp_channel }
 }
 
-export async function signupVerify({ phone, code, password }) {
-  const data = await invokeAuth('auth-verify-otp', { phone, code, password });
+export async function signupVerify({ phone, code, password, verification_token }) {
+  const data = await invokeAuth('auth-verify-otp', { phone, code, password, verification_token });
   if (data.session?.access_token && data.session?.refresh_token) {
     await sb.auth.setSession({
       access_token: data.session.access_token,
@@ -96,12 +104,12 @@ export async function signupVerify({ phone, code, password }) {
   return data;
 }
 
-export async function signupResend(phone) {
-  return invokeAuth('auth-resend-otp', { phone });
+export async function signupResend(phone, verification_token, useEmail = false) {
+  return invokeAuth('auth-resend-otp', { phone, verification_token, ...(useEmail ? { delivery_channel: 'email' } : {}) });
 }
 
-export async function signupChangePhone({ pending_id, phone }) {
-  return invokeAuth('auth-update-phone', { pending_id, phone });
+export async function signupChangePhone({ pending_id, phone, verification_token }) {
+  return invokeAuth('auth-update-phone', { pending_id, phone, verification_token });
 }
 
 export async function signIn(identifier, password) {
@@ -127,11 +135,12 @@ export async function approveKioskQr(cart_id) {
 
 | Function | Body | Success |
 |---|---|---|
-| `auth-signup` | `{ full_name, date_of_birth, phone, email, password }` | `{ pending_id, phone, email, expires_at }` |
-| `auth-verify-otp` | `{ phone, code, password }` | `{ session }` |
-| `auth-resend-otp` | `{ phone }` | `{ ok / expires_at }` |
-| `auth-update-phone` | `{ pending_id, phone }` | updated pending + new OTP |
-| `auth-signin` | `{ identifier, password }` | `{ session }` or `{ needs_otp, … }` / `{ wrong_password }` / `{ not_found }` |
+| `auth-signup` GET | `?action=sms-consent` | `{ sms_consent: { version, label, optional, default_opt_in, disclosure, purposes, privacy_policy_url, sms_terms_url, privacy_policy_path, sms_terms_path } }` |
+| `auth-signup` POST | `{ full_name, date_of_birth, phone, email, password, client_type: "app", sms_opt_in, sms_consent_version }` | `{ pending_id, verification_token, phone, email, expires_at, otp_channel, sms_opt_in, sms_consent_version, signup_source }` |
+| `auth-verify-otp` | `{ phone, code, password, verification_token }` | `{ session, messaging_preference }` (new signup); session may be null: show returned sign-in message |
+| `auth-resend-otp` | `{ phone, verification_token, delivery_channel?: "email" }` | `{ expires_at, otp_channel, … }` |
+| `auth-update-phone` | `{ pending_id, phone, verification_token }` | updated pending + new OTP |
+| `auth-signin` | `{ identifier, password }` | `{ session }` or password-proven `{ needs_otp, verification_token, … }`; generic 401 for invalid credentials |
 | `qr-cart-approve` | `{ cart_id }` + user JWT | `{ success: true }` |
 
 ## Password rules

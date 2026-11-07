@@ -1298,12 +1298,18 @@ body.create-account #create-email::placeholder {
 
 .auth-error {
     margin-top: 8px;
-    color: #b91c1c;
-    background: rgba(185, 28, 28, 0.08);
-    border: 1px solid rgba(185, 28, 28, 0.18);
+    color: #625b51;
+    background: #f3f1ed;
+    border: 1px solid rgba(98, 91, 81, 0.14);
     padding: 10px 12px;
     border-radius: 12px;
     font-size: 13px;
+}
+
+.auth-error.is-invalid {
+    color: #b91c1c;
+    background: rgba(185, 28, 28, 0.08);
+    border-color: rgba(185, 28, 28, 0.18);
 }
 
 /* Hide any right panel if present on signin */
@@ -2895,6 +2901,211 @@ body.signin.keyboard-open:not(.create-account) .signin-center .auth-card {
     }
     body.signin.keyboard-open:not(.create-account) .qr-app-btn { margin-top: 0; }
     body.signin.keyboard-open:not(.create-account) .auth-links { margin-top: 0; }
+}
+
+/* Keep the primary action easy to tap. */
+body.signin:not(.create-account) #signin-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 420px;
+    height: 54px;
+    min-height: 54px;
+    padding: 0 18px;
+}
+body.signin.keyboard-visible:not(.create-account) #signin-submit {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 16px;
+    font-size: 16px;
+}
+
+/* Two persistent choices share one quiet, sliding selection bar. */
+body.signin:not(.create-account) .signin-mode-switch {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 20px;
+    background: #f2f2f2;
+    isolation: isolate;
+}
+.signin-mode-switch::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc((100% - 12px) / 2);
+    border-radius: 16px;
+    background: #e7e7e7;
+    z-index: -1;
+    transition: transform 160ms ease-out;
+}
+.signin-mode-switch[data-mode="phone"]::before {
+    transform: translateX(calc(100% + 4px));
+}
+.signin-mode-switch.is-dragging::before {
+    transform: translateX(var(--signin-thumb-offset, 0px));
+    transition: none;
+}
+.signin-mode-switch { touch-action: pan-y; }
+.signin-card-content {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    gap: inherit;
+    width: 100%;
+    min-height: 0;
+}
+body.signin:not(.create-account) .signin-center .auth-card {
+    transition: height 160ms ease-out;
+    isolation: isolate;
+}
+.signin-card-surface { display: none; }
+body.signin:not(.create-account) .signin-center .auth-card.is-keyboard-changing {
+    transition: none;
+    background: transparent !important;
+    border-color: transparent !important;
+}
+.auth-card.is-keyboard-changing .signin-card-surface {
+    display: block;
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border: 1px solid var(--signin-card-surface-border);
+    border-radius: inherit;
+    background: var(--signin-card-surface-color);
+    transform-origin: center bottom;
+    pointer-events: none;
+}
+body.signin:not(.create-account) #signin-form,
+body.signin:not(.create-account) #qr-app-panel { transition: opacity 100ms ease-out; }
+body.signin:not(.create-account) #signin-form .auth-field,
+body.signin:not(.create-account) #signin-form .auth-button,
+body.signin:not(.create-account) #signin-form .auth-links {
+    transition: opacity 100ms ease-out;
+    transition-delay: 0s;
+}
+body.signin #qr-app-canvas .qr-app-frame {
+    transform: none;
+    transition: opacity 100ms ease-out;
+}
+body.signin #qr-app-canvas .qr-app-placeholder { animation: none; transition: opacity 100ms ease-out; transform: none; }
+body.signin #qr-app-dot { animation: none !important; }
+@media (max-height: 700px) {
+    body.signin #qr-app-canvas { min-height: 224px; }
+    body.signin #qr-app-canvas .qr-app-placeholder { width: 224px; height: 224px; }
+    body.signin #qr-app-canvas .qr-app-frame { padding: 12px; }
+    body.signin #qr-app-canvas img { width: 200px; height: 200px; }
+}
+.signin-mode-button {
+    appearance: none;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 16px;
+    background: transparent;
+    color: #555;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 550;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 180ms ease;
+}
+.signin-mode-button[aria-pressed="true"] { color: #333; }
+.signin-mode-button:focus-visible { outline: 2px solid #8b7355; outline-offset: -2px; }
+.signin-mode-button:disabled { opacity: 0.45; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+    .signin-mode-switch::before, .signin-mode-button { transition: none; }
+    body.signin:not(.create-account) .signin-center .auth-card { transition: none; }
+    body.signin:not(.create-account) #signin-form,
+    body.signin:not(.create-account) #qr-app-panel,
+    body.signin:not(.create-account) #signin-form .auth-field,
+    body.signin:not(.create-account) #signin-form .auth-button,
+    body.signin:not(.create-account) #signin-form .auth-links,
+    body.signin #qr-app-canvas .qr-app-frame,
+    body.signin #qr-app-canvas .qr-app-placeholder { transition: none; }
+}
+
+/* Keep every sign-in method accessible directly above the keyboard. */
+body.signin.keyboard-open:not(.create-account) .auth-wrapper {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 8px 14px;
+}
+body.signin.keyboard-open:not(.create-account) .signin-center .auth-card {
+    padding: 14px 20px 12px;
+    gap: 8px;
+    background: #fff;
+    border-color: rgba(45, 42, 38, 0.08);
+}
+body.signin #signin-title.is-dismissed { visibility: hidden; }
+body.signin.keyboard-visible:not(.create-account) .auth-input {
+    background: #f7f6f4;
+    box-shadow: none;
+}
+body.signin.keyboard-visible:not(.create-account) .auth-input:focus {
+    background: #fff;
+    border-color: #8b7355;
+    box-shadow: 0 0 0 2px rgba(139, 115, 85, 0.1);
+}
+
+/* Keep the alternate account action in a clear footer while typing. */
+body.signin.keyboard-visible:not(.create-account) .auth-subtitle {
+    display: none;
+}
+body.signin:not(.create-account) .signin-app-option {
+    text-align: center;
+    margin-bottom: 12px;
+}
+body.signin.keyboard-visible:not(.create-account) .signin-app-option {
+    margin-bottom: 0;
+}
+body.signin.keyboard-visible:not(.create-account) #signin-form .auth-links {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(45, 42, 38, 0.08);
+}
+body.signin.keyboard-visible:not(.create-account) #create-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #705b42;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    touch-action: manipulation;
+    transition: color 180ms ease, transform 180ms ease;
+}
+body.signin.keyboard-visible:not(.create-account) #create-link:hover,
+body.signin.keyboard-visible:not(.create-account) #create-link:focus-visible {
+    color: #543106;
+    background: transparent;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+body.signin.keyboard-visible:not(.create-account) #create-link:active {
+    transform: scale(0.98);
+}
+body.signin.keyboard-visible:not(.create-account) #create-link:focus-visible {
+    outline: 2px solid #8b7355;
+    outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+    body.signin.keyboard-visible:not(.create-account) #create-link { transition: none; }
 }
 
 /* Tap the scale demonstration to expand it; tap again to restore it. */

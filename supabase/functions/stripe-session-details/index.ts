@@ -4,6 +4,8 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+import { receiptLine } from "../_shared/receipt-line.mjs";
+
 const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const STRIPE_API = "https://api.stripe.com/v1";
 
@@ -30,7 +32,7 @@ serve(async (req: Request) => {
   if (!session_id) return badRequest("Missing session_id");
 
   // Retrieve session with line items
-  const res = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(session_id)}?expand[]=line_items`, {
+  const res = await fetch(`${STRIPE_API}/checkout/sessions/${encodeURIComponent(session_id)}?expand[]=line_items.data.price.product`, {
     headers: { "authorization": `Bearer ${STRIPE_SECRET_KEY}` },
   });
   if (!res.ok) {
@@ -43,17 +45,13 @@ serve(async (req: Request) => {
   const total_cents: number = Number(s?.amount_total ?? 0) || 0;
   const subtotal_cents: number | null = s?.amount_subtotal != null ? (Number(s.amount_subtotal) || 0) : null;
 
-  const items = Array.isArray(s?.line_items?.data) ? s.line_items.data.map((li: any) => {
-    const name = li?.description || li?.price?.product?.name || li?.price?.nickname || "Item";
-    const qty = Number(li?.quantity ?? 1) || 1;
-    const unit_amount = Number(li?.price?.unit_amount ?? 0) || 0;
-    const product_id = li?.price?.product?.metadata?.id ?? null;
-    return { name, quantity: qty, amount_cents: unit_amount, product_id };
-  }) : [];
+  const items = Array.isArray(s?.line_items?.data) ? s.line_items.data.map(receiptLine) : [];
 
   const out = {
     id: s?.id || session_id,
     currency,
+    status: s?.status,
+    payment_status: s?.payment_status,
     amount_total_cents: total_cents,
     amount_subtotal_cents: subtotal_cents ?? undefined,
     items,

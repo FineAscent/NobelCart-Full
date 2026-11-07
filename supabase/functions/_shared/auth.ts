@@ -1,3 +1,5 @@
+import { AuthFlowError, prepareChallenge, challengeMetadata, deliveryFailure } from './auth-security.ts';
+import { canSendSms, deliverPreferredMessage } from "./sms-consent.mjs";
 import { verificationEmailHtml } from "./verification-email.mjs";
 import { SUPPORT_EMAIL } from "./email-layout.mjs";
 // Shared helpers for NobelCart auth edge functions.
@@ -88,26 +90,21 @@ export const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 export const OTP_MAX_ATTEMPTS = 5;
 export const OTP_RESEND_COOLDOWN_MS = 60 * 1000; // 60 seconds
 
-/**
- * OTP delivery channel.
- *
- * CURRENT (website): "email" — Brevo transactional email (no US SMS registration needed).
- *
- * TO ENABLE REAL SMS LATER (after US business / toll-free sender is approved in Brevo):
- *   1. In Brevo: register a US toll-free / 10DLC sender for transactional SMS.
- *   2. Supabase secret: BREVO_SMS_SENDER=+1XXXXXXXXXX  (the approved number)
- *   3. Supabase secret: OTP_CHANNEL=sms
- *   4. Redeploy auth-signup, auth-verify-otp, auth-resend-otp, auth-update-phone, auth-signin
- *   5. Update kiosk copy back to "SMS code" if you want (create-account.html / signin.html)
- *
- * Phone numbers are still collected + stored for bans / future SMS even while OTP_CHANNEL=email.
- */
-export function otpChannel(): "email" | "sms" {
-  const v = (Deno.env.get("OTP_CHANNEL") || "email").trim().toLowerCase();
-  return v === "sms" ? "sms" : "email";
+/** Per-customer SMS preference. An explicit email override remains a rollout switch. */
+export function smsReady(): boolean {
+  return !!Deno.env.get('BREVO_API_KEY') && !!Deno.env.get('BREVO_SMS_SENDER') &&
+    (Deno.env.get('OTP_CHANNEL') || 'auto').trim().toLowerCase() !== 'email';
 }
 
-/** Hold SMS until US sender is registered — see otpChannel() comments above. */
+export async function accountSmsAllowed(
+  admin: ReturnType<typeof adminClient>, userId: string, phone: string, purpose = 'account',
+): Promise<boolean> {
+  const { data, error } = await admin.from('sms_consents')
+    .select('phone, opted_in, consent_version').eq('user_id', userId).maybeSingle();
+  return !error && canSendSms(data, phone, purpose);
+}
+
+/** Use only a registered Brevo sender configured in BREVO_SMS_SENDER. */
 export async function sendBrevoSms(phone: string, content: string): Promise<{ messageId?: string | number }> {
   const key = Deno.env.get("BREVO_API_KEY") || "";
   if (!key) throw new Error("SMS is not configured (BREVO_API_KEY).");
@@ -117,8 +114,8 @@ export async function sendBrevoSms(phone: string, content: string): Promise<{ me
   const sender = senderRaw.slice(0, 15);
 
   let body = content;
-  if (phone.startsWith("+1") && !/^NobelCart[:\s]/i.test(body)) {
-    body = `NobelCart: ${body}`;
+  if (phone.startsWith("+1") && !/^NobleCart[:\s]/i.test(body)) {
+    body = `NobleCart: ${body}`;
   }
 
   const payload = {
@@ -216,23 +213,19 @@ export async function sendOtpEmail(email: string, code: string): Promise<{ messa
   });
 }
 
-/** Send OTP using current channel (email now; SMS when OTP_CHANNEL=sms). */
+/** Prefer SMS only with consent; report the channel that actually accepted the code. */
 export async function sendSignupOtp(opts: {
   email: string;
   phone: string;
   code: string;
+  smsOptIn?: boolean;
+  forceEmail?: boolean;
 }): Promise<{ messageId?: string | number; channel: "email" | "sms" }> {
-  const channel = otpChannel();
-  const content = `Your verification code is ${opts.code}. It expires in 10 minutes.`;
-
-  if (channel === "sms") {
-    // Requires BREVO_SMS_SENDER — see otpChannel() header comment.
-    const { messageId } = await sendBrevoSms(opts.phone, content);
-    return { messageId, channel };
-  }
-
-  const { messageId } = await sendOtpEmail(opts.email, opts.code);
-  return { messageId, channel };
+  return deliverPreferredMessage({ optedIn: opts.smsOptIn, smsReady: smsReady(), forceEmail: opts.forceEmail }, {
+    sms: () => sendBrevoSms(opts.phone, `NobleCart: Your verification code is ${opts.code}. It expires in 10 minutes. Do not share it. Reply STOP to cancel or HELP for help.`),
+    email: () => sendOtpEmail(opts.email, opts.code),
+    onSmsError: (e: unknown) => console.warn('SMS unavailable; delivering verification by email instead.', e),
+  });
 }
 
 export async function upsertBrevoContact(opts: {
@@ -346,102 +339,42 @@ export async function isFingerprintBanned(
   return !!data;
 }
 
-/** Create OTP row + send code (email by default). Deletes prior OTPs for this user/phone. */
+/** Create OTP row and send using the saved preference. Deletes prior OTPs for this user/phone. */
 export async function issueOtp(
-  admin: ReturnType<typeof adminClient>,
-  userId: string,
-  phone: string,
-  email: string,
-): Promise<{ expires_at: string; messageId?: string | number; channel: "email" | "sms" }> {
-  const code = randomOtp6();
-  const code_hash = await sha256Hex(`${phone}:${code}`);
-  const expires_at = new Date(Date.now() + OTP_TTL_MS).toISOString();
-
-  await admin.from("otp_verifications").delete().eq("user_id", userId);
-  const { error } = await admin.from("otp_verifications").insert({
-    user_id: userId,
-    phone,
-    code_hash,
-    expires_at,
-    attempts: 0,
-  });
-  if (error) throw new Error(error.message || "Failed to store OTP");
-
-  const sent = await sendSignupOtp({ email, phone, code });
-  return { expires_at, messageId: sent.messageId, channel: sent.channel };
+  admin: ReturnType<typeof adminClient>, userId: string, phone: string, email: string,
+  forceEmail = false,
+) {
+  const challenge = await prepareChallenge(admin, 'legacy', { user_id: userId, phone, email });
+  try {
+    const allowed = await accountSmsAllowed(admin, userId, phone);
+    const sent = await sendSignupOtp({ email, phone, code: challenge.code, smsOptIn: allowed, forceEmail });
+    return { ...challengeMetadata(challenge), channel: sent.channel, messageId: sent.messageId };
+  } catch { throw deliveryFailure(challenge); }
 }
 
-/** Store pending signup + OTP. No auth.users row until verify succeeds. */
+/** The database reserves sends and updates the challenge in one transaction. */
 export async function upsertPendingSignup(
   admin: ReturnType<typeof adminClient>,
-  row: {
-    email: string;
-    phone: string;
-    full_name: string;
-    date_of_birth: string;
-  },
-): Promise<{
-  pending_id: string;
-  phone: string;
-  email: string;
-  expires_at: string;
-  messageId?: string | number;
-  channel: "email" | "sms";
-}> {
-  const code = randomOtp6();
-  const code_hash = await sha256Hex(`${row.phone}:${code}`);
-  const expires_at = new Date(Date.now() + OTP_TTL_MS).toISOString();
-
-  await admin.from("pending_signups").delete().eq("email", row.email);
-  await admin.from("pending_signups").delete().eq("phone", row.phone);
-
-  const { data, error } = await admin
-    .from("pending_signups")
-    .insert({
-      email: row.email,
-      phone: row.phone,
-      full_name: row.full_name,
-      date_of_birth: row.date_of_birth,
-      code_hash,
-      expires_at,
-      attempts: 0,
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) throw new Error(error?.message || "Failed to store pending signup");
-
-  const sent = await sendSignupOtp({ email: row.email, phone: row.phone, code });
-  return {
-    pending_id: data.id,
-    phone: row.phone,
-    email: row.email,
-    expires_at,
-    messageId: sent.messageId,
-    channel: sent.channel,
-  };
+  row: { email: string; phone: string; full_name: string; date_of_birth: string;
+    signup_source?: 'kiosk_signup' | 'app_signup'; sms_opt_in?: boolean;
+    sms_consent_version?: string | null; sms_consent_text?: string | null; sms_consent_at?: string | null; },
+  token?: string,
+) {
+  const challenge = await prepareChallenge(admin, 'signup', row, token);
+  try {
+    const sent = await sendSignupOtp({ email: row.email, phone: row.phone, code: challenge.code, smsOptIn: row.sms_opt_in === true });
+    return { ...challengeMetadata(challenge), channel: sent.channel, messageId: sent.messageId };
+  } catch { throw deliveryFailure(challenge); }
 }
 
-/** Delete orphan unverified auth users for email/phone so signup can proceed cleanly. */
-export async function deleteUnverifiedOrphans(
-  admin: ReturnType<typeof adminClient>,
-  email: string,
-  phone: string,
-): Promise<void> {
-  const { data: rows } = await admin
-    .from("profiles")
-    .select("id, email, phone, phone_verified, is_admin")
-    .or(`email.eq.${email},phone.eq.${phone}`);
-
-  for (const p of rows || []) {
-    if (p.is_admin) continue;
-    if (p.phone_verified) continue;
-    try {
-      await admin.auth.admin.deleteUser(p.id);
-    } catch (e) {
-      console.warn("Failed to delete unverified orphan", p.id, e);
-    }
+export function authFailureResponse(error: unknown) {
+  if (error instanceof AuthFlowError) {
+    const response = bad(error.message, error.status, error.extra);
+    if (typeof error.extra.retry_after === 'number') response.headers.set('Retry-After', String(error.extra.retry_after));
+    return response;
   }
+  console.error('Auth request failed', error instanceof Error ? error.message : 'Unknown error');
+  return bad('Verification is temporarily unavailable. Please try again.', 503);
 }
 
 /** Password sign-in via anon client; returns session object. */

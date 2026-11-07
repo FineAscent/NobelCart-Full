@@ -6,9 +6,9 @@
 //
 // To revise the policy, edit NC_POLICY_HTML and bump NC_POLICY_VERSION below.
 (function () {
-  const NC_POLICY_VERSION = '2026-04-17';
+  const NC_POLICY_VERSION = '2026-10-21.1';
   const NC_POLICY_TITLE = 'Privacy Policy';
-  const NC_POLICY_SUBTITLE = 'FineAscent LLC. · Effective April 17, 2026';
+  const NC_POLICY_SUBTITLE = 'FineAscent LLC. · Effective October 21, 2026';
 
   const NC_POLICY_HTML = `
     <p class="policy-lede">How FineAscent LLC. collects, uses, shares, and protects information about you
@@ -25,6 +25,7 @@
     <ul>
       <li>Name</li>
       <li>Email address</li>
+      <li>Mobile phone number and your optional SMS consent preference</li>
       <li>Password (stored in hashed form — never in plaintext)</li>
       <li>Payment information (processed via our third-party payment processor; we do not store full card numbers)</li>
       <li>Any other information you choose to provide</li>
@@ -51,6 +52,18 @@
       <li>Detect, investigate, and prevent fraudulent or unauthorized activity</li>
       <li>Comply with applicable legal obligations</li>
     </ul>
+
+    <h4>3.1 Optional Text Messages</h4>
+    <p>Providing a phone number or accepting this Privacy Policy does not enroll you in text messages.
+    You may separately choose to receive automated account verification, security, and order-related texts from NobleCart by
+    FineAscent LLC. SMS consent is optional and is not a condition of purchase or account creation.
+    We record your choice, the phone number, the disclosure version and text, and the consent timestamp.
+    Message frequency varies. Message and data rates may apply. Reply STOP to cancel or HELP for help,
+    or contact fineascentcreative@gmail.com. Carriers are not liable for delayed or undelivered messages.
+    Read our <a href="sms-terms.html" target="_blank" rel="noopener">SMS Terms &amp; Conditions</a>.</p>
+    <p>We do not sell or share mobile numbers, SMS opt-in data, or consent with third parties or affiliates
+    for their marketing or promotional purposes. Service providers may process mobile numbers solely
+    to operate and deliver our messaging service, subject to confidentiality and use restrictions.</p>
 
     <h3>4. How We Share Your Information</h3>
     <p>We do not sell your personal information. We may share your information with:</p>
@@ -82,6 +95,8 @@
     <p>In the event of a merger, acquisition, or sale of all or a portion of our assets, your information
     may be transferred as part of that transaction. We will notify you via email and/or a prominent notice
     on the Service prior to such transfer.</p>
+
+    <p>All the above categories exclude text messaging originator opt-in data and consent; this information won’t be shared with any third parties.</p>
 
     <h3>5. Data Retention</h3>
     <p>We follow a minimal retention philosophy. We only keep your data for as long as necessary to provide
@@ -235,10 +250,10 @@
     try {
       const { data } = await sb
         .from('profiles')
-        .select('policy_accepted')
+        .select('policy_accepted, policy_version')
         .eq('id', userId)
         .maybeSingle();
-      accepted = data ? data.policy_accepted === true : false;
+      accepted = data ? data.policy_accepted === true && data.policy_version === NC_POLICY_VERSION : false;
     } catch (_) {
       // A profile that cannot be read is treated as not yet agreed rather than
       // waved through, so a failed lookup cannot silently skip the agreement.
@@ -276,6 +291,7 @@
 
   window.ncPolicy = {
     VERSION: NC_POLICY_VERSION,
+    HTML: NC_POLICY_HTML,
     show: showPolicyModal,
     requireAccepted,
   };

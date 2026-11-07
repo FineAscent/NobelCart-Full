@@ -1,3 +1,4 @@
+import { checkChallenge } from '../_shared/auth-security.ts';
 // auth-verify-otp:
 // 1) Pending signup → create auth user ONLY after OTP matches
 // 2) Legacy unverified profile → mark verified (signin recovery)
@@ -13,11 +14,20 @@ import {
   createStripeCustomer,
   json,
   normalizeUsPhone,
-  OTP_MAX_ATTEMPTS,
+  authFailureResponse,
   passwordSession,
-  sha256Hex,
   upsertBrevoContact,
 } from "../_shared/auth.ts";
+
+// Only release a consumed code after an unambiguous account/profile failure.
+// Counters stay incremented, so retries cannot reset either attempt budget.
+async function releaseFailedChallenge(admin: ReturnType<typeof adminClient>, challenge: any) {
+  const row = challenge.record;
+  const table = challenge.kind === 'pending' ? 'pending_signups' : 'otp_verifications';
+  const { error } = await admin.from(table).update({ consumed_at: null })
+    .eq('id', row.id).eq('code_hash', row.code_hash).eq('verification_token_hash', row.verification_token_hash);
+  if (error) console.warn('Unable to release failed verification challenge');
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -30,6 +40,7 @@ serve(async (req: Request) => {
     return bad("Invalid JSON body");
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return bad('Invalid JSON body');
   const phone = normalizeUsPhone(String(body.phone || ""));
   const code = String(body.code || "").trim().replace(/\s+/g, "");
   const password = String(body.password || "");
@@ -44,34 +55,13 @@ serve(async (req: Request) => {
   }
 
   const admin = adminClient();
-  const expect = await sha256Hex(`${phone}:${code}`);
+  let challenge;
+  try { challenge = await checkChallenge(admin, phone, code, body.verification_token); }
+  catch (e) { return authFailureResponse(e); }
 
-  // ---------- Path A: pending signup (preferred — no auth user yet) ----------
-  const { data: pending } = await admin
-    .from("pending_signups")
-    .select("*")
-    .eq("phone", phone)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (pending) {
-    if (new Date(pending.expires_at).getTime() < Date.now()) {
-      await admin.from("pending_signups").delete().eq("id", pending.id);
-      return bad("Code expired. Start signup again.", 410);
-    }
-    if ((pending.attempts || 0) >= OTP_MAX_ATTEMPTS) {
-      await admin.from("pending_signups").delete().eq("id", pending.id);
-      return bad("Too many attempts. Start signup again.", 429);
-    }
-    if (expect !== pending.code_hash) {
-      await admin
-        .from("pending_signups")
-        .update({ attempts: (pending.attempts || 0) + 1 })
-        .eq("id", pending.id);
-      return bad("Invalid code.", 401);
-    }
-
+  // A successful database check has already consumed this challenge exactly once.
+  if (challenge.kind === 'pending') {
+    const pending = challenge.record;
     // OTP OK → create the real account now
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email: pending.email,
@@ -89,6 +79,7 @@ serve(async (req: Request) => {
       if (/already|registered|exists/i.test(msg)) {
         return bad("An account with this email already exists. Please sign in.", 409);
       }
+      await releaseFailedChallenge(admin, challenge);
       return bad(msg, 400);
     }
 
@@ -116,10 +107,35 @@ serve(async (req: Request) => {
 
     if (profErr) {
       try {
-        await admin.auth.admin.deleteUser(userId);
+        const { error: cleanupError } = await admin.auth.admin.deleteUser(userId);
+        if (!cleanupError) await releaseFailedChallenge(admin, challenge);
       } catch (_) {}
       return bad(profErr.message || "Failed to save profile.", 500);
     }
+
+    // Record the server-captured disclosure and choice only for a verified account.
+    const { error: consentError } = await admin.from("sms_consents").insert({
+      user_id: userId,
+      phone,
+      opted_in: pending.sms_opt_in === true,
+      consent_version: pending.sms_consent_version || null,
+      consent_text: pending.sms_consent_text || null,
+      consented_at: pending.sms_consent_at || null,
+      source: pending.signup_source === 'app_signup' ? 'app_signup' : 'kiosk_signup',
+    });
+    if (consentError) {
+      try {
+        const { error: cleanupError } = await admin.auth.admin.deleteUser(userId);
+        if (!cleanupError) await releaseFailedChallenge(admin, challenge);
+      } catch (_) {}
+      return bad('Could not save your messaging preference. Please try again.', 500);
+    }
+
+    const messagingPreference = {
+      sms_opt_in: pending.sms_opt_in === true,
+      sms_consent_version: pending.sms_consent_version || null,
+      preferred_channel: pending.sms_opt_in === true ? 'sms' : 'email',
+    };
 
     await admin.from("pending_signups").delete().eq("id", pending.id);
     await admin.from("otp_verifications").delete().eq("phone", phone);
@@ -142,6 +158,7 @@ serve(async (req: Request) => {
         phone_verified: true,
         stripe_customer_id: stripeCustomerId,
         user_id: userId,
+        messaging_preference: messagingPreference,
       });
     } catch (e) {
       console.warn("session after create failed", e);
@@ -149,37 +166,14 @@ serve(async (req: Request) => {
         session: null,
         phone_verified: true,
         user_id: userId,
+        messaging_preference: messagingPreference,
         message: "Account created. Please sign in with your email or phone and password.",
       });
     }
   }
 
-  // ---------- Path B: legacy unverified profile (signin recovery) ----------
-  const { data: otp } = await admin
-    .from("otp_verifications")
-    .select("*")
-    .eq("phone", phone)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!otp) return bad("No verification code found. Request a new code.", 404);
-
-  if (new Date(otp.expires_at).getTime() < Date.now()) {
-    await admin.from("otp_verifications").delete().eq("id", otp.id);
-    return bad("Code expired. Request a new code.", 410);
-  }
-  if ((otp.attempts || 0) >= OTP_MAX_ATTEMPTS) {
-    return bad("Too many attempts. Request a new code.", 429);
-  }
-  if (expect !== otp.code_hash) {
-    await admin
-      .from("otp_verifications")
-      .update({ attempts: (otp.attempts || 0) + 1 })
-      .eq("id", otp.id);
-    return bad("Invalid code.", 401);
-  }
-
+  // Legacy profile challenge; also atomically checked and consumed above.
+  const otp = challenge.record;
   const userId = otp.user_id as string;
   const { data: profile, error: profErr } = await admin
     .from("profiles")
@@ -218,7 +212,10 @@ serve(async (req: Request) => {
       active: true,
     })
     .eq("id", userId);
-  if (updErr) return bad(updErr.message || "Failed to verify phone.", 500);
+  if (updErr) {
+    await releaseFailedChallenge(admin, challenge);
+    return bad("Could not complete verification. Please try again.", 500);
+  }
 
   await admin.from("otp_verifications").delete().eq("user_id", userId);
 

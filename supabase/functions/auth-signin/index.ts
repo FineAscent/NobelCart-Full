@@ -10,6 +10,7 @@ import {
   isEmail,
   isPhoneBanned,
   issueOtp,
+  authFailureResponse,
   json,
   normalizeUsPhone,
   passwordSession,
@@ -26,6 +27,7 @@ serve(async (req: Request) => {
     return bad("Invalid JSON body");
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return bad('Invalid JSON body');
   const identifier = String(body.identifier || "").trim();
   const password = String(body.password || "");
   if (!identifier) return bad("Enter your email or phone number.");
@@ -47,30 +49,12 @@ serve(async (req: Request) => {
       .eq("email", email)
       .maybeSingle();
 
-    if (!profile) {
-      // Pending signup may still exist — nudge them to finish create-account OTP
-      const { data: pending } = await admin
-        .from("pending_signups")
-        .select("id, email")
-        .eq("email", email)
-        .maybeSingle();
-      if (pending) {
-        return bad("Finish verifying your email code to create your account.", 403, {
-          needs_otp: true,
-          email,
-          pending_id: pending.id,
-        });
-      }
-      return bad("No account found with that email.", 401, {
-        not_found: true,
-        email,
-      });
-    }
+    if (!profile) return bad('Email, phone, or password is incorrect.', 401);
 
     if (profile) {
-      if (profile.active === false) return bad("This account is deactivated.", 403);
+      if (profile.active === false) return bad('Email, phone, or password is incorrect.', 401);
       if (profile.phone && (await isPhoneBanned(admin, profile.phone))) {
-        return bad("This account cannot sign in.", 403);
+        return bad('Email, phone, or password is incorrect.', 401);
       }
       if (!profile.is_admin && !profile.phone_verified) {
         needsOtp = true;
@@ -82,7 +66,7 @@ serve(async (req: Request) => {
     const phone = normalizeUsPhone(identifier);
     if (!phone) return bad("Enter a valid email or US phone number.");
     if (await isPhoneBanned(admin, phone)) {
-      return bad("This account cannot sign in.", 403);
+      return bad('Email, phone, or password is incorrect.', 401);
     }
 
     const { data: profile } = await admin
@@ -91,26 +75,8 @@ serve(async (req: Request) => {
       .eq("phone", phone)
       .maybeSingle();
 
-    if (!profile?.email) {
-      // Maybe only a pending signup exists — tell them to finish OTP / signup
-      const { data: pending } = await admin
-        .from("pending_signups")
-        .select("id, phone")
-        .eq("phone", phone)
-        .maybeSingle();
-      if (pending) {
-        return bad("Finish verifying your phone code to create your account.", 403, {
-          needs_otp: true,
-          phone,
-          pending_id: pending.id,
-        });
-      }
-      return bad("No account found with that phone.", 401, {
-        not_found: true,
-        phone,
-      });
-    }
-    if (profile.active === false) return bad("This account is deactivated.", 403);
+    if (!profile?.email) return bad('Email, phone, or password is incorrect.', 401);
+    if (profile.active === false) return bad('Email, phone, or password is incorrect.', 401);
     if (!profile.is_admin && !profile.phone_verified) {
       needsOtp = true;
       profilePhone = profile.phone || phone;
@@ -138,23 +104,29 @@ serve(async (req: Request) => {
         );
       }
 
+      let otpChannel = "email";
+      let verificationToken = "";
+      let expiresAt = "";
       try {
-        await issueOtp(admin, profileId!, profilePhone, email);
+        const delivered = await issueOtp(admin, profileId!, profilePhone, email);
+        otpChannel = delivered.channel;
+        verificationToken = delivered.verification_token;
+        expiresAt = delivered.expires_at;
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Could not send verification code.";
-        return bad(msg, 502, { needs_otp: true, phone: profilePhone, email, user_id: profileId });
+        return authFailureResponse(e);
       }
 
-      return bad("Enter the verification code we just sent to your email to finish verifying.", 403, {
+      return bad(`Enter the verification code we just sent by ${otpChannel === "sms" ? "text message" : "email"} to finish verifying.`, 403, {
         needs_otp: true,
         phone: profilePhone,
         email,
-        user_id: profileId,
-        otp_channel: "email",
+        verification_token: verificationToken,
+        expires_at: expiresAt,
+        otp_channel: otpChannel,
       });
     } catch {
       // Profile exists — credentials failed means wrong password
-      return bad("That password is wrong.", 401, { wrong_password: true });
+      return bad('Email, phone, or password is incorrect.', 401);
     }
   }
 
@@ -162,12 +134,7 @@ serve(async (req: Request) => {
     const session = await passwordSession(email!, password);
     if (!session) return bad("Sign-in failed.", 401);
     return json({ session });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Sign-in failed.";
-    // We already resolved a real profile above, so invalid credentials = wrong password
-    if (/invalid login credentials/i.test(msg)) {
-      return bad("That password is wrong.", 401, { wrong_password: true });
-    }
-    return bad(msg, 401);
+  } catch {
+    return bad('Email, phone, or password is incorrect.', 401);
   }
 });
